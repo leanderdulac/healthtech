@@ -6,18 +6,22 @@ from src.security.anonymization import anonimizar_paciente_fhir
 from src.ml_pipeline.online_inference import VertexOnlineDetector
 from src.ml_pipeline.batch_inference import orquestrar_batch_vertex_ai
 
+import os
+from dotenv import load_dotenv
+
+# Carrega variáveis do .env
+load_dotenv()
+
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Variáveis do Google Cloud Platform (GCP)
-GCP_PROJECT_ID = "project-d28ce7a4-0717-428d-ae4"
-GCP_LOCATION = "us-central1"
-# ID do Endpoint Online onde o modelo de detecção de arritmia estaria rodando (exemplo)
-VERTEX_ENDPOINT_ID = "1234567890123456789" 
-# Nome do modelo no Model Registry para Batch Prediction
-VERTEX_MODEL_NAME = "modelo-saude-populacional-v2"
-GCS_INPUT_DATA = "gs://seu-bucket-datalake/pacientes_fhir/dados_historicos.jsonl"
-GCS_OUTPUT_DATA = "gs://seu-bucket-datalake/vertex_predictions/batch_risco/"
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "project-placeholder")
+GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
+VERTEX_ENDPOINT_ID = os.getenv("VERTEX_ENDPOINT_ID", "endpoint-placeholder") 
+VERTEX_MODEL_NAME = os.getenv("VERTEX_MODEL_NAME", "model-placeholder")
+GCS_INPUT_DATA = os.getenv("GCS_INPUT_DATA", "gs://placeholder/input.jsonl")
+GCS_OUTPUT_DATA = os.getenv("GCS_OUTPUT_DATA", "gs://placeholder/output/")
 
 def run_simulation():
     print("="*60)
@@ -53,13 +57,16 @@ def run_simulation():
         time.sleep(0.2)
 
     # 4. Inferência Batch (Vertex AI Batch Prediction)
+    VERTEX_MACHINE_TYPE = os.getenv("VERTEX_MACHINE_TYPE", "n1-standard-4")
+
     print("\n[4] INFERÊNCIA EM LOTE (Submetendo Job no Vertex AI)...")
     resultado_batch = orquestrar_batch_vertex_ai(
         project=GCP_PROJECT_ID,
         location=GCP_LOCATION,
         model_name=VERTEX_MODEL_NAME,
         gcs_input_uri=GCS_INPUT_DATA,
-        gcs_output_uri=GCS_OUTPUT_DATA
+        gcs_output_uri=GCS_OUTPUT_DATA,
+        machine_type=VERTEX_MACHINE_TYPE
     )
     
     print("\n=> Status do Job Batch:")

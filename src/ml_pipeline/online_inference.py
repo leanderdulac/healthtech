@@ -1,6 +1,7 @@
 import logging
 from google.cloud import aiplatform
 from google.api_core.exceptions import GoogleAPIError
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,11 @@ class VertexOnlineDetector:
         except Exception as e:
             logger.warning(f"Aviso: Não foi possível autenticar no Vertex AI ({e}). Modo Simulação ativado.")
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5), reraise=True)
+    def _call_vertex_predict(self, instances):
+        """Chama a API do Vertex com política de retry para falhas de rede."""
+        return self.endpoint.predict(instances=instances)
+
     def processar_nova_leitura(self, valor_bpm: float) -> dict:
         """Envia um pulso para o Vertex AI para classificação em tempo real."""
         payload = {"instances": [{"bpm": valor_bpm}]}
@@ -31,7 +37,7 @@ class VertexOnlineDetector:
         if self.is_ready:
             try:
                 # Fazendo a inferência real na nuvem via REST/gRPC
-                response = self.endpoint.predict(instances=payload["instances"])
+                response = self._call_vertex_predict(payload["instances"])
                 # Assumindo que o modelo retorna [is_anomaly_boolean, confidence_score]
                 is_anomalia = response.predictions[0][0]
                 score = response.predictions[0][1]

@@ -11,9 +11,9 @@ def reconciliar_dados_biometricos(dados_sensores: pd.DataFrame, janela_tempo_seg
     if dados_sensores.empty:
         return dados_sensores
         
-    # 1. Garantir o formato datetime
+    # 1. Garantir o formato datetime (otimizado)
+    # Formato gerado pelo data_generator: '%Y-%m-%d %H:%M:%S' ou '%Y-%m-%d %H:%M:%S.%f'
     dados_sensores['timestamp'] = pd.to_datetime(dados_sensores['timestamp'], format='mixed')
-    
     # 2. Ordenar cronologicamente
     df_ordenado = dados_sensores.sort_values('timestamp')
     

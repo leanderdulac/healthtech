@@ -1,6 +1,10 @@
 import logging
 from google.cloud import bigquery
 from google.api_core.exceptions import GoogleAPIError
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +62,8 @@ def provision_bigquery_datalake(project_id: str, location: str = "US"):
         type_=bigquery.TimePartitioningType.DAY,
         field="timestamp" 
     )
+    # Adicionando Clustering por patient_id para otimizar pesquisas granulares
+    table_biometrics.clustering_fields = ["patient_id"]
 
     # Executar a criação das tabelas
     try:
@@ -71,6 +77,5 @@ def provision_bigquery_datalake(project_id: str, location: str = "US"):
         logger.error(f"Erro na criação das tabelas: {e}")
 
 if __name__ == "__main__":
-    # Substitua pelo seu ID
-    GCP_PROJECT_ID = "project-d28ce7a4-0717-428d-ae4" 
+    GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "project-placeholder")
     provision_bigquery_datalake(project_id=GCP_PROJECT_ID)

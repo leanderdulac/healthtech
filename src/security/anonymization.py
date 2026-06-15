@@ -1,4 +1,9 @@
 import copy
+import hashlib
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def anonimizar_paciente_fhir(paciente_fhir: dict) -> dict:
     """
@@ -19,9 +24,13 @@ def anonimizar_paciente_fhir(paciente_fhir: dict) -> dict:
     if 'telecom' in paciente_anonimizado:
         del paciente_anonimizado['telecom']
         
-    # 4. Anonimizar Identificadores
+    # 4. Anonimizar Identificadores (com Hash Determinístico Longitudinal)
     if 'identifier' in paciente_anonimizado:
-        paciente_anonimizado['identifier'] = [{'system': 'urn:uuid', 'value': 'ID-ANONIMIZADO'}]
+        # Pega o primeiro identificador
+        id_original = str(paciente_anonimizado['identifier'][0].get('value', ''))
+        salt = os.getenv("SECRET_SALT", "default-salt")
+        hash_id = hashlib.sha256((id_original + salt).encode('utf-8')).hexdigest()
+        paciente_anonimizado['identifier'] = [{'system': 'urn:uuid', 'value': hash_id}]
         
     # 5. Generalizar Endereço
     if 'address' in paciente_anonimizado:

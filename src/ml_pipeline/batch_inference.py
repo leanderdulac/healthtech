@@ -3,7 +3,7 @@ from google.cloud import aiplatform
 
 logger = logging.getLogger(__name__)
 
-def orquestrar_batch_vertex_ai(project: str, location: str, model_name: str, gcs_input_uri: str, gcs_output_uri: str) -> dict:
+def orquestrar_batch_vertex_ai(project: str, location: str, model_name: str, gcs_input_uri: str, gcs_output_uri: str, machine_type: str = "n1-standard-4") -> dict:
     """
     Orquestra um Job de Inferência em Lote no Vertex AI.
     Ao invés de processar os dados na máquina, delega o processamento pesado 
@@ -25,7 +25,7 @@ def orquestrar_batch_vertex_ai(project: str, location: str, model_name: str, gcs
             gcs_destination_prefix=gcs_output_uri,
             instances_format="jsonl",
             predictions_format="jsonl",
-            machine_type="n1-standard-4", # Maquina parruda na nuvem
+            machine_type=machine_type, # Maquina parruda na nuvem configurável
             starting_replica_count=1,
             max_replica_count=5, # Auto-scaling ativado
             sync=False # Retorna imediatamente sem bloquear o fluxo principal
