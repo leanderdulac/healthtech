@@ -2,9 +2,29 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import random
+from typing import Optional
 
-def generate_sensor_data(num_records=50, base_time=None):
-    """Gera dados simulados de sensores biométricos."""
+
+def generate_sensor_data(
+    num_records: int = 50,
+    base_time: Optional[datetime] = None,
+    seed: Optional[int] = None
+) -> pd.DataFrame:
+    """
+    Gera dados simulados de sensores biométricos.
+    
+    Args:
+        num_records: Número de registros principais a gerar.
+        base_time: Timestamp inicial. Se None, usa datetime.now().
+        seed: Seed para reprodutibilidade dos dados gerados.
+        
+    Returns:
+        DataFrame com colunas ['timestamp', 'sensor_id', 'heart_rate']
+    """
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+    
     if base_time is None:
         base_time = datetime.now()
         
@@ -14,7 +34,7 @@ def generate_sensor_data(num_records=50, base_time=None):
     # Simula batimentos cardíacos normais com pequena variação
     current_hr = random.randint(65, 75)
     
-    for _ in range(num_records):
+    for idx in range(num_records):
         # Avança 1 ou 2 segundos
         current_time += timedelta(seconds=random.randint(1, 2))
         
@@ -25,7 +45,7 @@ def generate_sensor_data(num_records=50, base_time=None):
         current_hr = max(50, min(180, current_hr))
         
         # Introduz anomalia repentina no final (simulando pico)
-        if _ > num_records - 5:
+        if idx > num_records - 5:
             current_hr += 35
             
         # Simula leitura de dois sensores (watch e phone/chest band)
@@ -41,7 +61,7 @@ def generate_sensor_data(num_records=50, base_time=None):
             records.append({
                 'timestamp': (current_time + timedelta(milliseconds=random.randint(100, 500))).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
                 'sensor_id': 'fitbit_band',
-                'heart_rate': current_hr + random.choice([-1, 0, 1]) # Variação leve do outro sensor
+                'heart_rate': current_hr + random.choice([-1, 0, 1])
             })
 
     return pd.DataFrame(records)
