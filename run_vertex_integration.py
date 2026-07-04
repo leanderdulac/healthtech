@@ -67,6 +67,12 @@ def main():
     print(f"  Amostras              : {result.training.get('training_samples', 0)}")
     local = result.training.get("local_model", {})
     print(f"  Modelo local          : {local.get('status', 'N/A')}")
+    temporal = result.training.get("temporal_model", {})
+    print(f"  Modelo temporal       : {temporal.get('status', 'N/A')} ({temporal.get('architecture', '')})")
+    if temporal.get("metrics"):
+        for h, m in temporal["metrics"].items():
+            if "f1" in m:
+                print(f"    {h}: F1={m['f1']:.2f}")
     if local.get("anomaly_rate") is not None:
         print(f"  Taxa anomalia treino  : {local['anomaly_rate']:.1%}")
     print(f"  CSV treino            : {result.training.get('csv_path', 'N/A')}")

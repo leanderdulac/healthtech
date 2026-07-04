@@ -39,6 +39,7 @@ cp .env.example .env   # configure variáveis GCP e SECRET_SALT
 | `python run_ontology_integration.py` | Integração ontologia → FHIR + ML |
 | `python run_hemodynamics_analysis.py` | Análise hemodinâmica grad/div/curl |
 | `python run_clinical_prediction.py` | Predição clínica multimodal (fuzzy + ghost) |
+| `python run_temporal_training.py` | Treino TCN+LSTM ghost+fuzzy (6h/24h/72h) |
 
 ## Estrutura do projeto
 

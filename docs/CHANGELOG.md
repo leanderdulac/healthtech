@@ -5,6 +5,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **F16** — Modelo temporal TCN+BiLSTM com features ghost+fuzzy (`run_temporal_training.py`)
+- Predição multi-horizonte: 6h, 24h, 72h com BCE ponderada e early stopping
 - **F15** — Inteligência clínica preditiva multimodal (`src/clinical_intelligence/`, `run_clinical_prediction.py`)
 - Filtragem Kalman+Hampel, sinais fantasmas, fuzzy Mamdani, fusão Bayesiana, CUSUM
 - Fase 8 no VertexIntegrationOrchestrator para predição com lead time

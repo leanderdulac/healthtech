@@ -358,6 +358,36 @@ python run_clinical_prediction.py
 
 ---
 
+## F16 — Modelo Temporal TCN+LSTM (ghost + fuzzy)
+
+**Objetivo:** Predição multi-horizonte (6h, 24h, 72h) de eventos clínicos via deep learning sobre sequências temporais enriquecidas com features ghost e fuzzy.
+
+**Componentes:**
+- `src/clinical_intelligence/temporal_features.py` — sequências (seq_len, 24 features)
+- `src/clinical_intelligence/temporal_model.py` — TCN+BiLSTM+Attention, 3 heads sigmoid
+- `run_temporal_training.py` — entry point de treino
+
+**Features por timestep (24):**
+- Wearable filtrado (5): hr, spo2, hrv, stress, quality_score
+- Derivadas (7): hr_deviation, spo2_risk, hrv_suppression, noise, artifacts, slope, persistence
+- Ghost (8): autonomic_imbalance, hidden_hypoxemia, pulse_irregularity, etc.
+- Fuzzy (4): event_prob, fp_risk, noise_gate, persistence
+
+**Arquitetura:**
+```
+Input (B, 32, 24) → TCN[d=1,2,4] → BiLSTM(2L) → Attention → 3×sigmoid(6h/24h/72h)
+```
+
+**Execução:**
+```bash
+python run_temporal_training.py --epochs 40 --patients 5 --hours 24
+python run_temporal_training.py --skip-pipeline  # usa datalake existente
+```
+
+**Integração:** `VertexTrainingPipeline` treina automaticamente após Isolation Forest.
+
+---
+
 ## F11 — Reconciliação Multi-sensor (Legado)
 
 **Objetivo:** Deduplicar leituras de múltiplos sensores em janelas temporais.
