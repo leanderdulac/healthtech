@@ -125,6 +125,18 @@ def main():
         print(f"  Irregularidades       : {hemo.get('total_irregularities', 0)}")
         print(f"  Saída                 : {hemo.get('output_dir', 'N/A')}")
 
+    print(f"\n  --- Inteligência Clínica Preditiva ---")
+    ci = result.clinical_intelligence
+    if ci:
+        print(f"  Status                : {ci.get('status', 'N/A')}")
+        print(f"  Pacientes analisados  : {ci.get('patients_analyzed', 0)}")
+        print(f"  Predições ativas      : {ci.get('active_predictions', 0)}")
+        print(f"  Saída                 : {ci.get('output_dir', 'N/A')}")
+        for pred in ci.get("top_predictions", [])[:3]:
+            if pred.get("event"):
+                print(f"    • {pred['patient_id']}: {pred['event']} "
+                      f"({pred['probability']:.0%}, lead={pred['lead_time_hours']:.0f}h)")
+
     print(f"\n  --- BigQuery Sync ---")
     bq = result.bigquery
     if bq:

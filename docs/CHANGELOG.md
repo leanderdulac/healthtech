@@ -5,6 +5,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **F15** — Inteligência clínica preditiva multimodal (`src/clinical_intelligence/`, `run_clinical_prediction.py`)
+- Filtragem Kalman+Hampel, sinais fantasmas, fuzzy Mamdani, fusão Bayesiana, CUSUM
+- Fase 8 no VertexIntegrationOrchestrator para predição com lead time
 - **F14** — Módulo hemodinâmica grad/div/curl (`src/hemodynamics/`, `run_hemodynamics_analysis.py`)
 - Simulador vascular 3D com cenários: normal, stenosis, aneurysm, turbulent
 - Detecção de irregularidades (gradiente, divergência, curl) + alertas FHIR

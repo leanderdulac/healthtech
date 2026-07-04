@@ -30,6 +30,7 @@ class VertexIntegrationResult:
     bigquery: Dict = field(default_factory=dict)
     ontology: Dict = field(default_factory=dict)
     hemodynamics: Dict = field(default_factory=dict)
+    clinical_intelligence: Dict = field(default_factory=dict)
     exports: Dict = field(default_factory=dict)
 
 
@@ -118,6 +119,9 @@ class VertexIntegrationOrchestrator:
         logger.info("=== FASE 7: Hemodinâmica (grad/div/curl) ===")
         result.hemodynamics = self._run_hemodynamics_analysis()
 
+        logger.info("=== FASE 8: Inteligência Clínica Preditiva ===")
+        result.clinical_intelligence = self._run_clinical_prediction(result)
+
         result.exports = {
             "training_csv": result.training.get("csv_path"),
             "batch_jsonl": result.batch.get("jsonl_path"),
@@ -128,9 +132,55 @@ class VertexIntegrationOrchestrator:
             "ontology": result.ontology.get("canonical_path"),
             "ontology_codesystem": result.ontology.get("codesystem_path"),
             "hemodynamics": result.hemodynamics.get("output_dir"),
+            "clinical_intelligence": result.clinical_intelligence.get("output_dir"),
         }
 
         return result
+
+    def _run_clinical_prediction(self, result: VertexIntegrationResult) -> Dict:
+        from src.clinical_intelligence.pipeline import ClinicalIntelligencePipeline
+        from src.clinical_intelligence.storage import ClinicalIntelligenceStorage
+
+        if not result.datalake or not result.datalake.patient_profiles:
+            return {"status": "SKIPPED", "reason": "no_patient_profiles"}
+
+        pipeline = ClinicalIntelligencePipeline()
+        storage = ClinicalIntelligenceStorage()
+
+        hemo_scores = {}
+        for s in result.hemodynamics.get("summaries", []):
+            if s.get("irregularities", 0) > 0:
+                hemo_scores[s.get("patient_id", "")] = min(
+                    1.0, s["irregularities"] / 6.0,
+                )
+
+        ci_results = pipeline.analyze_from_profiles(
+            query_engine=self.datalake.query_engine,
+            patient_profiles=result.datalake.patient_profiles,
+            partition_dates=result.datalake.partition_dates,
+            hemodynamic_scores=hemo_scores,
+        )
+
+        paths = [storage.save_result(r) for r in ci_results]
+        summary_path = storage.save_batch_summary(ci_results) if ci_results else ""
+
+        return {
+            "status": "INTEGRATED",
+            "patients_analyzed": len(ci_results),
+            "active_predictions": sum(1 for r in ci_results if r.predictions),
+            "output_dir": str(storage.output_dir),
+            "artifact_paths": paths + ([summary_path] if summary_path else []),
+            "top_predictions": [
+                {
+                    "patient_id": r.patient_id,
+                    "fusion_score": r.fusion_score,
+                    "event": r.predictions[0].event_type if r.predictions else None,
+                    "probability": r.predictions[0].probability if r.predictions else 0,
+                    "lead_time_hours": r.predictions[0].lead_time_hours if r.predictions else 0,
+                }
+                for r in ci_results
+            ],
+        }
 
     def _run_hemodynamics_analysis(self) -> Dict:
         from src.hemodynamics.alerts import HemodynamicsAlertGenerator

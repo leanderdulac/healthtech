@@ -318,6 +318,46 @@ python run_hemodynamics_analysis.py
 
 ---
 
+## F15 — Inteligência Clínica Preditiva Multimodal
+
+**Objetivo:** Predizer eventos clínicos com horas/dias de antecedência, cruzando telemetria wearable, dados clínicos FHIR, sinais fantasmas inferidos e lógica fuzzy — com filtragem de ruído e supressão de falsos positivos.
+
+**Componentes:**
+- `src/clinical_intelligence/signal_processing.py` — Kalman 1D, Hampel, baseline EWMA adaptativo
+- `src/clinical_intelligence/ghost_signals.py` — 7 biomarcadores inferidos (ANS, hipoxemia oculta, etc.)
+- `src/clinical_intelligence/fuzzy_engine.py` — Sistema Mamdani (9 regras clínicas)
+- `src/clinical_intelligence/evidence_fusion.py` — Fusão Bayesiana multimodal (≥2 fontes)
+- `src/clinical_intelligence/prognostic_engine.py` — CUSUM, persistência, lead time
+- `src/clinical_intelligence/pipeline.py` — `ClinicalIntelligencePipeline`
+- `run_clinical_prediction.py` — entry point dedicado
+
+**Sinais fantasmas (ghost signals):**
+
+| Sinal | Derivação | Relevância clínica |
+|-------|-----------|-------------------|
+| `autonomic_imbalance` | HRV↓ + HR↑ | ICC, sepse, SCA |
+| `hidden_hypoxemia` | SpO2 dips noturnos | Apneia, EPOC, embolia |
+| `pulse_irregularity` | Variação beat-to-beat | FA, extrassístoles |
+| `recovery_deficit` | HR recovery pós-pico | Miocardite, overtraining |
+| `circadian_desync` | Amplitude circadiana HR | Evento CV noturno |
+| `hemodynamic_irregularity_proxy` | grad/div/curl | Estenose, aneurisma |
+
+**Pipeline fuzzy:** suprime alertas com ruído alto + persistência baixa; amplifica com ≥2 ghost signals concordantes.
+
+**Integrações:**
+- Datalake Silver (vitals stream) → denoising
+- FHIR Conditions/Medications → `clinical_burden`
+- Ontologia F13 → scores semânticos
+- Hemodinâmica F14 → proxy vascular
+- `VertexIntegrationOrchestrator` — Fase 8
+
+**Execução:**
+```bash
+python run_clinical_prediction.py
+```
+
+---
+
 ## F11 — Reconciliação Multi-sensor (Legado)
 
 **Objetivo:** Deduplicar leituras de múltiplos sensores em janelas temporais.
@@ -337,5 +377,5 @@ F02 (Simulação) → F01 (Datalake) → F03 (Quality Gates)
                                   → F05 (Vertex) → F06 (BigQuery)
 F07 (Anonimização) → F08 (FHIR)
 F12 (Scraper USP) → F13 (Ontologia) → F05 (Treino ML) + F08 (FHIR)
-F13 (Ontologia) → F14 (Hemodinâmica) → F08 (FHIR Flags)
+F13 (Ontologia) → F14 (Hemodinâmica) → F15 (Predição Clínica) → F08 (FHIR Flags)
 ```
