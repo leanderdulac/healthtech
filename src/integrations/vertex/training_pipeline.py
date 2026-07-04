@@ -6,6 +6,7 @@ from src.integrations.vertex.export import VertexDataExporter
 from src.integrations.vertex.feature_builder import DatalakeFeatureBuilder
 from src.integrations.vertex.local_model import LocalAnomalyModel
 from src.ml_pipeline.training import orquestrar_custom_training
+from src.ontology.registry import MedicalOntologyRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +57,21 @@ class VertexTrainingPipeline:
                 vertex_result = {"status": "FAILED", "error": str(e)}
                 logger.warning("Vertex CustomTraining falhou: %s", e)
 
+        ontology_info = {"status": "NOT_LOADED"}
+        registry = MedicalOntologyRegistry()
+        if registry.load():
+            ontology_info = {
+                "status": "LOADED",
+                "keywords": len(registry.get_top_keywords(999)),
+                "areas": len(registry.get_top_areas(999)),
+                "statistics": registry.statistics,
+            }
+
         return {
             "status": "COMPLETED",
             "training_samples": len(features),
             "csv_path": str(csv_path),
             "local_model": local_result,
             "vertex_training": vertex_result,
+            "ontology": ontology_info,
         }

@@ -36,6 +36,7 @@ cp .env.example .env   # configure variáveis GCP e SECRET_SALT
 | `python run_vertex_integration.py` | Datalake + ML + BigQuery + FHIR |
 | `python run_fhir_export.py` | Exportação FHIR dedicada |
 | `python run_usp_scraper.py` | Scraper de teses USP (medicina) |
+| `python run_ontology_integration.py` | Integração ontologia → FHIR + ML |
 
 ## Estrutura do projeto
 
@@ -53,6 +54,7 @@ healthtech-main/
 │   ├── integrations/           # BigQuery + Vertex AI
 │   ├── ml_pipeline/            # Treino e inferência
 │   ├── scraping/               # Scraper teses USP
+│   ├── ontology/               # Ontologia médica integrada
 │   ├── security/               # Anonimização FHIR
 │   └── utils/                  # Geradores de dados
 └── docs/

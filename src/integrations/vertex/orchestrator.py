@@ -14,6 +14,9 @@ from src.integrations.vertex.local_model import LocalAnomalyModel
 from src.integrations.vertex.online_pipeline import VertexOnlinePipeline
 from src.integrations.vertex.training_pipeline import VertexTrainingPipeline
 from src.integrations.bigquery_bridge import BigQueryBridge
+from src.ontology.fhir_bridge import OntologyFhirBridge
+from src.ontology.registry import MedicalOntologyRegistry
+from src.ontology.sync import sync_ontology_to_project
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,7 @@ class VertexIntegrationResult:
     online: List[Dict] = field(default_factory=list)
     batch: Dict = field(default_factory=dict)
     bigquery: Dict = field(default_factory=dict)
+    ontology: Dict = field(default_factory=dict)
     exports: Dict = field(default_factory=dict)
 
 
@@ -107,6 +111,9 @@ class VertexIntegrationOrchestrator:
             patient_profiles=result.datalake.patient_profiles,
         )
 
+        logger.info("=== FASE 6: Ontologia Médica ===")
+        result.ontology = self._integrate_ontology()
+
         result.exports = {
             "training_csv": result.training.get("csv_path"),
             "batch_jsonl": result.batch.get("jsonl_path"),
@@ -114,6 +121,34 @@ class VertexIntegrationOrchestrator:
             "model_path": str(self.vertex_config.local_model_dir / "anomaly_detector.pkl"),
             "fhir_bundle": (result.datalake.fhir_export or {}).get("bundle_path"),
             "fhir_ndjson": (result.datalake.fhir_export or {}).get("ndjson_path"),
+            "ontology": result.ontology.get("canonical_path"),
+            "ontology_codesystem": result.ontology.get("codesystem_path"),
         }
 
         return result
+
+    def _integrate_ontology(self) -> Dict:
+        sync = sync_ontology_to_project()
+        registry = MedicalOntologyRegistry()
+        if not registry.load():
+            return {"status": "NOT_AVAILABLE", "sync": sync}
+
+        bridge = OntologyFhirBridge(registry)
+        codesystem = bridge.build_codesystem()
+
+        import json
+        from pathlib import Path
+        cs_path = Path("data/ontology/fhir_codesystem.json")
+        cs_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cs_path, "w", encoding="utf-8") as f:
+            json.dump(codesystem, f, indent=2, ensure_ascii=False)
+
+        return {
+            "status": "INTEGRATED",
+            "sync": sync,
+            "canonical_path": str(registry.ontology_path),
+            "codesystem_path": str(cs_path),
+            "statistics": registry.statistics,
+            "top_keywords": registry.get_top_keywords(10),
+            "domains_available": list(registry.domain_scores("telemedicina cardiovascular").keys()),
+        }

@@ -14,6 +14,7 @@ from src.scraping.usp_teses.parsers import (
     parse_thesis_detail,
 )
 from src.scraping.usp_teses.storage import ScraperStorage
+from src.ontology.sync import sync_ontology_to_project
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +181,10 @@ class UspTesesScraper:
             "ontology": str(self.storage.save_ontology(ontology)),
             "report": str(self.storage.save_report(report)),
         }
+
+        sync_result = sync_ontology_to_project()
+        paths["ontology_canonical"] = sync_result.get("target", "")
+        report["ontology_sync"] = sync_result
         report["output_paths"] = paths
 
         logger.info(

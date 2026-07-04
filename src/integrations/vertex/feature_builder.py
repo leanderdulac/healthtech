@@ -7,6 +7,7 @@ import pandas as pd
 from src.datalake.extraction.filters import QueryFilters
 from src.datalake.extraction.query_engine import DatalakeQueryEngine
 from src.datalake.schemas.base import DataLayer, MetricType
+from src.ontology.feature_enricher import OntologyFeatureEnricher
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class DatalakeFeatureBuilder:
 
     def __init__(self, query_engine: DatalakeQueryEngine):
         self.query_engine = query_engine
+        self.ontology_enricher = OntologyFeatureEnricher()
 
     def build_batch_features(
         self,
@@ -72,6 +74,9 @@ class DatalakeFeatureBuilder:
         features["risk_label"] = features["clinical_risk_level"].map({
             "low": 0, "moderate": 1, "elevated": 2, "critical": 3,
         }).fillna(0).astype(int)
+
+        if self.ontology_enricher.is_available:
+            features = self.ontology_enricher.enrich_batch_features(features)
 
         return features
 
@@ -120,6 +125,13 @@ class DatalakeFeatureBuilder:
         if features_df.empty:
             return np.array([]), np.array([])
 
-        X = features_df[FEATURE_COLUMNS].values.astype(float)
+        cols = list(FEATURE_COLUMNS)
+        if self.ontology_enricher.is_available:
+            cols.extend(self.ontology_enricher.get_feature_columns())
+            for c in self.ontology_enricher.get_feature_columns():
+                if c not in features_df.columns:
+                    features_df[c] = 0.0
+
+        X = features_df[cols].values.astype(float)
         y = features_df.get("risk_label", pd.Series([0] * len(features_df))).values
         return X, y

@@ -245,6 +245,36 @@ python run_usp_scraper.py --discover-areas   # descobre áreas de concentração
 
 ---
 
+## F13 — Ontologia Médica Integrada
+
+**Objetivo:** Integrar a ontologia derivada de teses USP ao FHIR, features ML e pipeline Vertex.
+
+**Componentes:**
+- `src/ontology/registry.py` — `MedicalOntologyRegistry` (carga e consulta)
+- `src/ontology/feature_enricher.py` — features `ont_*` por domínio
+- `src/ontology/fhir_bridge.py` — CodeSystem FHIR + extensões em Flags
+- `src/ontology/sync.py` — sincronização para `data/ontology/`
+- `run_ontology_integration.py` — entry point de integração
+
+**Domínios ontológicos:** cardiovascular, respiratory, monitoring, neurology, oncology, mental_health, imaging
+
+**Integrações:**
+- `DatalakeFeatureBuilder` — adiciona colunas `ont_cardiovascular`, `ont_monitoring`, etc.
+- `gold_alert_to_flag` — extensões FHIR `ontology-keyword` e `ontology-domain`
+- `VertexIntegrationOrchestrator` — Fase 6: sync + export CodeSystem
+- `VertexTrainingPipeline` — reporta estatísticas da ontologia no treino
+
+**Artefatos canônicos:**
+- `data/ontology/medical_ontology.json`
+- `data/ontology/fhir_codesystem.json`
+
+**Execução:**
+```bash
+python run_ontology_integration.py
+```
+
+---
+
 ## F11 — Reconciliação Multi-sensor (Legado)
 
 **Objetivo:** Deduplicar leituras de múltiplos sensores em janelas temporais.
@@ -263,5 +293,5 @@ F02 (Simulação) → F01 (Datalake) → F03 (Quality Gates)
                                   → F08 (FHIR) → F09 (Export) → F10 (BQ FHIR)
                                   → F05 (Vertex) → F06 (BigQuery)
 F07 (Anonimização) → F08 (FHIR)
-F12 (Scraper USP) → Ontologia + Corpus NLP → F05 (Treino ML)
+F12 (Scraper USP) → F13 (Ontologia) → F05 (Treino ML) + F08 (FHIR)
 ```

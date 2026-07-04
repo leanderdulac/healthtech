@@ -5,6 +5,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **F13** — Ontologia médica integrada (`src/ontology/`, `run_ontology_integration.py`)
+- Features ML enriquecidas com domínios ontológicos (`ont_cardiovascular`, etc.)
+- FHIR CodeSystem exportado a partir da ontologia USP
+- Fase 6 no VertexIntegrationOrchestrator para sync de ontologia
 - **F12** — Scraper USP Teses de Medicina (`src/scraping/usp_teses/`, `run_usp_scraper.py`)
 - Construtor de ontologia a partir de palavras-chave e áreas de concentração
 - Corpus NLP (`training_corpus.txt`) para treino de modelos

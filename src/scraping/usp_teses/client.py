@@ -40,6 +40,7 @@ class UspTesesClient:
         response = self.session.get(url, params=params, timeout=self.config.request_timeout)
         self._last_request_at = time.time()
         response.raise_for_status()
+        response.encoding = response.apparent_encoding or "utf-8"
         return response.text
 
     def build_search_url(self, field: str, term: str, page: int = 1) -> str:

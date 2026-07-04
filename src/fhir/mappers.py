@@ -98,7 +98,7 @@ def silver_row_to_observation(row: Dict[str, Any]) -> dict:
 
 
 def gold_alert_to_flag(alert: GoldPatientAlert) -> dict:
-    """Converte alerta Gold em FHIR Flag."""
+    """Converte alerta Gold em FHIR Flag com extensões da ontologia."""
     flag = build_flag(
         flag_id=alert.alert_id,
         patient_id=alert.patient_id,
@@ -110,7 +110,16 @@ def gold_alert_to_flag(alert: GoldPatientAlert) -> dict:
         period_start=alert.window_start,
         period_end=alert.window_end,
     )
-    return resource_to_dict(flag)
+    flag_dict = resource_to_dict(flag)
+    try:
+        from src.ontology.fhir_bridge import OntologyFhirBridge
+        bridge = OntologyFhirBridge()
+        if bridge.registry.is_loaded:
+            alert_text = f"{alert.alert_type} {alert.metric_type} {alert.severity}"
+            flag_dict = bridge.enrich_flag_extensions(flag_dict, alert_text)
+    except Exception:
+        pass
+    return flag_dict
 
 
 def device_binding_to_fhir(binding: DeviceBinding) -> dict:
