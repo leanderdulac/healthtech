@@ -275,6 +275,49 @@ python run_ontology_integration.py
 
 ---
 
+## F14 — Hemodinâmica (grad · div · curl)
+
+**Objetivo:** Modelar padrões de circulação sanguínea em grade 3D e detectar irregularidades vasculares via operadores vetoriais NumPy.
+
+**Componentes:**
+- `src/hemodynamics/operators.py` — `gradient`, `divergence`, `curl`, `gradient_magnitude`, `curl_magnitude`, `create_grid`
+- `src/hemodynamics/models.py` — `Grid3D`, `ScalarField3D`, `VectorField3D`, `FlowIrregularity`, `FlowAnalysisResult`
+- `src/hemodynamics/simulator.py` — `VascularFlowSimulator` (cenários sintéticos)
+- `src/hemodynamics/analyzer.py` — `VascularFlowAnalyzer` (detecção de hotspots)
+- `src/hemodynamics/alerts.py` — `HemodynamicsAlertGenerator` → `GoldPatientAlert` + FHIR Flags
+- `src/hemodynamics/storage.py` — persistência JSON em `data/hemodynamics/`
+- `run_hemodynamics_analysis.py` — entry point dedicado
+
+**Operadores:**
+
+| Operador | Campo | Irregularidade detectada |
+|----------|-------|--------------------------|
+| `gradient` | Pressão | Pico de gradiente (estenose) |
+| `divergence` | Velocidade | Fonte (aneurisma) / sumidouro (estenose) |
+| `curl` | Velocidade | Fluxo rotacional / turbulento |
+
+**Cenários simulados:** `normal`, `stenosis`, `aneurysm`, `turbulent`
+
+**Integrações:**
+- Ontologia cardiovascular via `MedicalOntologyRegistry` (scores por domínio)
+- FHIR Flags via `gold_alert_to_flag` com extensões ontológicas
+- `VertexIntegrationOrchestrator` — Fase 7: análise hemodinâmica pós-ontologia
+
+**Saídas:**
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| `analysis_*.json` | Resultado completo por cenário |
+| `summary_*.json` | Métricas dos operadores e contagem de alertas |
+| `fhir_flags_*.json` | Bundle FHIR com Flags clínicos |
+
+**Execução:**
+```bash
+python run_hemodynamics_analysis.py
+```
+
+---
+
 ## F11 — Reconciliação Multi-sensor (Legado)
 
 **Objetivo:** Deduplicar leituras de múltiplos sensores em janelas temporais.
@@ -294,4 +337,5 @@ F02 (Simulação) → F01 (Datalake) → F03 (Quality Gates)
                                   → F05 (Vertex) → F06 (BigQuery)
 F07 (Anonimização) → F08 (FHIR)
 F12 (Scraper USP) → F13 (Ontologia) → F05 (Treino ML) + F08 (FHIR)
+F13 (Ontologia) → F14 (Hemodinâmica) → F08 (FHIR Flags)
 ```

@@ -29,6 +29,7 @@ class VertexIntegrationResult:
     batch: Dict = field(default_factory=dict)
     bigquery: Dict = field(default_factory=dict)
     ontology: Dict = field(default_factory=dict)
+    hemodynamics: Dict = field(default_factory=dict)
     exports: Dict = field(default_factory=dict)
 
 
@@ -114,6 +115,9 @@ class VertexIntegrationOrchestrator:
         logger.info("=== FASE 6: Ontologia Médica ===")
         result.ontology = self._integrate_ontology()
 
+        logger.info("=== FASE 7: Hemodinâmica (grad/div/curl) ===")
+        result.hemodynamics = self._run_hemodynamics_analysis()
+
         result.exports = {
             "training_csv": result.training.get("csv_path"),
             "batch_jsonl": result.batch.get("jsonl_path"),
@@ -123,9 +127,49 @@ class VertexIntegrationOrchestrator:
             "fhir_ndjson": (result.datalake.fhir_export or {}).get("ndjson_path"),
             "ontology": result.ontology.get("canonical_path"),
             "ontology_codesystem": result.ontology.get("codesystem_path"),
+            "hemodynamics": result.hemodynamics.get("output_dir"),
         }
 
         return result
+
+    def _run_hemodynamics_analysis(self) -> Dict:
+        from src.hemodynamics.alerts import HemodynamicsAlertGenerator
+        from src.hemodynamics.analyzer import VascularFlowAnalyzer
+        from src.hemodynamics.simulator import VascularFlowSimulator
+        from src.hemodynamics.storage import HemodynamicsStorage
+
+        simulator = VascularFlowSimulator(nx=40, ny=24, nz=24, spacing=0.5)
+        analyzer = VascularFlowAnalyzer()
+        alert_gen = HemodynamicsAlertGenerator()
+        storage = HemodynamicsStorage()
+
+        scenarios = list(VascularFlowSimulator.SCENARIOS)
+        summaries = []
+        artifact_paths = []
+
+        for scenario in scenarios:
+            pressure, velocity = simulator.simulate(scenario)
+            analysis = analyzer.analyze(
+                pressure=pressure,
+                velocity=velocity,
+                patient_id=f"PAT-HEMO-{scenario[:4].upper()}",
+                scenario=scenario,
+            )
+            summary = alert_gen.summary(analysis)
+            flags = alert_gen.generate_fhir_flags(analysis)
+            paths = storage.save_analysis(analysis, summary)
+            fhir_path = storage.save_fhir_flags(flags, scenario)
+            summaries.append(summary)
+            artifact_paths.extend([paths["analysis"], paths["summary"], fhir_path])
+
+        return {
+            "status": "INTEGRATED",
+            "scenarios": scenarios,
+            "summaries": summaries,
+            "total_irregularities": sum(s["irregularities"] for s in summaries),
+            "output_dir": str(storage.output_dir),
+            "artifact_paths": artifact_paths,
+        }
 
     def _integrate_ontology(self) -> Dict:
         sync = sync_ontology_to_project()

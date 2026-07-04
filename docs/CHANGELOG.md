@@ -5,6 +5,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **F14** — Módulo hemodinâmica grad/div/curl (`src/hemodynamics/`, `run_hemodynamics_analysis.py`)
+- Simulador vascular 3D com cenários: normal, stenosis, aneurysm, turbulent
+- Detecção de irregularidades (gradiente, divergência, curl) + alertas FHIR
+- Fase 7 no VertexIntegrationOrchestrator para análise hemodinâmica
 - **F13** — Ontologia médica integrada (`src/ontology/`, `run_ontology_integration.py`)
 - Features ML enriquecidas com domínios ontológicos (`ont_cardiovascular`, etc.)
 - FHIR CodeSystem exportado a partir da ontologia USP

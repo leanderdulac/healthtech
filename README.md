@@ -33,10 +33,11 @@ cp .env.example .env   # configure variáveis GCP e SECRET_SALT
 |---------|-----------|
 | `python main_simulation.py` | Pipeline completo (redireciona para Vertex) |
 | `python run_datalake_pipeline.py` | Datalake + FHIR + extração |
-| `python run_vertex_integration.py` | Datalake + ML + BigQuery + FHIR |
+| `python run_vertex_integration.py` | Datalake + ML + BigQuery + FHIR + Ontologia + Hemodinâmica |
 | `python run_fhir_export.py` | Exportação FHIR dedicada |
 | `python run_usp_scraper.py` | Scraper de teses USP (medicina) |
 | `python run_ontology_integration.py` | Integração ontologia → FHIR + ML |
+| `python run_hemodynamics_analysis.py` | Análise hemodinâmica grad/div/curl |
 
 ## Estrutura do projeto
 
@@ -55,6 +56,7 @@ healthtech-main/
 │   ├── ml_pipeline/            # Treino e inferência
 │   ├── scraping/               # Scraper teses USP
 │   ├── ontology/               # Ontologia médica integrada
+│   ├── hemodynamics/           # Análise vascular grad/div/curl
 │   ├── security/               # Anonimização FHIR
 │   └── utils/                  # Geradores de dados
 └── docs/
@@ -74,6 +76,7 @@ healthtech-main/
 | `data/models/` | Modelo local `anomaly_detector.pkl` |
 | `data/bigquery_simulation/` | Fallback local quando GCP não configurado |
 | `data/scraping/usp_teses/` | Teses USP, ontologia e corpus NLP |
+| `data/hemodynamics/` | Análises hemodinâmicas e FHIR Flags |
 
 ## Interoperabilidade FHIR R4
 

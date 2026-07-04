@@ -110,6 +110,21 @@ def main():
         val = fhir.get("validation", {})
         print(f"  Recursos              : {val.get('resource_counts', {})}")
 
+    print(f"\n  --- Ontologia Médica ---")
+    ont = result.ontology
+    if ont:
+        print(f"  Status                : {ont.get('status', 'N/A')}")
+        print(f"  Keywords              : {ont.get('statistics', {}).get('total_keywords', 'N/A')}")
+        print(f"  CodeSystem            : {ont.get('codesystem_path', 'N/A')}")
+
+    print(f"\n  --- Hemodinâmica (grad/div/curl) ---")
+    hemo = result.hemodynamics
+    if hemo:
+        print(f"  Status                : {hemo.get('status', 'N/A')}")
+        print(f"  Cenários              : {', '.join(hemo.get('scenarios', []))}")
+        print(f"  Irregularidades       : {hemo.get('total_irregularities', 0)}")
+        print(f"  Saída                 : {hemo.get('output_dir', 'N/A')}")
+
     print(f"\n  --- BigQuery Sync ---")
     bq = result.bigquery
     if bq:
@@ -125,7 +140,7 @@ def main():
             print(f"  Fallback local        : {silv['path']}")
 
     print_section("INTEGRAÇÃO CONCLUÍDA")
-    print(f"  Artefatos em          : data/vertex_exports/ e data/models/")
+    print(f"  Artefatos em          : data/vertex_exports/, data/models/, data/hemodynamics/")
     print(f"  Lakehouse em          : {lakehouse_config.base_path.resolve()}")
     print(f"  Diagramas/docs        : docs/Healthtech_Datalake_VertexAI.pptx")
     print(f"  Visualização HTML     : docs/diagramas.html")
