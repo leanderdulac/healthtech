@@ -5,6 +5,9 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **F12** — Scraper USP Teses de Medicina (`src/scraping/usp_teses/`, `run_usp_scraper.py`)
+- Construtor de ontologia a partir de palavras-chave e áreas de concentração
+- Corpus NLP (`training_corpus.txt`) para treino de modelos
 - **F08** — Módulo FHIR R4/HL7 (`src/fhir/`) com terminologias LOINC, UCUM, SNOMED CT
 - **F09** — Exportação FHIR: Bundle JSON, NDJSON bulk (`run_fhir_export.py`)
 - **F10** — Tabela BigQuery `fhir_resources` com JSON nativo FHIR

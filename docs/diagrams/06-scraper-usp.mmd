@@ -1,0 +1,41 @@
+flowchart TB
+    START([run_usp_scraper.py])
+
+    subgraph FONTE["teses.usp.br"]
+        AREA["/area?lang=pt-br"]
+        SEARCH["Busca avançada<br/>área · palavra-chave · resumo"]
+        DETAIL["Página detalhe<br/>pt-br.html + Dublin Core"]
+    end
+
+    subgraph SCRAPER["src/scraping/usp_teses/"]
+        CLIENT[UspTesesClient<br/>rate limit + retry]
+        PARSE[parsers.py<br/>listagem + detalhe]
+        FILTER[Filtro medicina<br/>40+ termos]
+        ONTO[OntologyBuilder<br/>keywords + coocorrência]
+        STORE[ScraperStorage]
+    end
+
+    subgraph SAIDA["data/scraping/usp_teses/"]
+        JSONL[theses.jsonl]
+        PARQUET[theses.parquet]
+        CORPUS[training_corpus.txt]
+        ONTO_JSON[ontology.json]
+        REPORT[scrape_report.json]
+    end
+
+    subgraph USO["Integração Healthtech"]
+        NLP[Treino NLP / tópicos]
+        FHIR[Enriquecimento ontologia FHIR]
+        ML[Vertex AI features]
+    end
+
+    START --> CLIENT
+    AREA --> CLIENT
+    SEARCH --> CLIENT
+    CLIENT --> PARSE --> FILTER
+    FILTER --> DETAIL --> PARSE
+    PARSE --> ONTO --> STORE
+    STORE --> JSONL & PARQUET & CORPUS & ONTO_JSON & REPORT
+    CORPUS --> NLP
+    ONTO_JSON --> FHIR
+    CORPUS --> ML

@@ -1,0 +1,1 @@
+"""Módulo de scraping para coleta de dados acadêmicos."""

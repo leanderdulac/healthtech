@@ -202,6 +202,49 @@ orchestrator.query_engine.extract_high_risk_cohort(min_risk_score=0.3)
 
 ---
 
+## F12 — Scraper USP Teses (Medicina + Ontologia)
+
+**Objetivo:** Coletar teses e dissertações sobre medicina da Biblioteca Digital da USP para treino NLP e construção de ontologia.
+
+**Fonte:** [https://teses.usp.br/area?lang=pt-br](https://teses.usp.br/area?lang=pt-br)
+
+**Componentes:**
+- `src/scraping/usp_teses/client.py` — cliente HTTP com rate limiting
+- `src/scraping/usp_teses/parsers.py` — parsing de listagens e páginas de detalhe
+- `src/scraping/usp_teses/scraper.py` — orquestração da coleta
+- `src/scraping/usp_teses/ontology.py` — construtor de ontologia
+- `src/scraping/usp_teses/storage.py` — persistência JSONL/Parquet
+- `run_usp_scraper.py` — entry point
+
+**Fluxo:**
+1. Busca por área/palavra-chave/resumo (medicina, saúde, telemedicina, wearable)
+2. Paginação de resultados (50–100 por página)
+3. Coleta de metadados Dublin Core (resumo, keywords, orientador, DOI)
+4. Filtro de relevância médica
+5. Geração de ontologia (áreas, keywords, coocorrências)
+6. Exportação de corpus de treino NLP
+
+**Saídas:**
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| `theses.jsonl` | Registros completos |
+| `theses.parquet` | Dataset estruturado |
+| `training_corpus.txt` | Corpus NLP (título + resumo + keywords) |
+| `ontology.json` | Ontologia com grafo de conceitos |
+| `areas_medicine.json` | Áreas de concentração filtradas |
+| `scrape_report.json` | Relatório da execução |
+
+**Execução:**
+```bash
+python run_usp_scraper.py --max-pages 5 --max-details 100
+python run_usp_scraper.py --discover-areas   # descobre áreas de concentração
+```
+
+**Variáveis de ambiente:** `SCRAPER_DELAY`, `SCRAPER_MAX_PAGES`, `SCRAPER_MAX_DETAILS`
+
+---
+
 ## F11 — Reconciliação Multi-sensor (Legado)
 
 **Objetivo:** Deduplicar leituras de múltiplos sensores em janelas temporais.
@@ -220,4 +263,5 @@ F02 (Simulação) → F01 (Datalake) → F03 (Quality Gates)
                                   → F08 (FHIR) → F09 (Export) → F10 (BQ FHIR)
                                   → F05 (Vertex) → F06 (BigQuery)
 F07 (Anonimização) → F08 (FHIR)
+F12 (Scraper USP) → Ontologia + Corpus NLP → F05 (Treino ML)
 ```
