@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+    participant U as run_vertex_integration
+    participant O as VertexIntegrationOrchestrator
+    participant D as DatalakeOrchestrator
+    participant S as TelemetrySimulator
+    participant B as Bronze
+    participant SV as Silver
+    participant G as Gold
+    participant F as FeatureBuilder
+    participant T as TrainingPipeline
+    participant OL as OnlinePipeline
+    participant BA as BatchPipeline
+    participant V as Vertex AI
+
+    U->>O: run_full_integration
+    O->>D: run_full_pipeline
+    D->>S: generate_24h_stream
+    S-->>D: BronzeTelemetryRecord
+    D->>B: ingest and validate
+    D->>SV: bronze_to_silver
+    D->>G: silver_to_gold
+    D-->>O: PipelineResult
+    O->>F: build_batch_features
+    F->>G: extract cohort
+    O->>T: run_training
+    T->>T: IsolationForest local
+    T-->>V: CustomTraining se GCP
+    O->>OL: stream_patient_vitals
+    OL->>SV: vitals_stream
+    OL->>V: Endpoint predict
+    OL->>OL: fallback local
+    O->>BA: run_batch_prediction
+    BA->>F: batch features
+    BA-->>V: batch_predict se GCP
+    O-->>U: VertexIntegrationResult

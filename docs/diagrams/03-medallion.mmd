@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph BRONZE["Bronze - Raw"]
+        B1[event_id]
+        B2[patient + device]
+        B3[metric + value]
+        B4[timestamp_utc]
+        B5[raw_payload]
+    end
+
+    subgraph SILVER["Silver - Curated"]
+        S1[window temporal]
+        S2[metric reconciliado]
+        S3[quality_score]
+        S4[is_anomaly]
+        S5[contexto sono/atividade]
+    end
+
+    subgraph GOLD["Gold - Analytics"]
+        G1[hourly_vitals]
+        G2[daily_summary]
+        G3[patient_alerts]
+    end
+
+    BRONZE -->|ETL + quality gate| SILVER
+    SILVER -->|agregacao + regras clinicas| GOLD

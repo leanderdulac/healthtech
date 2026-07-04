@@ -1,0 +1,119 @@
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Dict, List, Optional
+
+from src.datalake.config import LakehouseConfig
+from src.datalake.pipeline.orchestrator import DatalakeOrchestrator, PipelineResult
+from src.datalake.utils.telemetry_simulator import SimulationConfig
+from src.integrations.vertex.batch_pipeline import VertexBatchPipeline
+from src.integrations.vertex.config import VertexConfig
+from src.integrations.vertex.export import VertexDataExporter
+from src.integrations.vertex.feature_builder import DatalakeFeatureBuilder
+from src.integrations.vertex.local_model import LocalAnomalyModel
+from src.integrations.vertex.online_pipeline import VertexOnlinePipeline
+from src.integrations.vertex.training_pipeline import VertexTrainingPipeline
+from src.integrations.bigquery_bridge import BigQueryBridge
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class VertexIntegrationResult:
+    datalake: Optional[PipelineResult] = None
+    training: Dict = field(default_factory=dict)
+    online: List[Dict] = field(default_factory=list)
+    batch: Dict = field(default_factory=dict)
+    bigquery: Dict = field(default_factory=dict)
+    exports: Dict = field(default_factory=dict)
+
+
+class VertexIntegrationOrchestrator:
+    """
+    Orquestrador unificado: Datalake → Features → Vertex AI.
+
+    Fluxo completo:
+      1. Pipeline datalake (Bronze → Silver → Gold)
+      2. Treinamento (local + Vertex CustomTraining)
+      3. Inferência online (stream vitals → Endpoint)
+      4. Inferência batch (coorte → JSONL → Batch Prediction)
+    """
+
+    def __init__(
+        self,
+        lakehouse_config: Optional[LakehouseConfig] = None,
+        vertex_config: Optional[VertexConfig] = None,
+    ):
+        self.lakehouse_config = lakehouse_config or LakehouseConfig()
+        self.vertex_config = vertex_config or VertexConfig()
+        self.vertex_config.ensure_directories()
+
+        self.datalake = DatalakeOrchestrator(self.lakehouse_config)
+        self.feature_builder = DatalakeFeatureBuilder(self.datalake.query_engine)
+        self.exporter = VertexDataExporter(self.vertex_config)
+        self.local_model = LocalAnomalyModel(self.vertex_config.local_model_dir)
+
+        self.training_pipeline = VertexTrainingPipeline(
+            self.vertex_config, self.feature_builder, self.exporter, self.local_model,
+        )
+        self.online_pipeline = VertexOnlinePipeline(
+            self.vertex_config, self.feature_builder, self.local_model,
+        )
+        self.batch_pipeline = VertexBatchPipeline(
+            self.vertex_config, self.feature_builder, self.exporter, self.local_model,
+        )
+        self.bigquery_bridge = BigQueryBridge(
+            self.datalake.store, self.vertex_config.project_id,
+        )
+
+    def run_full_integration(
+        self,
+        simulation_config: Optional[SimulationConfig] = None,
+        start_time: Optional[datetime] = None,
+        online_max_records: int = 15,
+    ) -> VertexIntegrationResult:
+        result = VertexIntegrationResult()
+
+        logger.info("=== FASE 1: Pipeline Datalake ===")
+        result.datalake = self.datalake.run_full_pipeline(
+            simulation_config=simulation_config,
+            start_time=start_time,
+        )
+
+        partition_dates = result.datalake.partition_dates
+        sample_patient = result.datalake.patients[0] if result.datalake.patients else None
+
+        logger.info("=== FASE 2: Treinamento ===")
+        result.training = self.training_pipeline.run_training(partition_dates=partition_dates)
+
+        if sample_patient and partition_dates:
+            logger.info("=== FASE 3: Inferência Online ===")
+            result.online = self.online_pipeline.stream_patient_vitals(
+                patient_id=sample_patient,
+                partition_date=partition_dates[0],
+                max_records=online_max_records,
+                delay_seconds=0.05,
+            )
+
+        logger.info("=== FASE 4: Inferência Batch ===")
+        result.batch = self.batch_pipeline.run_batch_prediction(
+            min_risk_score=0.2,
+            partition_dates=partition_dates,
+        )
+
+        logger.info("=== FASE 5: Sync BigQuery + FHIR ===")
+        result.bigquery = self.bigquery_bridge.sync_all(
+            partition_dates=partition_dates,
+            patient_profiles=result.datalake.patient_profiles,
+        )
+
+        result.exports = {
+            "training_csv": result.training.get("csv_path"),
+            "batch_jsonl": result.batch.get("jsonl_path"),
+            "batch_predictions": result.batch.get("local_predictions_path"),
+            "model_path": str(self.vertex_config.local_model_dir / "anomaly_detector.pkl"),
+            "fhir_bundle": (result.datalake.fhir_export or {}).get("bundle_path"),
+            "fhir_ndjson": (result.datalake.fhir_export or {}).get("ndjson_path"),
+        }
+
+        return result

@@ -1,0 +1,19 @@
+# Ambientes Virtuais e Cache
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Configurações sensíveis
+.env
+
+# Arquivos de sistema
+.DS_Store
+
+# Artefatos gerados em runtime
+data/
+*.csv
+*.pkl
+*.parquet
+*.jsonl

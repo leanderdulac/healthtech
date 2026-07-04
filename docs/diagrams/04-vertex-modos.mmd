@@ -1,0 +1,17 @@
+flowchart TD
+    START([Inicio]) --> CHECK{GCP configurado?}
+
+    CHECK -->|Sim| GCP[Vertex AI Producao]
+    CHECK -->|Nao| LOCAL[Modo Local]
+
+    GCP --> T1[CustomTrainingJob]
+    GCP --> T2[Endpoint Online]
+    GCP --> T3[Batch Prediction]
+
+    LOCAL --> L1[Isolation Forest]
+    LOCAL --> L2[Detector Contextual]
+    LOCAL --> L3[Predicoes Batch JSONL]
+
+    T1 & L1 --> OUT1[Modelo Treinado]
+    T2 & L2 --> OUT2[Alertas Online]
+    T3 & L3 --> OUT3[Coorte Scored]

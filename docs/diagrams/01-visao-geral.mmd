@@ -1,0 +1,70 @@
+flowchart TB
+    subgraph FONTES["Fontes de Dados"]
+        W1[Pixel Watch]
+        W2[Fitbit Band]
+        W3[Outros Wearables]
+        SIM[TelemetrySimulator 24h]
+    end
+
+    subgraph INGESTAO["Ingestao - Bronze"]
+        REG[DeviceRegistry]
+        VAL[TelemetryValidator]
+        ING[TelemetryIngestor]
+        BRZ[(Bronze: telemetry_raw)]
+    end
+
+    subgraph TRANSFORM["Transformacao - Silver"]
+        ETL1[BronzeToSilverTransformer]
+        ANOM[Deteccao Contextual de Anomalias]
+        QG1{Quality Gate B to S}
+        SLV[(Silver: telemetry_curated)]
+    end
+
+    subgraph ANALYTICS["Analytics - Gold"]
+        ETL2[SilverToGoldTransformer]
+        HRL[hourly_vitals]
+        DLY[daily_summary]
+        ALT[patient_alerts]
+        QG2{Quality Gate S to G}
+        GLD[(Gold: hourly / daily / alerts)]
+    end
+
+    subgraph EXTRACAO["Extracao"]
+        QE[DatalakeQueryEngine]
+        TL[Timeline]
+        VS[Vitals Stream]
+        AW[Anomaly Windows]
+        PC[Population Cohort]
+    end
+
+    subgraph VERTEX["Vertex AI"]
+        FB[FeatureBuilder]
+        EXP[DataExporter]
+        TRN[Training]
+        ONL[Online Pipeline]
+        BAT[Batch Pipeline]
+        LM[Modelo Local]
+        VTX[Vertex AI GCP]
+    end
+
+    W1 & W2 & W3 -.-> ING
+    SIM --> ING
+    SIM --> REG
+    REG --> ING
+    ING --> VAL --> BRZ
+    BRZ --> ETL1 --> ANOM --> QG1 --> SLV
+    SLV --> ETL2 --> HRL & DLY & ALT --> QG2 --> GLD
+    SLV & GLD --> QE
+    QE --> TL & VS & AW & PC
+    GLD --> FB
+    SLV --> FB
+    FB --> EXP
+    FB --> TRN & ONL & BAT
+    TRN --> LM
+    TRN -.-> VTX
+    ONL --> VTX
+    ONL --> LM
+    BAT --> VTX
+    BAT --> LM
+    PC --> BAT
+    VS --> ONL

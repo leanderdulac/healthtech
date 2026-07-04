@@ -1,0 +1,100 @@
+flowchart TB
+    START([main_simulation.py / run_vertex_integration.py / run_fhir_export.py])
+
+    subgraph F1["FASE 1 — Datalake 24h"]
+        SIM[TelemetrySimulator<br/>wearables 24h]
+        REG[DeviceRegistry]
+        ING[TelemetryIngestor]
+        VAL[TelemetryValidator]
+        BRZ[(Bronze<br/>telemetry_raw)]
+        ETL1[BronzeToSilverTransformer<br/>reconciliacao 5s + anomalias]
+        QG1{Quality Gate}
+        SLV[(Silver<br/>telemetry_curated)]
+        ETL2[SilverToGoldTransformer]
+        GLD[(Gold<br/>hourly_vitals / daily_summary / patient_alerts)]
+    end
+
+    subgraph F1B["FASE 1b — Exportacao FHIR R4"]
+        MAP[FhirMappers]
+        BUILD[FhirBuilders<br/>LOINC + UCUM + SNOMED]
+        FEXP[FhirExporter]
+        BUNDLE[Bundle JSON + NDJSON]
+    end
+
+    subgraph F2["FASE 2 — Treinamento"]
+        FB[DatalakeFeatureBuilder]
+        CSV[training_data.csv]
+        LM[LocalAnomalyModel<br/>Isolation Forest]
+        VTR[Vertex CustomTraining]
+    end
+
+    subgraph F3["FASE 3 — Inferencia Online"]
+        VS[VitalsStreamExtractor]
+        ONL[VertexOnlinePipeline]
+        VEP[Vertex Endpoint]
+        LOC1[Detector Local]
+    end
+
+    subgraph F4["FASE 4 — Inferencia Batch"]
+        PC[PopulationCohortExtractor]
+        JSONL[batch_input.jsonl]
+        VBT[Vertex Batch Prediction]
+        PRED[batch_predictions.jsonl]
+    end
+
+    subgraph F5["FASE 5 — BigQuery + FHIR Sync"]
+        BQ[BigQueryBridge]
+        BQT0[fhir_resources]
+        BQT1[wearable_biometrics]
+        BQT2[gold_daily_summary]
+        SIMBQ[(bigquery_simulation)]
+    end
+
+    subgraph OUT["Saidas"]
+        O1[data/lakehouse/]
+        O2[data/models/]
+        O3[data/vertex_exports/]
+        O4[data/bigquery_simulation/]
+        O5[data/fhir_exports/]
+    end
+
+    START --> SIM
+    SIM --> REG & ING
+    ING --> VAL --> BRZ
+    BRZ --> ETL1 --> QG1 --> SLV
+    SLV --> ETL2 --> GLD
+
+    SLV & GLD --> MAP --> BUILD --> FEXP --> BUNDLE --> O5
+
+    GLD --> FB
+    SLV --> FB
+    FB --> CSV --> LM
+    FB -.->|GCP ativo| VTR
+    LM --> O2
+
+    SLV --> VS --> ONL
+    ONL -->|GCP ativo| VEP
+    ONL --> LOC1
+
+    GLD --> PC --> JSONL
+    JSONL --> VBT
+    JSONL --> PRED
+    LM --> PRED
+    VBT -.->|GCP ativo| O3
+    PRED --> O3
+
+    SLV & GLD & BUNDLE --> BQ
+    BQ -->|GCP ativo| BQT0 & BQT1 & BQT2
+    BQ -->|sem GCP| SIMBQ
+
+    BRZ & SLV & GLD --> O1
+    SIMBQ --> O4
+
+    classDef phase fill:#E8F4F8,stroke:#065A82,stroke-width:2px
+    classDef store fill:#D4EDDA,stroke:#028090,stroke-width:2px
+    classDef vertex fill:#FFF3CD,stroke:#856404,stroke-width:2px
+    classDef fhir fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px
+    class F1,F2,F3,F4,F5 phase
+    class F1B fhir
+    class BRZ,SLV,GLD,SIMBQ store
+    class VEP,VTR,VBT vertex

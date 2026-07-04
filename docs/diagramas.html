@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Healthtech — Diagramas de Fluxo</title>
+  <style>
+    :root { --navy: #065A82; --teal: #028090; --bg: #F2F7FA; --text: #21295C; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    header { background: linear-gradient(135deg, var(--navy), var(--teal)); color: white; padding: 2rem; }
+    header h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+    header p { opacity: 0.9; }
+    nav { background: white; padding: 1rem 2rem; border-bottom: 1px solid #ddd; display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    nav a { color: var(--teal); text-decoration: none; font-weight: 600; }
+    nav a:hover { text-decoration: underline; }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    section { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    section h2 { color: var(--navy); margin-bottom: 0.5rem; font-size: 1.3rem; }
+    section p { color: #555; margin-bottom: 1rem; font-size: 0.95rem; }
+    .diagram { text-align: center; overflow-x: auto; }
+    .diagram img { max-width: 100%; height: auto; border: 1px solid #e0e0e0; border-radius: 8px; }
+    .links { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .links a { font-size: 0.85rem; padding: 0.3rem 0.8rem; background: var(--bg); border-radius: 6px; color: var(--navy); text-decoration: none; }
+    .links a:hover { background: var(--teal); color: white; }
+    footer { text-align: center; padding: 2rem; color: #888; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Healthtech — Diagramas de Fluxo</h1>
+    <p>Datalake de Telemetria 24h + Integração Vertex AI</p>
+  </header>
+  <nav>
+    <a href="#fluxo-completo">Fluxo Completo</a>
+    <a href="#visao-geral">Visão Geral</a>
+    <a href="#sequencia">Sequência</a>
+    <a href="#medallion">Medallion</a>
+    <a href="#vertex">Vertex AI</a>
+    <a href="Healthtech_Datalake_VertexAI.pptx">Download PPTX</a>
+  </nav>
+  <main>
+    <section id="fluxo-completo">
+      <h2>Fluxo Completo — Processo Implementado</h2>
+      <p>Pipeline end-to-end com as 5 fases: Datalake → Treino → Online → Batch → BigQuery.</p>
+      <div class="links">
+        <a href="diagrams/fluxo-completo.png" download>PNG</a>
+        <a href="diagrams/fluxo-completo.svg" download>SVG</a>
+        <a href="diagrams/fluxo-completo.mmd" download>Mermaid</a>
+      </div>
+      <div class="diagram"><img src="diagrams/fluxo-completo.svg" alt="Fluxo Completo" /></div>
+    </section>
+    <section id="visao-geral">
+      <h2>1. Visão Geral — End-to-End</h2>
+      <p>Fluxo completo desde wearables e simulador até extração e Vertex AI.</p>
+      <div class="links">
+        <a href="diagrams/01-visao-geral.png" download>PNG</a>
+        <a href="diagrams/01-visao-geral.svg" download>SVG</a>
+        <a href="diagrams/01-visao-geral.mmd" download>Mermaid</a>
+      </div>
+      <div class="diagram"><img src="diagrams/01-visao-geral.png" alt="Visão Geral" /></div>
+    </section>
+    <section id="sequencia">
+      <h2>2. Sequência de Execução</h2>
+      <p>Ordem temporal do pipeline integrado (<code>run_vertex_integration.py</code>).</p>
+      <div class="links">
+        <a href="diagrams/02-sequencia.png" download>PNG</a>
+        <a href="diagrams/02-sequencia.svg" download>SVG</a>
+        <a href="diagrams/02-sequencia.mmd" download>Mermaid</a>
+      </div>
+      <div class="diagram"><img src="diagrams/02-sequencia.png" alt="Sequência" /></div>
+    </section>
+    <section id="medallion">
+      <h2>3. Camadas Medallion</h2>
+      <p>Bronze (raw) → Silver (curated) → Gold (analytics).</p>
+      <div class="links">
+        <a href="diagrams/03-medallion.png" download>PNG</a>
+        <a href="diagrams/03-medallion.svg" download>SVG</a>
+        <a href="diagrams/03-medallion.mmd" download>Mermaid</a>
+      </div>
+      <div class="diagram"><img src="diagrams/03-medallion.png" alt="Medallion" /></div>
+    </section>
+    <section id="vertex">
+      <h2>4. Modos Vertex AI</h2>
+      <p>Produção GCP vs modo local com Isolation Forest.</p>
+      <div class="links">
+        <a href="diagrams/04-vertex-modos.png" download>PNG</a>
+        <a href="diagrams/04-vertex-modos.svg" download>SVG</a>
+        <a href="diagrams/04-vertex-modos.mmd" download>Mermaid</a>
+      </div>
+      <div class="diagram"><img src="diagrams/04-vertex-modos.png" alt="Vertex AI" /></div>
+    </section>
+  </main>
+  <footer>Healthtech · Gerado automaticamente · docs/diagrams/</footer>
+</body>
+</html>
