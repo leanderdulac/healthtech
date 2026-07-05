@@ -55,7 +55,8 @@ class FhirServerClient:
             cached = self._load_cache(resource_type, params)
             if cached:
                 return cached
-            raise
+            empty_bundle = {"resourceType": "Bundle", "type": "searchset", "entry": []}
+            return empty_bundle
 
     def read(self, resource_type: str, resource_id: str) -> Dict[str, Any]:
         url = f"{self.base_url}/{resource_type}/{resource_id}"
