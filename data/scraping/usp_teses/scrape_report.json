@@ -1,0 +1,38 @@
+{
+  "queries_executed": [
+    {
+      "field": "area",
+      "term": "medicina",
+      "results": 250
+    },
+    {
+      "field": "area",
+      "term": "saúde",
+      "results": 250
+    },
+    {
+      "field": "palavra_chave",
+      "term": "medicina",
+      "results": 215
+    },
+    {
+      "field": "resumo",
+      "term": "telemedicina",
+      "results": 42
+    },
+    {
+      "field": "resumo",
+      "term": "wearable",
+      "results": 13
+    },
+    {
+      "field": "resumo",
+      "term": "monitoramento cardíaco",
+      "results": 212
+    }
+  ],
+  "areas_discovered": 0,
+  "listings_collected": 969,
+  "records_collected": 200,
+  "medicine_records": 200
+}

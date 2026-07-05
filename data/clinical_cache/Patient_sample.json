@@ -1,0 +1,17 @@
+{
+  "cached_at": "2026-07-05T10:00:00",
+  "bundle": {
+    "resourceType": "Bundle",
+    "type": "searchset",
+    "entry": [
+      {
+        "resource": {
+          "resourceType": "Patient",
+          "id": "PAT-SAMPLE-001",
+          "birthDate": "1965-03-15",
+          "name": [{"family": "Silva", "given": ["Maria"]}]
+        }
+      }
+    ]
+  }
+}

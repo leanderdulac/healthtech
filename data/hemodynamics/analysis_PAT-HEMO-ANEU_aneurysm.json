@@ -1,0 +1,108 @@
+{
+  "patient_id": "PAT-HEMO-ANEU",
+  "scenario": "aneurysm",
+  "pressure": {
+    "name": "blood_pressure_mmhg",
+    "shape": [
+      40,
+      24,
+      24
+    ],
+    "min": 93.0187365504054,
+    "max": 125.0,
+    "mean": 112.29080968513703
+  },
+  "velocity": {
+    "name": "blood_velocity_cms",
+    "shape": [
+      40,
+      24,
+      24
+    ],
+    "max_magnitude": 25.0,
+    "mean_magnitude": 3.926424941811786
+  },
+  "gradient_max": 34.19324314072129,
+  "divergence_max": 16.571559632187515,
+  "curl_max": 17.9238766521344,
+  "irregularities_count": 4,
+  "irregularities": [
+    {
+      "irregularity_type": "pressure_gradient_spike",
+      "severity": "high",
+      "location": [
+        17,
+        7,
+        13
+      ],
+      "world_position": [
+        8.5,
+        3.5,
+        6.5
+      ],
+      "metric_value": 34.19324314072129,
+      "threshold": 8.0,
+      "description": "Gradiente de pressao elevado |grad_p|=34.2 em (8.5, 3.5, 6.5)",
+      "operator": "gradient"
+    },
+    {
+      "irregularity_type": "pressure_gradient_spike",
+      "severity": "high",
+      "location": [
+        17,
+        11,
+        17
+      ],
+      "world_position": [
+        8.5,
+        5.5,
+        8.5
+      ],
+      "metric_value": 34.19324314072129,
+      "threshold": 8.0,
+      "description": "Gradiente de pressao elevado |grad_p|=34.2 em (8.5, 5.5, 8.5)",
+      "operator": "gradient"
+    },
+    {
+      "irregularity_type": "flow_source",
+      "severity": "high",
+      "location": [
+        25,
+        10,
+        10
+      ],
+      "world_position": [
+        12.5,
+        5.0,
+        5.0
+      ],
+      "metric_value": 16.490913160781584,
+      "threshold": 15.0,
+      "description": "Fonte de fluxo (aneurisma?) div=16.5 em (12.5, 5.0, 5.0)",
+      "operator": "divergence"
+    },
+    {
+      "irregularity_type": "flow_sink",
+      "severity": "medium",
+      "location": [
+        15,
+        15,
+        12
+      ],
+      "world_position": [
+        7.5,
+        7.5,
+        6.0
+      ],
+      "metric_value": -16.571559632187515,
+      "threshold": -12.0,
+      "description": "Sumidouro de fluxo (estenose?) div=-16.6 em (7.5, 7.5, 6.0)",
+      "operator": "divergence"
+    }
+  ],
+  "ontology_domains": {
+    "cardiovascular": 1.0,
+    "monitoring": 0.8,
+    "imaging": 0.0
+  }
+}

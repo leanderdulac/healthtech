@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HealthData locale="pt_BR">
+  <ExportDate>2026-07-05 10:00:00 +0000</ExportDate>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" device="AW-001" unit="count/min" creationDate="2026-07-05 08:00:00 +0000" startDate="2026-07-05 08:00:00 +0000" endDate="2026-07-05 08:00:05 +0000" value="72"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" device="AW-001" unit="count/min" creationDate="2026-07-05 08:05:00 +0000" startDate="2026-07-05 08:05:00 +0000" endDate="2026-07-05 08:05:05 +0000" value="75"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" device="AW-001" unit="count/min" creationDate="2026-07-05 08:10:00 +0000" startDate="2026-07-05 08:10:00 +0000" endDate="2026-07-05 08:10:05 +0000" value="78"/>
+  <Record type="HKQuantityTypeIdentifierOxygenSaturation" sourceName="Apple Watch" device="AW-001" unit="%" creationDate="2026-07-05 08:00:00 +0000" startDate="2026-07-05 08:00:00 +0000" endDate="2026-07-05 08:00:05 +0000" value="0.97"/>
+  <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch" device="AW-001" unit="ms" creationDate="2026-07-05 08:00:00 +0000" startDate="2026-07-05 08:00:00 +0000" endDate="2026-07-05 08:00:05 +0000" value="48"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" device="IPH-001" unit="count" creationDate="2026-07-05 09:00:00 +0000" startDate="2026-07-05 09:00:00 +0000" endDate="2026-07-05 09:05:00 +0000" value="120"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" creationDate="2026-07-05 06:00:00 +0000" startDate="2026-07-05 06:00:00 +0000" endDate="2026-07-05 07:00:00 +0000" value="HKCategoryValueSleepAnalysisAsleep"/>
+</HealthData>

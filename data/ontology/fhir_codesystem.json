@@ -1,0 +1,281 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "healthtech-medical-ontology",
+  "meta": {
+    "profile": [
+      "http://healthtech.local/fhir/StructureDefinition/HealthtechMedicalOntology"
+    ]
+  },
+  "url": "http://healthtech.local/fhir/StructureDefinition/CodeSystem/healthtech-ontology",
+  "version": "1.0.0",
+  "name": "HealthtechMedicalOntology",
+  "title": "Ontologia Médica Healthtech (USP Teses)",
+  "status": "active",
+  "experimental": true,
+  "date": "2026-07-04",
+  "publisher": "Healthtech",
+  "description": "Ontologia derivada de teses e dissertações de medicina da USP",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "fmri",
+      "display": "fmri",
+      "definition": "Conceito médico (freq=11) da ontologia USP"
+    },
+    {
+      "code": "qualidade-de-vida",
+      "display": "qualidade de vida",
+      "definition": "Conceito médico (freq=10) da ontologia USP"
+    },
+    {
+      "code": "primary-health-care",
+      "display": "primary health care",
+      "definition": "Conceito médico (freq=10) da ontologia USP"
+    },
+    {
+      "code": "quality-of-life",
+      "display": "quality of life",
+      "definition": "Conceito médico (freq=9) da ontologia USP"
+    },
+    {
+      "code": "family-health-program",
+      "display": "family health program",
+      "definition": "Conceito médico (freq=8) da ontologia USP"
+    },
+    {
+      "code": "atenã§ã£o-primã¡ria-ã-saãºde",
+      "display": "atenã§ã£o primã¡ria ã saãºde",
+      "definition": "Conceito médico (freq=8) da ontologia USP"
+    },
+    {
+      "code": "idoso",
+      "display": "idoso",
+      "definition": "Conceito médico (freq=7) da ontologia USP"
+    },
+    {
+      "code": "programa-saãºde-da-famã­lia",
+      "display": "programa saãºde da famã­lia",
+      "definition": "Conceito médico (freq=7) da ontologia USP"
+    },
+    {
+      "code": "fatores-de-risco",
+      "display": "fatores de risco",
+      "definition": "Conceito médico (freq=7) da ontologia USP"
+    },
+    {
+      "code": "risk-factors",
+      "display": "risk factors",
+      "definition": "Conceito médico (freq=7) da ontologia USP"
+    },
+    {
+      "code": "estudos-transversais",
+      "display": "estudos transversais",
+      "definition": "Conceito médico (freq=6) da ontologia USP"
+    },
+    {
+      "code": "cross-sectional-studies",
+      "display": "cross-sectional studies",
+      "definition": "Conceito médico (freq=6) da ontologia USP"
+    },
+    {
+      "code": "pesquisa-qualitativa",
+      "display": "pesquisa qualitativa",
+      "definition": "Conceito médico (freq=6) da ontologia USP"
+    },
+    {
+      "code": "hiv",
+      "display": "hiv",
+      "definition": "Conceito médico (freq=6) da ontologia USP"
+    },
+    {
+      "code": "sistema-ãnico-de-saãºde",
+      "display": "sistema ãnico de saãºde",
+      "definition": "Conceito médico (freq=6) da ontologia USP"
+    },
+    {
+      "code": "sã£o-paulo-(sp)",
+      "display": "sã£o paulo (sp)",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "saãºde-do-idoso",
+      "display": "saãºde do idoso",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "health-policy",
+      "display": "health policy",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "deterministic-walk",
+      "display": "deterministic walk",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "aged",
+      "display": "aged",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "qualitative-research",
+      "display": "qualitative research",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "breast-cancer",
+      "display": "breast cancer",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "violãªncia-contra-a-mulher",
+      "display": "violãªncia contra a mulher",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "single-health-system",
+      "display": "single health system",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "assistãªncia-ã-saãºde",
+      "display": "assistãªncia ã saãºde",
+      "definition": "Conceito médico (freq=5) da ontologia USP"
+    },
+    {
+      "code": "alq3",
+      "display": "alq3",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "questionnaires",
+      "display": "questionnaires",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "spray-pyrolysis",
+      "display": "spray pyrolysis",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "health-services",
+      "display": "health services",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "caminhada-determinista",
+      "display": "caminhada determinista",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "caminhada-do-turista",
+      "display": "caminhada do turista",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "tourist-walk",
+      "display": "tourist walk",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "educaã§ã£o-em-saãºde",
+      "display": "educaã§ã£o em saãºde",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "health-education",
+      "display": "health education",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "acquired-immunodeficiency-syndrome",
+      "display": "acquired immunodeficiency syndrome",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "brasil",
+      "display": "brasil",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "brazil",
+      "display": "brazil",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "polã­tica-de-saãºde",
+      "display": "polã­tica de saãºde",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "health-promotion",
+      "display": "health promotion",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "aids",
+      "display": "aids",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "cã¢ncer-de-mama",
+      "display": "cã¢ncer de mama",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "violence-against-women",
+      "display": "violence against women",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "educaã§ã£o-mã©dica",
+      "display": "educaã§ã£o mã©dica",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "assistãªncia-integral-ã-saãºde",
+      "display": "assistãªncia integral ã saãºde",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "sã£o-paulo",
+      "display": "sã£o paulo",
+      "definition": "Conceito médico (freq=4) da ontologia USP"
+    },
+    {
+      "code": "elderly",
+      "display": "elderly",
+      "definition": "Conceito médico (freq=3) da ontologia USP"
+    },
+    {
+      "code": "dna",
+      "display": "dna",
+      "definition": "Conceito médico (freq=3) da ontologia USP"
+    },
+    {
+      "code": "lead-iodide",
+      "display": "lead iodide",
+      "definition": "Conceito médico (freq=3) da ontologia USP"
+    },
+    {
+      "code": "comorbidity",
+      "display": "comorbidity",
+      "definition": "Conceito médico (freq=3) da ontologia USP"
+    },
+    {
+      "code": "edmr",
+      "display": "edmr",
+      "definition": "Conceito médico (freq=3) da ontologia USP"
+    },
+    {
+      "code": "area-Medicina-Preventiva",
+      "display": "Medicina Preventiva",
+      "definition": "Área de concentração USP (n=115)"
+    },
+    {
+      "code": "area-FÃ­sica-Aplicada-Ã-Medicina-e-Biologia",
+      "display": "FÃ­sica Aplicada Ã Medicina e Biologia",
+      "definition": "Área de concentração USP (n=85)"
+    }
+  ]
+}

@@ -1,0 +1,254 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-e04ecb1f4130",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "H",
+                  "display": "high"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "heart_rate"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": 34.19324314072129
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "pressure_gradient_spike",
+              "display": "Pressure Gradient Spike"
+            }
+          ],
+          "text": "Gradiente de pressao elevado |grad_p|=34.2 em (8.5, 3.5, 6.5)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-ANEU"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.320006",
+          "end": "2026-07-04T21:39:08.320006"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-944e602c42cc",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "H",
+                  "display": "high"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "heart_rate"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": 34.19324314072129
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "pressure_gradient_spike",
+              "display": "Pressure Gradient Spike"
+            }
+          ],
+          "text": "Gradiente de pressao elevado |grad_p|=34.2 em (8.5, 3.5, 6.5)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-ANEU"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.320006",
+          "end": "2026-07-04T21:39:08.320006"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-c85a8a2b2b7b",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "H",
+                  "display": "high"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "heart_rate"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": 16.490913160781584
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "flow_source",
+              "display": "Flow Source"
+            }
+          ],
+          "text": "Fonte de fluxo (aneurisma?) div=16.5 em (12.5, 5.0, 5.0)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-ANEU"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.320006",
+          "end": "2026-07-04T21:39:08.320006"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-ee9eb36b3c03",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "M",
+                  "display": "moderate"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "heart_rate"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": -16.571559632187515
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "flow_sink",
+              "display": "Flow Sink"
+            }
+          ],
+          "text": "Sumidouro de fluxo (estenose?) div=-16.6 em (7.5, 7.5, 6.0)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-ANEU"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.320006",
+          "end": "2026-07-04T21:39:08.320006"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "saved_at": "2026-07-05T10:00:00+00:00",
+  "readings": [
+    {"metric_type": "heart_rate", "value": 68, "timestamp": "2026-07-05T07:00:00+00:00"},
+    {"metric_type": "heart_rate", "value": 71, "timestamp": "2026-07-05T07:05:00+00:00"},
+    {"metric_type": "heart_rate", "value": 74, "timestamp": "2026-07-05T07:10:00+00:00"},
+    {"metric_type": "spo2", "value": 96.5, "timestamp": "2026-07-05T07:00:00+00:00"},
+    {"metric_type": "hrv", "value": 52, "timestamp": "2026-07-05T07:00:00+00:00"},
+    {"metric_type": "steps", "value": 250, "timestamp": "2026-07-05T08:00:00+00:00"}
+  ]
+}

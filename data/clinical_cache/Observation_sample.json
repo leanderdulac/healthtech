@@ -1,0 +1,17 @@
+{
+  "bundle": {
+    "resourceType": "Bundle",
+    "entry": [
+      {
+        "resource": {
+          "resourceType": "Observation",
+          "id": "obs-1",
+          "status": "final",
+          "code": {"coding": [{"code": "8867-4", "display": "Heart rate"}]},
+          "valueQuantity": {"value": 68, "unit": "bpm"},
+          "subject": {"reference": "Patient/PAT-SAMPLE-001"}
+        }
+      }
+    ]
+  }
+}

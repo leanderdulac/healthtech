@@ -1,0 +1,35 @@
+{
+  "architecture": "TCN-per-horizon",
+  "n_features": 24,
+  "seq_len": 32,
+  "horizon_names": [
+    "event_6h",
+    "event_24h",
+    "event_72h"
+  ],
+  "train_samples": 601,
+  "val_samples": 151,
+  "metrics": {
+    "event_6h": {
+      "precision": 0.981,
+      "recall": 1.0,
+      "f1": 0.99,
+      "positive_rate": 0.274,
+      "threshold": 0.85
+    },
+    "event_24h": {
+      "precision": 0.985,
+      "recall": 0.985,
+      "f1": 0.985,
+      "positive_rate": 0.528,
+      "threshold": 0.529
+    },
+    "event_72h": {
+      "precision": 0.712,
+      "recall": 0.712,
+      "f1": 0.712,
+      "positive_rate": 0.54,
+      "threshold": 0.832
+    }
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "patient_id": "PAT-880b42dca128",
+  "scenario": "datalake",
+  "denoised_signals": {
+    "heart_rate": {
+      "metric": "heart_rate",
+      "samples": 6480,
+      "noise_estimate": 6.188546877066035,
+      "artifact_ratio": 0.014197530864197531,
+      "quality_score": 0.8985413966049383,
+      "last_raw": 130.73,
+      "last_filtered": 98.30349946342466
+    },
+    "spo2": {
+      "metric": "spo2",
+      "samples": 720,
+      "noise_estimate": 0.5936304928727585,
+      "artifact_ratio": 0.1736111111111111,
+      "quality_score": 0.9227304398148147,
+      "last_raw": 97.78,
+      "last_filtered": 98.12485587677439
+    },
+    "hrv": {
+      "metric": "hrv",
+      "samples": 144,
+      "noise_estimate": 2.8341332818003644,
+      "artifact_ratio": 0.06944444444444445,
+      "quality_score": 0.9293495370370368,
+      "last_raw": 32.86,
+      "last_filtered": 34.77407915156891
+    }
+  },
+  "ghost_signals": [
+    {
+      "name": "autonomic_imbalance",
+      "value": 0.6137992026868309,
+      "confidence": 0.8086872569444444,
+      "derivation": "hrv_suppression + hr_elevation",
+      "clinical_relevance": "Arritmia, ICC descompensada, sepse precoce, evento coronariano",
+      "operator": "inference"
+    },
+    {
+      "name": "hidden_hypoxemia",
+      "value": 0.3248614137049949,
+      "confidence": 0.7843208738425925,
+      "derivation": "spo2_percentile_dips",
+      "clinical_relevance": "Apneia do sono, descompensação respiratória, embolia",
+      "operator": "inference"
+    },
+    {
+      "name": "pulse_irregularity",
+      "value": 0.4882480789289726,
+      "confidence": 0.8857843273938805,
+      "derivation": "hr_beat_to_beat_variation",
+      "clinical_relevance": "FA, extrassístoles, bloqueio AV, flutter",
+      "operator": "inference"
+    },
+    {
+      "name": "circadian_desync",
+      "value": 1.0,
+      "confidence": 0.55,
+      "derivation": "hr_day_night_amplitude",
+      "clinical_relevance": "Distúrbio circadiano, depressão, apneia, evento cardiovascular noturno",
+      "operator": "inference"
+    }
+  ],
+  "fuzzy": {
+    "event_probability": 0.0974,
+    "false_positive_risk": 0.0,
+    "noise_gate": 0.0,
+    "persistence_score": 0.3666666666666667,
+    "rule_activations": {
+      "R1_noise_suppress": 0.0,
+      "R2_hypoxemia_ghost": 0,
+      "R3_autonomic_event": 0,
+      "R4_cardiac_critical": 0,
+      "R5_ghost_trajectory": 0,
+      "R6_transient_hr": 0.0,
+      "R7_persistent_moderate": 0,
+      "R8_clinical_ghost": 0,
+      "R9_all_normal": 0
+    },
+    "linguistic_summary": "Risco BAIXO — dentro do esperado. Baixo risco de falso positivo."
+  },
+  "predictions": [
+    {
+      "patient_id": "PAT-880b42dca128",
+      "event_type": "arrhythmia_event",
+      "probability": 0.2934,
+      "confidence_interval": [
+        0.2934,
+        0.3934
+      ],
+      "lead_time_hours": 9.5,
+      "lead_time_days": 0.4,
+      "horizon": "hours",
+      "evidence_sources": [
+        "wearable",
+        "ghost"
+      ],
+      "ghost_signals_involved": [
+        "pulse_irregularity",
+        "autonomic_imbalance"
+      ],
+      "false_positive_risk": 0.0,
+      "recommendation": "[VIGILÂNCIA] Risco de arrhythmia event em ~10h. Confirmar com ECG/SpO2 contínuo e avaliação clínica.",
+      "timestamp": "2026-07-04T22:14:47.961881"
+    },
+    {
+      "patient_id": "PAT-880b42dca128",
+      "event_type": "cardiovascular_event",
+      "probability": 0.2445,
+      "confidence_interval": [
+        0.2445,
+        0.3445
+      ],
+      "lead_time_hours": 77.7,
+      "lead_time_days": 3.24,
+      "horizon": "days",
+      "evidence_sources": [
+        "wearable",
+        "ghost"
+      ],
+      "ghost_signals_involved": [
+        "pulse_irregularity",
+        "autonomic_imbalance"
+      ],
+      "false_positive_risk": 0.0,
+      "recommendation": "[VIGILÂNCIA] Risco de cardiovascular event em ~3.2 dias. Confirmar com ECG/SpO2 contínuo e avaliação clínica.",
+      "timestamp": "2026-07-04T22:14:47.961881"
+    },
+    {
+      "patient_id": "PAT-880b42dca128",
+      "event_type": "autonomic_crisis",
+      "probability": 0.2445,
+      "confidence_interval": [
+        0.2445,
+        0.3445
+      ],
+      "lead_time_hours": 19.4,
+      "lead_time_days": 0.81,
+      "horizon": "hours",
+      "evidence_sources": [
+        "wearable",
+        "ghost"
+      ],
+      "ghost_signals_involved": [
+        "autonomic_imbalance",
+        "circadian_desync"
+      ],
+      "false_positive_risk": 0.0,
+      "recommendation": "[VIGILÂNCIA] Risco de autonomic crisis em ~19h. Confirmar com ECG/SpO2 contínuo e avaliação clínica.",
+      "timestamp": "2026-07-04T22:14:47.961881"
+    },
+    {
+      "patient_id": "PAT-880b42dca128",
+      "event_type": "respiratory_decompensation",
+      "probability": 0.22,
+      "confidence_interval": [
+        0.22,
+        0.32
+      ],
+      "lead_time_hours": 39.3,
+      "lead_time_days": 1.64,
+      "horizon": "hours",
+      "evidence_sources": [
+        "wearable",
+        "ghost"
+      ],
+      "ghost_signals_involved": [
+        "hidden_hypoxemia"
+      ],
+      "false_positive_risk": 0.0,
+      "recommendation": "[VIGILÂNCIA] Risco de respiratory decompensation em ~39h. Confirmar com ECG/SpO2 contínuo e avaliação clínica.",
+      "timestamp": "2026-07-04T22:14:47.961881"
+    }
+  ],
+  "fusion_score": 0.2933971420553308,
+  "ontology_domains": {
+    "cardiovascular": 0.2,
+    "monitoring": 0.4
+  }
+}

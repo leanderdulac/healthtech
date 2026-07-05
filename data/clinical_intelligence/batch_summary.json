@@ -1,0 +1,96 @@
+{
+  "patients_analyzed": 3,
+  "predictions": [
+    {
+      "patient_id": "PAT-880b42dca128",
+      "fusion_score": 0.2933971420553308,
+      "ghost_count": 4,
+      "top_prediction": {
+        "patient_id": "PAT-880b42dca128",
+        "event_type": "arrhythmia_event",
+        "probability": 0.2934,
+        "confidence_interval": [
+          0.2934,
+          0.3934
+        ],
+        "lead_time_hours": 9.5,
+        "lead_time_days": 0.4,
+        "horizon": "hours",
+        "evidence_sources": [
+          "wearable",
+          "ghost"
+        ],
+        "ghost_signals_involved": [
+          "pulse_irregularity",
+          "autonomic_imbalance"
+        ],
+        "false_positive_risk": 0.0,
+        "recommendation": "[VIGILÂNCIA] Risco de arrhythmia event em ~10h. Confirmar com ECG/SpO2 contínuo e avaliação clínica.",
+        "timestamp": "2026-07-04T22:14:47.961881"
+      },
+      "fuzzy_summary": "Risco BAIXO — dentro do esperado. Baixo risco de falso positivo."
+    },
+    {
+      "patient_id": "PAT-cb1ac7aefbcb",
+      "fusion_score": 0.43200023022040684,
+      "ghost_count": 4,
+      "top_prediction": {
+        "patient_id": "PAT-cb1ac7aefbcb",
+        "event_type": "arrhythmia_event",
+        "probability": 0.432,
+        "confidence_interval": [
+          0.432,
+          0.532
+        ],
+        "lead_time_hours": 8.9,
+        "lead_time_days": 0.37,
+        "horizon": "hours",
+        "evidence_sources": [
+          "wearable",
+          "ghost",
+          "clinical",
+          "fuzzy"
+        ],
+        "ghost_signals_involved": [
+          "pulse_irregularity",
+          "autonomic_imbalance"
+        ],
+        "false_positive_risk": 0.0,
+        "recommendation": "[VIGILÂNCIA] Risco de arrhythmia event em ~9h. Confirmar com ECG/SpO2 contínuo e avaliação clínica.",
+        "timestamp": "2026-07-04T22:14:49.754966"
+      },
+      "fuzzy_summary": "Risco BAIXO-MODERADO — vigilância. Baixo risco de falso positivo."
+    },
+    {
+      "patient_id": "PAT-9822c35cfe20",
+      "fusion_score": 0.7526085994660835,
+      "ghost_count": 4,
+      "top_prediction": {
+        "patient_id": "PAT-9822c35cfe20",
+        "event_type": "arrhythmia_event",
+        "probability": 0.7526,
+        "confidence_interval": [
+          0.7526,
+          0.8526
+        ],
+        "lead_time_hours": 7.3,
+        "lead_time_days": 0.31,
+        "horizon": "hours",
+        "evidence_sources": [
+          "wearable",
+          "ghost",
+          "clinical",
+          "fuzzy"
+        ],
+        "ghost_signals_involved": [
+          "pulse_irregularity",
+          "autonomic_imbalance"
+        ],
+        "false_positive_risk": 0.0,
+        "recommendation": "[URGENTE] Risco de arrhythmia event em ~7h. Confirmar com ECG/SpO2 contínuo e avaliação clínica.",
+        "timestamp": "2026-07-04T22:14:52.023623"
+      },
+      "fuzzy_summary": "ALTO risco de evento clínico. Baixo risco de falso positivo."
+    }
+  ]
+}

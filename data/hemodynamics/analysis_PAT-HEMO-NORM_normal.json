@@ -1,0 +1,35 @@
+{
+  "patient_id": "PAT-HEMO-NORM",
+  "scenario": "normal",
+  "pressure": {
+    "name": "blood_pressure_mmhg",
+    "shape": [
+      40,
+      24,
+      24
+    ],
+    "min": 104.40061704902044,
+    "max": 125.0,
+    "mean": 113.06771940735925
+  },
+  "velocity": {
+    "name": "blood_velocity_cms",
+    "shape": [
+      40,
+      24,
+      24
+    ],
+    "max_magnitude": 25.0,
+    "mean_magnitude": 4.356553819444445
+  },
+  "gradient_max": 1.686806944555851,
+  "divergence_max": 3.552713678800501e-15,
+  "curl_max": 11.048543456039802,
+  "irregularities_count": 0,
+  "irregularities": [],
+  "ontology_domains": {
+    "cardiovascular": 0.0,
+    "monitoring": 0.0,
+    "imaging": 0.0
+  }
+}

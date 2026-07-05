@@ -1,0 +1,25 @@
+{
+  "bundle": {
+    "resourceType": "Bundle",
+    "entry": [
+      {
+        "resource": {
+          "resourceType": "Condition",
+          "id": "cond-1",
+          "clinicalStatus": {"coding": [{"code": "active"}]},
+          "code": {"coding": [{"system": "http://snomed.info/sct", "code": "38341003", "display": "Hypertension"}]},
+          "subject": {"reference": "Patient/PAT-SAMPLE-001"}
+        }
+      },
+      {
+        "resource": {
+          "resourceType": "Condition",
+          "id": "cond-2",
+          "clinicalStatus": {"coding": [{"code": "active"}]},
+          "code": {"coding": [{"display": "Type 2 diabetes mellitus"}]},
+          "subject": {"reference": "Patient/PAT-SAMPLE-001"}
+        }
+      }
+    ]
+  }
+}

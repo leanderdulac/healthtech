@@ -1,0 +1,21 @@
+{
+  "synced_at": "2026-07-05T04:34:58.433206",
+  "baseline": {
+    "patient_id": "PAT-SAMPLE-001",
+    "resting_hr": 68.0,
+    "baseline_spo2": 97.0,
+    "baseline_hrv": 50.0,
+    "age": 61,
+    "risk_factor": 0.37,
+    "activity_level": "moderate",
+    "clinical_conditions": [
+      "hypertension",
+      "type 2 diabetes mellitus"
+    ],
+    "medications": [
+      "metoprolol beta blocker"
+    ]
+  },
+  "active_flags": 1,
+  "fhir_live": false
+}

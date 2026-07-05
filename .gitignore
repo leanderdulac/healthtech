@@ -11,9 +11,20 @@ env/
 # Arquivos de sistema
 .DS_Store
 
-# Artefatos gerados em runtime
-data/
+# Dados regeneráveis em runtime (não versionar)
+data/lakehouse/
+data/bigquery_simulation/
+data/vertex_exports/
+data/fhir_exports/
+
+# Formatos voláteis (exceto scraping USP e modelos)
 *.csv
-*.pkl
 *.parquet
+!data/scraping/**
 *.jsonl
+!data/scraping/**
+
+# Pickle — liberado apenas em data/models/
+*.pkl
+!data/models/
+!data/models/**

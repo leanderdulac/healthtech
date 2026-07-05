@@ -1,0 +1,35 @@
+{
+  "patient_id": "PAT-HEMO-TURB",
+  "scenario": "turbulent",
+  "pressure": {
+    "name": "blood_pressure_mmhg",
+    "shape": [
+      40,
+      24,
+      24
+    ],
+    "min": 104.40061704902044,
+    "max": 125.0,
+    "mean": 113.06771940735925
+  },
+  "velocity": {
+    "name": "blood_velocity_cms",
+    "shape": [
+      40,
+      24,
+      24
+    ],
+    "max_magnitude": 25.0,
+    "mean_magnitude": 4.305769255995951
+  },
+  "gradient_max": 1.686806944555851,
+  "divergence_max": 14.92820323027551,
+  "curl_max": 16.14392731730865,
+  "irregularities_count": 0,
+  "irregularities": [],
+  "ontology_domains": {
+    "cardiovascular": 0.0,
+    "monitoring": 0.0,
+    "imaging": 0.0
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "patient_id": "PAT-HEMO-ANEU",
+  "scenario": "aneurysm",
+  "operators": {
+    "gradient_max": 34.19324314072129,
+    "divergence_range": [
+      -16.571559632187515,
+      16.490913160781584
+    ],
+    "curl_max": 17.9238766521344
+  },
+  "irregularities": 4,
+  "alerts_generated": 4,
+  "ontology_domains": {
+    "cardiovascular": 1.0,
+    "monitoring": 0.8,
+    "imaging": 0.0
+  },
+  "by_operator": {
+    "gradient": 2,
+    "divergence": 2
+  }
+}

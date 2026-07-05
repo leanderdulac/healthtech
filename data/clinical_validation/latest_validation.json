@@ -1,0 +1,54 @@
+{
+  "status": "completed",
+  "validated_at": "2026-07-05T04:42:56.009235",
+  "source": "datalake_labels",
+  "n_sequences": 752,
+  "n_patients": 5,
+  "metrics": {
+    "horizons": [
+      {
+        "horizon": "event_6h",
+        "sensitivity": 0.7143,
+        "specificity": 0.6105,
+        "ppv": 0.3693,
+        "npv": 0.87,
+        "accuracy": 0.6356,
+        "f1": 0.4869,
+        "threshold": 0.85,
+        "n_positive": 182,
+        "n_negative": 570,
+        "lead_time_mae_hours": null
+      },
+      {
+        "horizon": "event_24h",
+        "sensitivity": 0.7108,
+        "specificity": 0.594,
+        "ppv": 0.8907,
+        "npv": 0.3062,
+        "accuracy": 0.6902,
+        "f1": 0.7907,
+        "threshold": 0.15,
+        "n_positive": 619,
+        "n_negative": 133,
+        "lead_time_mae_hours": null
+      },
+      {
+        "horizon": "event_72h",
+        "sensitivity": 0.6496,
+        "specificity": 0.6205,
+        "ppv": 0.6496,
+        "npv": 0.6205,
+        "accuracy": 0.6356,
+        "f1": 0.6496,
+        "threshold": 0.8377,
+        "n_positive": 391,
+        "n_negative": 361,
+        "lead_time_mae_hours": null
+      }
+    ],
+    "mean_f1": 0.6424,
+    "mean_sensitivity": 0.6916,
+    "mean_specificity": 0.6083
+  },
+  "conformal_available": true
+}

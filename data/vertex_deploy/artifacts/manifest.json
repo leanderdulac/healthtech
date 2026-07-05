@@ -1,0 +1,17 @@
+{
+  "model_type": "tcn_per_horizon",
+  "horizons": [
+    "6h",
+    "24h",
+    "72h"
+  ],
+  "artifacts": [
+    "temporal_horizon_event_6h.pt",
+    "temporal_horizon_event_24h.pt",
+    "temporal_horizon_event_72h.pt",
+    "temporal_scaler.pkl",
+    "temporal_model_meta.json"
+  ],
+  "predictor": "predictor.py",
+  "requirements": "requirements-serving.txt"
+}

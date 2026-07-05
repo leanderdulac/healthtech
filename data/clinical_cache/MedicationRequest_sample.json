@@ -1,0 +1,16 @@
+{
+  "bundle": {
+    "resourceType": "Bundle",
+    "entry": [
+      {
+        "resource": {
+          "resourceType": "MedicationRequest",
+          "id": "med-1",
+          "status": "active",
+          "medicationCodeableConcept": {"coding": [{"display": "Metoprolol beta blocker"}]},
+          "subject": {"reference": "Patient/PAT-SAMPLE-001"}
+        }
+      }
+    ]
+  }
+}

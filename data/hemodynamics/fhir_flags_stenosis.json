@@ -1,0 +1,378 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-7b20c49dd5d7",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "H",
+                  "display": "high"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "heart_rate"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": 61.6696415223992
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "pressure_gradient_spike",
+              "display": "Pressure Gradient Spike"
+            }
+          ],
+          "text": "Gradiente de pressao elevado |grad_p|=61.7 em (15.5, 2.5, 4.5)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-STEN"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.232211",
+          "end": "2026-07-04T21:39:08.232211"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-2cacc4248e85",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "H",
+                  "display": "high"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "heart_rate"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": 61.6696415223992
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "pressure_gradient_spike",
+              "display": "Pressure Gradient Spike"
+            }
+          ],
+          "text": "Gradiente de pressao elevado |grad_p|=61.7 em (15.5, 2.5, 4.5)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-STEN"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.232211",
+          "end": "2026-07-04T21:39:08.232211"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-adfdb9214964",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "H",
+                  "display": "high"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "heart_rate"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": -37.5
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "flow_sink",
+              "display": "Flow Sink"
+            }
+          ],
+          "text": "Sumidouro de fluxo (estenose?) div=-37.5 em (16.0, 6.0, 6.0)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-STEN"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.232211",
+          "end": "2026-07-04T21:39:08.232211"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-cbef9ca57cec",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "H",
+                  "display": "high"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "heart_rate"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": -37.5
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "flow_sink",
+              "display": "Flow Sink"
+            }
+          ],
+          "text": "Sumidouro de fluxo (estenose?) div=-37.5 em (16.0, 6.0, 6.0)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-STEN"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.232211",
+          "end": "2026-07-04T21:39:08.232211"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-3befe46620da",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "H",
+                  "display": "high"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "hrv"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": 54.27596972779554
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "vortical_flow",
+              "display": "Vortical Flow"
+            }
+          ],
+          "text": "Fluxo rotacional (turbulento) |curl|=54.3 em (13.0, 7.5, 4.5)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-STEN"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.232211",
+          "end": "2026-07-04T21:39:08.232211"
+        }
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Flag",
+        "id": "HEMO-638476cad779",
+        "meta": {
+          "profile": [
+            "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/alert-severity",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                  "code": "H",
+                  "display": "high"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-metric",
+            "valueString": "hrv"
+          },
+          {
+            "url": "http://healthtech.local/fhir/StructureDefinition/trigger-value",
+            "valueDecimal": 54.27596972779554
+          }
+        ],
+        "status": "active",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                "code": "safety",
+                "display": "Safety"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://healthtech.local/fhir/CodeSystem/alert-type",
+              "code": "vortical_flow",
+              "display": "Vortical Flow"
+            }
+          ],
+          "text": "Fluxo rotacional (turbulento) |curl|=54.3 em (13.0, 7.5, 4.5)"
+        },
+        "subject": {
+          "reference": "Patient/PAT-HEMO-STEN"
+        },
+        "period": {
+          "start": "2026-07-04T21:39:08.232211",
+          "end": "2026-07-04T21:39:08.232211"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"feature_columns": ["avg_resting_hr", "max_hr", "min_hr", "avg_spo2", "avg_hrv", "total_steps", "sleep_hours", "stress_peak", "anomaly_episodes", "coverage_24h", "total_alerts"], "online_columns": ["bpm", "spo2", "hrv", "stress", "quality_score", "hour_of_day", "is_active", "is_sleeping"]}

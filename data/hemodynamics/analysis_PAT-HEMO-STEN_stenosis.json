@@ -1,0 +1,144 @@
+{
+  "patient_id": "PAT-HEMO-STEN",
+  "scenario": "stenosis",
+  "pressure": {
+    "name": "blood_pressure_mmhg",
+    "shape": [
+      40,
+      24,
+      24
+    ],
+    "min": 104.40061704902044,
+    "max": 150.0,
+    "mean": 115.12001975458148
+  },
+  "velocity": {
+    "name": "blood_velocity_cms",
+    "shape": [
+      40,
+      24,
+      24
+    ],
+    "max_magnitude": 62.5,
+    "mean_magnitude": 4.926927354600695
+  },
+  "gradient_max": 61.6696415223992,
+  "divergence_max": 37.5,
+  "curl_max": 54.27596972779554,
+  "irregularities_count": 6,
+  "irregularities": [
+    {
+      "irregularity_type": "pressure_gradient_spike",
+      "severity": "high",
+      "location": [
+        31,
+        5,
+        9
+      ],
+      "world_position": [
+        15.5,
+        2.5,
+        4.5
+      ],
+      "metric_value": 61.6696415223992,
+      "threshold": 8.0,
+      "description": "Gradiente de pressao elevado |grad_p|=61.7 em (15.5, 2.5, 4.5)",
+      "operator": "gradient"
+    },
+    {
+      "irregularity_type": "pressure_gradient_spike",
+      "severity": "high",
+      "location": [
+        31,
+        9,
+        19
+      ],
+      "world_position": [
+        15.5,
+        4.5,
+        9.5
+      ],
+      "metric_value": 61.6696415223992,
+      "threshold": 8.0,
+      "description": "Gradiente de pressao elevado |grad_p|=61.7 em (15.5, 4.5, 9.5)",
+      "operator": "gradient"
+    },
+    {
+      "irregularity_type": "flow_sink",
+      "severity": "high",
+      "location": [
+        32,
+        12,
+        12
+      ],
+      "world_position": [
+        16.0,
+        6.0,
+        6.0
+      ],
+      "metric_value": -37.5,
+      "threshold": -12.0,
+      "description": "Sumidouro de fluxo (estenose?) div=-37.5 em (16.0, 6.0, 6.0)",
+      "operator": "divergence"
+    },
+    {
+      "irregularity_type": "flow_sink",
+      "severity": "high",
+      "location": [
+        31,
+        12,
+        12
+      ],
+      "world_position": [
+        15.5,
+        6.0,
+        6.0
+      ],
+      "metric_value": -37.5,
+      "threshold": -12.0,
+      "description": "Sumidouro de fluxo (estenose?) div=-37.5 em (15.5, 6.0, 6.0)",
+      "operator": "divergence"
+    },
+    {
+      "irregularity_type": "vortical_flow",
+      "severity": "high",
+      "location": [
+        26,
+        15,
+        9
+      ],
+      "world_position": [
+        13.0,
+        7.5,
+        4.5
+      ],
+      "metric_value": 54.27596972779554,
+      "threshold": 20.0,
+      "description": "Fluxo rotacional (turbulento) |curl|=54.3 em (13.0, 7.5, 4.5)",
+      "operator": "curl"
+    },
+    {
+      "irregularity_type": "vortical_flow",
+      "severity": "high",
+      "location": [
+        29,
+        15,
+        9
+      ],
+      "world_position": [
+        14.5,
+        7.5,
+        4.5
+      ],
+      "metric_value": 54.27596972779554,
+      "threshold": 20.0,
+      "description": "Fluxo rotacional (turbulento) |curl|=54.3 em (14.5, 7.5, 4.5)",
+      "operator": "curl"
+    }
+  ],
+  "ontology_domains": {
+    "cardiovascular": 1.0,
+    "monitoring": 0.8,
+    "imaging": 0.6
+  }
+}

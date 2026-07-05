@@ -1,0 +1,24 @@
+{
+  "patient_id": "PAT-HEMO-STEN",
+  "scenario": "stenosis",
+  "operators": {
+    "gradient_max": 61.6696415223992,
+    "divergence_range": [
+      -37.5,
+      37.5
+    ],
+    "curl_max": 54.27596972779554
+  },
+  "irregularities": 6,
+  "alerts_generated": 6,
+  "ontology_domains": {
+    "cardiovascular": 1.0,
+    "monitoring": 0.8,
+    "imaging": 0.6
+  },
+  "by_operator": {
+    "gradient": 2,
+    "divergence": 2,
+    "curl": 2
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "patient_id": "PAT-HEMO-NORM",
+  "scenario": "normal",
+  "operators": {
+    "gradient_max": 1.686806944555851,
+    "divergence_range": [
+      -8.881784197001252e-16,
+      3.552713678800501e-15
+    ],
+    "curl_max": 11.048543456039802
+  },
+  "irregularities": 0,
+  "alerts_generated": 0,
+  "ontology_domains": {
+    "cardiovascular": 0.0,
+    "monitoring": 0.0,
+    "imaging": 0.0
+  },
+  "by_operator": {}
+}

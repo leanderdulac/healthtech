@@ -1,0 +1,20 @@
+{
+  "patient_id": "PAT-HEMO-TURB",
+  "scenario": "turbulent",
+  "operators": {
+    "gradient_max": 1.686806944555851,
+    "divergence_range": [
+      -13.514620451915846,
+      14.92820323027551
+    ],
+    "curl_max": 16.14392731730865
+  },
+  "irregularities": 0,
+  "alerts_generated": 0,
+  "ontology_domains": {
+    "cardiovascular": 0.0,
+    "monitoring": 0.0,
+    "imaging": 0.0
+  },
+  "by_operator": {}
+}
