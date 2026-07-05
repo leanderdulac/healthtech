@@ -51,12 +51,12 @@ def list_users(db: Session = Depends(get_db)):
     return crud.list_user_ids(db)
 
 
-@app.post("/records", response_model=schemas.HealthRecordRead)
+@app.post("/records", response_model=schemas.HealthRecordResponse)
 def create_record(payload: schemas.HealthRecordCreate, db: Session = Depends(get_db)):
     return crud.create_health_record(db, payload)
 
 
-@app.get("/records/{user_id}", response_model=List[schemas.HealthRecordRead])
+@app.get("/records/{user_id}", response_model=List[schemas.HealthRecordResponse])
 def get_records(
     user_id: str,
     source: Optional[str] = None,
@@ -73,7 +73,7 @@ def get_summary(user_id: str, db: Session = Depends(get_db)):
     return agg.build_summary(user_id)
 
 
-@app.get("/users/{user_id}/daily", response_model=List[schemas.DailyAggregation])
+@app.get("/users/{user_id}/daily", response_model=List[schemas.DailyAggregate])
 def get_daily(user_id: str, source: Optional[str] = None, db: Session = Depends(get_db)):
     return crud.daily_aggregation(db, user_id, source=source)
 

@@ -7,25 +7,35 @@ from pydantic import BaseModel, Field
 class HealthRecordCreate(BaseModel):
     user_id: str
     source: str
-    timestamp: Optional[datetime] = None
-    date: Optional[str] = None
-    steps: int = 0
+    timestamp: datetime
+    steps: Optional[int] = 0
     heart_rate_bpm: Optional[float] = None
     hrv: Optional[float] = None
     spo2: Optional[float] = None
-    calories_burned: float = 0
-    sleep_duration_min: int = 0
+    calories_burned: Optional[float] = 0
+    sleep_duration_min: Optional[int] = 0
     weight: Optional[float] = None
     body_fat: Optional[float] = None
     raw_data: Optional[Dict[str, Any]] = None
 
 
-class HealthRecordRead(HealthRecordCreate):
+class HealthRecordResponse(HealthRecordCreate):
     id: int
     record_id: str
+    date: str
 
     class Config:
         from_attributes = True
+
+
+class DailyAggregate(BaseModel):
+    date: str
+    total_steps: int
+    avg_heart_rate: float
+    total_calories: float
+    avg_spo2: float
+    total_sleep_min: int
+    overall_score: float
 
 
 class AggregateRequest(BaseModel):
@@ -42,19 +52,6 @@ class AggregateRequest(BaseModel):
         populate_by_name = True
 
 
-class DailyAggregation(BaseModel):
-    date: str
-    user_id: str
-    source: Optional[str] = None
-    total_steps: int = 0
-    avg_heart_rate_bpm: Optional[float] = None
-    avg_hrv: Optional[float] = None
-    avg_spo2: Optional[float] = None
-    total_calories: float = 0
-    total_sleep_min: int = 0
-    record_count: int = 0
-
-
 class UserHealthSummary(BaseModel):
     user_id: str
     record_count: int = 0
@@ -62,7 +59,7 @@ class UserHealthSummary(BaseModel):
     sources: List[str] = []
     clinical: Optional[Dict[str, Any]] = None
     prediction: Optional[Dict[str, Any]] = None
-    daily: List[DailyAggregation] = []
+    daily: List[DailyAggregate] = []
     aggregated_at: datetime
 
 

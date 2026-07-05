@@ -27,7 +27,7 @@ def normalize_source(source: str) -> str:
 
 
 def create_health_record(db: Session, payload: schemas.HealthRecordCreate) -> models.HealthRecord:
-    ts = payload.timestamp or datetime.utcnow()
+    ts = payload.timestamp
     row = models.HealthRecord(
         record_id=str(uuid.uuid4()),
         user_id=payload.user_id,
@@ -101,45 +101,55 @@ def list_user_ids(db: Session) -> List[str]:
     return [r[0] for r in rows]
 
 
+def _compute_overall_score(
+    steps: int,
+    avg_hr: float,
+    avg_spo2: float,
+    total_sleep: int,
+) -> float:
+    """Score composto 0–100 a partir de métricas diárias."""
+    step_score = min(steps / 10000.0, 1.0) * 25
+    hr_score = 25.0 if 55 <= avg_hr <= 85 else max(0.0, 25 - abs(avg_hr - 70) * 0.5)
+    spo2_score = min(max((avg_spo2 - 90) / 10.0, 0.0), 1.0) * 25
+    sleep_score = min(total_sleep / 480.0, 1.0) * 25
+    return round(step_score + hr_score + spo2_score + sleep_score, 2)
+
+
 def daily_aggregation(
     db: Session,
     user_id: str,
     source: Optional[str] = None,
-) -> List[schemas.DailyAggregation]:
+) -> List[schemas.DailyAggregate]:
     q = db.query(
         models.HealthRecord.date,
-        models.HealthRecord.source,
         func.sum(models.HealthRecord.steps).label("total_steps"),
         func.avg(models.HealthRecord.heart_rate_bpm).label("avg_hr"),
-        func.avg(models.HealthRecord.hrv).label("avg_hrv"),
         func.avg(models.HealthRecord.spo2).label("avg_spo2"),
         func.sum(models.HealthRecord.calories_burned).label("total_cal"),
         func.sum(models.HealthRecord.sleep_duration_min).label("total_sleep"),
-        func.count(models.HealthRecord.id).label("cnt"),
     ).filter(models.HealthRecord.user_id == user_id)
 
     if source:
         q = q.filter(models.HealthRecord.source == normalize_source(source))
 
-    q = q.group_by(models.HealthRecord.date, models.HealthRecord.source).order_by(
-        models.HealthRecord.date.desc()
-    )
+    q = q.group_by(models.HealthRecord.date).order_by(models.HealthRecord.date.desc())
 
-    return [
-        schemas.DailyAggregation(
+    results = []
+    for row in q.all():
+        avg_hr = float(row.avg_hr or 0)
+        avg_spo2 = float(row.avg_spo2 or 0)
+        total_steps = int(row.total_steps or 0)
+        total_sleep = int(row.total_sleep or 0)
+        results.append(schemas.DailyAggregate(
             date=row.date,
-            user_id=user_id,
-            source=row.source,
-            total_steps=int(row.total_steps or 0),
-            avg_heart_rate_bpm=round(float(row.avg_hr), 1) if row.avg_hr else None,
-            avg_hrv=round(float(row.avg_hrv), 1) if row.avg_hrv else None,
-            avg_spo2=round(float(row.avg_spo2), 1) if row.avg_spo2 else None,
+            total_steps=total_steps,
+            avg_heart_rate=round(avg_hr, 1),
             total_calories=float(row.total_cal or 0),
-            total_sleep_min=int(row.total_sleep or 0),
-            record_count=int(row.cnt or 0),
-        )
-        for row in q.all()
-    ]
+            avg_spo2=round(avg_spo2, 1),
+            total_sleep_min=total_sleep,
+            overall_score=_compute_overall_score(total_steps, avg_hr, avg_spo2, total_sleep),
+        ))
+    return results
 
 
 def latest_by_source(db: Session, user_id: str, source: str) -> Optional[models.HealthRecord]:
