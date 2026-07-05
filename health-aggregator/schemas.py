@@ -4,66 +4,32 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
-class PatientCreate(BaseModel):
-    patient_id: str
-    display_name: str = ""
-    birth_year: Optional[int] = None
-    risk_factor: float = 0.0
-
-
-class PatientRead(PatientCreate):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class TelemetryRead(BaseModel):
-    id: int
-    event_id: str
-    patient_id: str
+class HealthRecordCreate(BaseModel):
+    user_id: str
     source: str
-    metric_type: str
-    metric_value: float
-    unit: str
-    vendor: str
-    timestamp_utc: datetime
+    timestamp: Optional[datetime] = None
+    date: Optional[str] = None
+    steps: int = 0
+    heart_rate_bpm: Optional[float] = None
+    hrv: Optional[float] = None
+    spo2: Optional[float] = None
+    calories_burned: float = 0
+    sleep_duration_min: int = 0
+    weight: Optional[float] = None
+    body_fat: Optional[float] = None
+    raw_data: Optional[Dict[str, Any]] = None
 
-    class Config:
-        from_attributes = True
 
-
-class ClinicalSnapshotRead(BaseModel):
+class HealthRecordRead(HealthRecordCreate):
     id: int
-    patient_id: str
-    conditions: List[str] = []
-    medications: List[str] = []
-    fhir_live: bool = False
-    synced_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class PredictionRead(BaseModel):
-    id: int
-    patient_id: str
-    prob_6h: float
-    prob_24h: float
-    prob_72h: float
-    horizon_at_risk: str
-    conformal_intervals: Dict[str, List[float]] = {}
-    modo: str
-    predicted_at: datetime
+    record_id: str
 
     class Config:
         from_attributes = True
 
 
 class AggregateRequest(BaseModel):
-    patient_id: Optional[str] = None
+    user_id: Optional[str] = Field(default=None, alias="patient_id")
     sources: Optional[List[str]] = Field(
         default=None,
         description="apple_health | google_fit | ble | fhir | tcn",
@@ -72,23 +38,39 @@ class AggregateRequest(BaseModel):
     sync_clinical: bool = True
     run_prediction: bool = True
 
+    class Config:
+        populate_by_name = True
 
-class PatientHealthSummary(BaseModel):
-    patient_id: str
-    display_name: str = ""
-    telemetry_count: int = 0
+
+class DailyAggregation(BaseModel):
+    date: str
+    user_id: str
+    source: Optional[str] = None
+    total_steps: int = 0
+    avg_heart_rate_bpm: Optional[float] = None
+    avg_hrv: Optional[float] = None
+    avg_spo2: Optional[float] = None
+    total_calories: float = 0
+    total_sleep_min: int = 0
+    record_count: int = 0
+
+
+class UserHealthSummary(BaseModel):
+    user_id: str
+    record_count: int = 0
     latest_metrics: Dict[str, float] = {}
-    clinical: Optional[ClinicalSnapshotRead] = None
-    prediction: Optional[PredictionRead] = None
     sources: List[str] = []
+    clinical: Optional[Dict[str, Any]] = None
+    prediction: Optional[Dict[str, Any]] = None
+    daily: List[DailyAggregation] = []
     aggregated_at: datetime
 
 
 class AggregationRunRead(BaseModel):
     id: int
-    patient_id: Optional[str]
+    user_id: Optional[str]
     sources: List[str]
-    telemetry_count: int
+    records_count: int
     status: str
     detail: Dict[str, Any] = {}
     started_at: datetime
@@ -101,5 +83,5 @@ class AggregationRunRead(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     service: str = "health-aggregator"
-    version: str = "1.0.0"
+    version: str = "2.0.0"
     healthtech_root: Optional[str] = None

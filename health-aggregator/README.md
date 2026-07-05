@@ -7,7 +7,7 @@ API REST que agrega telemetria wearable, dados clínicos FHIR e predições TCN 
 ```
 health-aggregator/
 ├── main.py          # FastAPI — endpoints REST
-├── models.py        # SQLAlchemy ORM
+├── models.py        # HealthRecord + AggregationRun
 ├── schemas.py       # Pydantic request/response
 ├── crud.py          # Operações de banco
 ├── aggregator.py    # Motor de agregação (Healthtech F17)
@@ -41,11 +41,11 @@ Documentação interativa: http://localhost:8090/docs
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/health` | Health check |
-| GET/POST | `/patients` | Listar / criar pacientes |
-| GET | `/patients/{id}/summary` | Visão unificada (telemetria + clínico + TCN) |
-| GET | `/patients/{id}/telemetry` | Leituras agregadas |
-| GET | `/patients/{id}/clinical` | Último snapshot FHIR |
-| GET | `/patients/{id}/prediction` | Última predição TCN |
+| GET | `/users` | Listar user_ids com registros |
+| POST | `/records` | Criar health_record |
+| GET | `/records/{user_id}` | Registros por usuário (filtro source/date) |
+| GET | `/users/{id}/summary` | Visão unificada + agregação diária |
+| GET | `/users/{id}/daily` | Agregação por dia (steps, HR, SpO2…) |
 | POST | `/aggregate` | Executar agregação multi-fonte |
 | GET | `/runs` | Histórico de agregações |
 
@@ -55,7 +55,7 @@ Documentação interativa: http://localhost:8090/docs
 curl -X POST http://localhost:8090/aggregate \
   -H "Content-Type: application/json" \
   -d '{
-    "patient_id": "PAT-APPLE-001",
+    "user_id": "PAT-APPLE-001",
     "sources": ["apple_health", "google_fit", "ble", "fhir", "tcn"],
     "sync_clinical": true,
     "run_prediction": true

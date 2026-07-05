@@ -1,148 +1,164 @@
 import json
+import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 import models
 import schemas
 
+SOURCE_MAP = {
+    "apple_health": "apple",
+    "apple": "apple",
+    "google_fit": "google",
+    "google": "google",
+    "ble": "samsung",
+    "samsung": "samsung",
+    "fhir": "fhir",
+    "tcn": "tcn",
+    "stub": "samsung",
+}
 
-def get_patient(db: Session, patient_id: str) -> Optional[models.Patient]:
-    return db.query(models.Patient).filter(models.Patient.patient_id == patient_id).first()
+
+def normalize_source(source: str) -> str:
+    return SOURCE_MAP.get(source.lower(), source.lower())
 
 
-def list_patients(db: Session, skip: int = 0, limit: int = 100) -> List[models.Patient]:
-    return db.query(models.Patient).offset(skip).limit(limit).all()
-
-
-def create_patient(db: Session, payload: schemas.PatientCreate) -> models.Patient:
-    existing = get_patient(db, payload.patient_id)
-    if existing:
-        existing.display_name = payload.display_name or existing.display_name
-        existing.birth_year = payload.birth_year or existing.birth_year
-        existing.risk_factor = payload.risk_factor
-        existing.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(existing)
-        return existing
-
-    row = models.Patient(**payload.model_dump())
+def create_health_record(db: Session, payload: schemas.HealthRecordCreate) -> models.HealthRecord:
+    ts = payload.timestamp or datetime.utcnow()
+    row = models.HealthRecord(
+        record_id=str(uuid.uuid4()),
+        user_id=payload.user_id,
+        source=normalize_source(payload.source),
+        timestamp=ts,
+        date=payload.date or ts.strftime("%Y-%m-%d"),
+        steps=payload.steps,
+        heart_rate_bpm=payload.heart_rate_bpm,
+        hrv=payload.hrv,
+        spo2=payload.spo2,
+        calories_burned=payload.calories_burned,
+        sleep_duration_min=payload.sleep_duration_min,
+        weight=payload.weight,
+        body_fat=payload.body_fat,
+        raw_data=payload.raw_data,
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
     return row
 
 
-def delete_patient(db: Session, patient_id: str) -> bool:
-    row = get_patient(db, patient_id)
-    if not row:
-        return False
-    db.delete(row)
-    db.commit()
-    return True
-
-
-def bulk_insert_telemetry(
-    db: Session,
-    records: List[Dict],
-) -> int:
-    inserted = 0
-    for rec in records:
-        exists = db.query(models.TelemetryRecord).filter(
-            models.TelemetryRecord.event_id == rec["event_id"]
+def upsert_health_record(db: Session, data: Dict) -> models.HealthRecord:
+    record_id = data.get("record_id")
+    if record_id:
+        existing = db.query(models.HealthRecord).filter(
+            models.HealthRecord.record_id == record_id
         ).first()
-        if exists:
-            continue
-        db.add(models.TelemetryRecord(**rec))
-        inserted += 1
+        if existing:
+            for key, val in data.items():
+                if key != "id" and hasattr(existing, key) and val is not None:
+                    setattr(existing, key, val)
+            db.commit()
+            db.refresh(existing)
+            return existing
+
+    row = models.HealthRecord(**{k: v for k, v in data.items() if hasattr(models.HealthRecord, k)})
+    if not row.record_id:
+        row.record_id = str(uuid.uuid4())
+    db.add(row)
     db.commit()
-    return inserted
+    db.refresh(row)
+    return row
 
 
-def list_telemetry(
+def bulk_upsert_health_records(db: Session, records: List[Dict]) -> int:
+    count = 0
+    for rec in records:
+        upsert_health_record(db, rec)
+        count += 1
+    return count
+
+
+def list_records(
     db: Session,
-    patient_id: str,
+    user_id: str,
+    source: Optional[str] = None,
+    date: Optional[str] = None,
     limit: int = 100,
-) -> List[models.TelemetryRecord]:
-    return (
-        db.query(models.TelemetryRecord)
-        .filter(models.TelemetryRecord.patient_id == patient_id)
-        .order_by(models.TelemetryRecord.timestamp_utc.desc())
-        .limit(limit)
-        .all()
-    )
+) -> List[models.HealthRecord]:
+    q = db.query(models.HealthRecord).filter(models.HealthRecord.user_id == user_id)
+    if source:
+        q = q.filter(models.HealthRecord.source == normalize_source(source))
+    if date:
+        q = q.filter(models.HealthRecord.date == date)
+    return q.order_by(models.HealthRecord.timestamp.desc()).limit(limit).all()
 
 
-def save_clinical_snapshot(
+def list_user_ids(db: Session) -> List[str]:
+    rows = db.query(models.HealthRecord.user_id).distinct().all()
+    return [r[0] for r in rows]
+
+
+def daily_aggregation(
     db: Session,
-    patient_id: str,
-    conditions: List[str],
-    medications: List[str],
-    fhir_live: bool,
-) -> models.ClinicalSnapshot:
-    row = models.ClinicalSnapshot(
-        patient_id=patient_id,
-        conditions_json=json.dumps(conditions, ensure_ascii=False),
-        medications_json=json.dumps(medications, ensure_ascii=False),
-        fhir_live=1 if fhir_live else 0,
-        synced_at=datetime.utcnow(),
+    user_id: str,
+    source: Optional[str] = None,
+) -> List[schemas.DailyAggregation]:
+    q = db.query(
+        models.HealthRecord.date,
+        models.HealthRecord.source,
+        func.sum(models.HealthRecord.steps).label("total_steps"),
+        func.avg(models.HealthRecord.heart_rate_bpm).label("avg_hr"),
+        func.avg(models.HealthRecord.hrv).label("avg_hrv"),
+        func.avg(models.HealthRecord.spo2).label("avg_spo2"),
+        func.sum(models.HealthRecord.calories_burned).label("total_cal"),
+        func.sum(models.HealthRecord.sleep_duration_min).label("total_sleep"),
+        func.count(models.HealthRecord.id).label("cnt"),
+    ).filter(models.HealthRecord.user_id == user_id)
+
+    if source:
+        q = q.filter(models.HealthRecord.source == normalize_source(source))
+
+    q = q.group_by(models.HealthRecord.date, models.HealthRecord.source).order_by(
+        models.HealthRecord.date.desc()
     )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return row
+
+    return [
+        schemas.DailyAggregation(
+            date=row.date,
+            user_id=user_id,
+            source=row.source,
+            total_steps=int(row.total_steps or 0),
+            avg_heart_rate_bpm=round(float(row.avg_hr), 1) if row.avg_hr else None,
+            avg_hrv=round(float(row.avg_hrv), 1) if row.avg_hrv else None,
+            avg_spo2=round(float(row.avg_spo2), 1) if row.avg_spo2 else None,
+            total_calories=float(row.total_cal or 0),
+            total_sleep_min=int(row.total_sleep or 0),
+            record_count=int(row.cnt or 0),
+        )
+        for row in q.all()
+    ]
 
 
-def latest_clinical(db: Session, patient_id: str) -> Optional[models.ClinicalSnapshot]:
+def latest_by_source(db: Session, user_id: str, source: str) -> Optional[models.HealthRecord]:
     return (
-        db.query(models.ClinicalSnapshot)
-        .filter(models.ClinicalSnapshot.patient_id == patient_id)
-        .order_by(models.ClinicalSnapshot.synced_at.desc())
+        db.query(models.HealthRecord)
+        .filter(
+            models.HealthRecord.user_id == user_id,
+            models.HealthRecord.source == normalize_source(source),
+        )
+        .order_by(models.HealthRecord.timestamp.desc())
         .first()
     )
 
 
-def save_prediction(
-    db: Session,
-    patient_id: str,
-    prediction: Dict,
-) -> models.PredictionSnapshot:
-    row = models.PredictionSnapshot(
-        patient_id=patient_id,
-        prob_6h=prediction.get("prob_6h", 0),
-        prob_24h=prediction.get("prob_24h", 0),
-        prob_72h=prediction.get("prob_72h", 0),
-        horizon_at_risk=prediction.get("horizon_at_risk", ""),
-        conformal_json=json.dumps(prediction.get("conformal_intervals", {})),
-        modo=prediction.get("modo", ""),
-        predicted_at=datetime.utcnow(),
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return row
-
-
-def latest_prediction(db: Session, patient_id: str) -> Optional[models.PredictionSnapshot]:
-    return (
-        db.query(models.PredictionSnapshot)
-        .filter(models.PredictionSnapshot.patient_id == patient_id)
-        .order_by(models.PredictionSnapshot.predicted_at.desc())
-        .first()
-    )
-
-
-def create_aggregation_run(
-    db: Session,
-    patient_id: Optional[str],
-    sources: List[str],
-) -> models.AggregationRun:
+def create_aggregation_run(db: Session, user_id: Optional[str], sources: List[str]) -> models.AggregationRun:
     row = models.AggregationRun(
-        patient_id=patient_id,
+        user_id=user_id,
         sources_json=json.dumps(sources),
         status="running",
-        started_at=datetime.utcnow(),
     )
     db.add(row)
     db.commit()
@@ -154,14 +170,14 @@ def finish_aggregation_run(
     db: Session,
     run_id: int,
     status: str,
-    telemetry_count: int,
+    records_count: int,
     detail: Dict,
 ) -> models.AggregationRun:
     row = db.query(models.AggregationRun).filter(models.AggregationRun.id == run_id).first()
     if not row:
         raise ValueError(f"run {run_id} not found")
     row.status = status
-    row.telemetry_count = telemetry_count
+    row.records_count = records_count
     row.detail_json = json.dumps(detail, default=str)
     row.finished_at = datetime.utcnow()
     db.commit()
@@ -178,39 +194,65 @@ def list_runs(db: Session, limit: int = 20) -> List[models.AggregationRun]:
     )
 
 
-def clinical_to_schema(row: models.ClinicalSnapshot) -> schemas.ClinicalSnapshotRead:
-    return schemas.ClinicalSnapshotRead(
-        id=row.id,
-        patient_id=row.patient_id,
-        conditions=json.loads(row.conditions_json or "[]"),
-        medications=json.loads(row.medications_json or "[]"),
-        fhir_live=bool(row.fhir_live),
-        synced_at=row.synced_at,
-    )
-
-
-def prediction_to_schema(row: models.PredictionSnapshot) -> schemas.PredictionRead:
-    return schemas.PredictionRead(
-        id=row.id,
-        patient_id=row.patient_id,
-        prob_6h=row.prob_6h,
-        prob_24h=row.prob_24h,
-        prob_72h=row.prob_72h,
-        horizon_at_risk=row.horizon_at_risk,
-        conformal_intervals=json.loads(row.conformal_json or "{}"),
-        modo=row.modo,
-        predicted_at=row.predicted_at,
-    )
-
-
 def run_to_schema(row: models.AggregationRun) -> schemas.AggregationRunRead:
     return schemas.AggregationRunRead(
         id=row.id,
-        patient_id=row.patient_id,
+        user_id=row.user_id,
         sources=json.loads(row.sources_json or "[]"),
-        telemetry_count=row.telemetry_count,
+        records_count=row.records_count,
         status=row.status,
         detail=json.loads(row.detail_json or "{}"),
         started_at=row.started_at,
         finished_at=row.finished_at,
     )
+
+
+def telemetry_rows_to_health_records(rows: List[Dict]) -> List[Dict]:
+    """Agrupa métricas por user + source + timestamp → HealthRecord."""
+    buckets: Dict[tuple, Dict] = {}
+
+    for row in rows:
+        ts = row["timestamp_utc"]
+        if isinstance(ts, str):
+            ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        user_id = row.get("patient_id") or row.get("user_id")
+        source = normalize_source(row.get("vendor") or row.get("source", "unknown"))
+        date = ts.strftime("%Y-%m-%d")
+        bucket_key = (user_id, source, date, ts.replace(second=0, microsecond=0))
+
+        if bucket_key not in buckets:
+            buckets[bucket_key] = {
+                "record_id": f"{user_id}-{source}-{ts.isoformat()}",
+                "user_id": user_id,
+                "source": source,
+                "timestamp": ts,
+                "date": date,
+                "steps": 0,
+                "heart_rate_bpm": None,
+                "hrv": None,
+                "spo2": None,
+                "calories_burned": 0,
+                "sleep_duration_min": 0,
+                "weight": None,
+                "body_fat": None,
+                "raw_data": {"events": []},
+            }
+
+        bucket = buckets[bucket_key]
+        metric = row.get("metric_type", "")
+        value = row.get("metric_value")
+
+        if metric in ("heart_rate", "hr"):
+            bucket["heart_rate_bpm"] = float(value)
+        elif metric == "spo2":
+            bucket["spo2"] = float(value)
+        elif metric == "hrv":
+            bucket["hrv"] = float(value)
+        elif metric == "steps":
+            bucket["steps"] = int(value)
+        elif metric == "sleep_stage":
+            bucket["sleep_duration_min"] = bucket.get("sleep_duration_min", 0) + 5
+
+        bucket["raw_data"]["events"].append(row)
+
+    return list(buckets.values())
