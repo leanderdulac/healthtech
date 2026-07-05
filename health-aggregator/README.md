@@ -11,8 +11,10 @@ health-aggregator/
 ├── schemas.py       # Pydantic request/response
 ├── crud.py          # Operações de banco
 ├── aggregator.py    # Motor de agregação (Healthtech F17)
-├── database.py      # SQLite + sessão
+├── database.py      # SQLite / PostgreSQL + sessão
+├── alembic/         # Migrações de schema
 ├── requirements.txt
+├── .env.example
 └── README.md
 ```
 
@@ -72,4 +74,17 @@ curl -X POST http://localhost:8090/aggregate \
 
 ## Banco de dados
 
-SQLite em `health-aggregator/data/aggregator.db` (configurável via `HEALTH_AGGREGATOR_DB_URL`).
+| Ambiente | URL |
+|----------|-----|
+| Local (default) | `sqlite:///./data/aggregator.db` |
+| PostgreSQL | `postgresql+psycopg2://user:pass@host:5432/health_aggregator` |
+
+Configure via `DATABASE_URL` no `.env` (veja `.env.example`).
+
+### Migrações Alembic
+
+```bash
+cp .env.example .env
+alembic upgrade head        # aplicar schema
+alembic revision --autogenerate -m "descricao"  # nova migração
+```
