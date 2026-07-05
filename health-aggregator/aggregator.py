@@ -1,18 +1,20 @@
 """
-Motor de agregação — unifica wearables, FHIR clínico e predição TCN → HealthRecord.
+Motor de agregação — normalização, persistência e agregação diária com pandas.
 """
 
 import logging
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import pandas as pd
 from sqlalchemy.orm import Session
 
 import crud
 import schemas
+from models import HealthRecord
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,94 @@ def _ensure_healthtech_path() -> bool:
 
 
 class HealthAggregator:
-    """Coleta multi-fonte e persiste em health_records (PostgreSQL)."""
+
+    @staticmethod
+    def normalize_and_save(db: Session, records: list[dict], source: str, user_id: str):
+        for rec in records:
+            ts = rec.get("timestamp")
+            if isinstance(ts, str):
+                ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if ts is None:
+                ts = datetime.utcnow()
+
+            record = HealthRecord(
+                user_id=user_id,
+                source=crud.normalize_source(source),
+                timestamp=ts,
+                date=ts.strftime("%Y-%m-%d"),
+                steps=rec.get("steps", 0),
+                heart_rate_bpm=rec.get("heart_rate_bpm"),
+                hrv=rec.get("hrv"),
+                spo2=rec.get("spo2"),
+                calories_burned=rec.get("calories_burned", 0),
+                sleep_duration_min=rec.get("sleep_duration_min", 0),
+                weight=rec.get("weight"),
+                body_fat=rec.get("body_fat"),
+                raw_data=rec,
+            )
+            db.add(record)
+        db.commit()
+
+    @staticmethod
+    def get_daily_aggregate(
+        db: Session,
+        user_id: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[dict]:
+        records = db.query(HealthRecord).filter(
+            HealthRecord.user_id == user_id,
+            HealthRecord.date.between(
+                start_date.strftime("%Y-%m-%d"),
+                end_date.strftime("%Y-%m-%d"),
+            ),
+        ).all()
+
+        if not records:
+            return []
+
+        df = pd.DataFrame([{
+            "date": r.date,
+            "steps": r.steps,
+            "heart_rate_bpm": r.heart_rate_bpm,
+            "calories_burned": r.calories_burned,
+            "spo2": r.spo2,
+            "sleep_duration_min": r.sleep_duration_min,
+        } for r in records])
+
+        daily = df.groupby("date").agg({
+            "steps": "sum",
+            "heart_rate_bpm": "mean",
+            "calories_burned": "sum",
+            "spo2": "mean",
+            "sleep_duration_min": "sum",
+        }).round(2).reset_index()
+
+        daily["overall_score"] = daily.apply(
+            lambda x: round((
+                min(100, x["steps"] / 10000 * 100) +
+                min(100, x["sleep_duration_min"] / 480 * 100) +
+                (100 - abs((x["heart_rate_bpm"] or 70) - 70) * 1.5)
+            ) / 3, 1),
+            axis=1,
+        )
+
+        return daily.to_dict(orient="records")
+
+    @staticmethod
+    def daily_to_schema(rows: list[dict]) -> List[schemas.DailyAggregate]:
+        return [
+            schemas.DailyAggregate(
+                date=row["date"],
+                total_steps=int(row["steps"]),
+                avg_heart_rate=float(row["heart_rate_bpm"] or 0),
+                total_calories=float(row["calories_burned"] or 0),
+                avg_spo2=float(row["spo2"] or 0),
+                total_sleep_min=int(row["sleep_duration_min"] or 0),
+                overall_score=float(row["overall_score"]),
+            )
+            for row in rows
+        ]
 
     DEFAULT_SOURCES = ["apple_health", "google_fit", "ble"]
 
@@ -45,21 +134,21 @@ class HealthAggregator:
 
         run = crud.create_aggregation_run(self.db, user_id, sources)
         detail: Dict = {}
-        health_records: List[Dict] = []
+        saved_count = 0
         user_ids: List[str] = []
 
         try:
             if any(s in sources for s in self.DEFAULT_SOURCES):
                 ingest = self._run_ingestion(user_id, sources, request.run_silver_gold)
                 detail["ingestion"] = ingest
-                health_records.extend(ingest.get("health_records", []))
+                for uid, recs in ingest.get("records_by_user", {}).items():
+                    for source, batch in recs.items():
+                        self.normalize_and_save(self.db, batch, source, uid)
+                        saved_count += len(batch)
                 user_ids.extend(ingest.get("users", []))
 
             if not user_ids and user_id:
                 user_ids = [user_id]
-
-            if health_records:
-                crud.bulk_upsert_health_records(self.db, health_records)
 
             if "fhir" in sources:
                 detail["clinical"] = self._sync_clinical(user_ids or [user_id])
@@ -71,14 +160,14 @@ class HealthAggregator:
             summary = self.build_summary(primary, sources)
 
             crud.finish_aggregation_run(
-                self.db, run.id, "completed", len(health_records), detail,
+                self.db, run.id, "completed", saved_count, detail,
             )
             return summary
 
         except Exception as e:
             logger.exception("Agregação falhou")
             crud.finish_aggregation_run(
-                self.db, run.id, "failed", len(health_records), {"error": str(e), **detail},
+                self.db, run.id, "failed", saved_count, {"error": str(e), **detail},
             )
             raise
 
@@ -86,10 +175,14 @@ class HealthAggregator:
         self,
         user_id: str,
         sources: Optional[List[str]] = None,
+        days: int = 30,
     ) -> schemas.UserHealthSummary:
-        records = crud.list_records(self.db, user_id, limit=500)
-        daily = crud.daily_aggregation(self.db, user_id)
+        end = datetime.utcnow()
+        start = end - timedelta(days=days)
+        daily_rows = self.get_daily_aggregate(self.db, user_id, start, end)
+        daily = self.daily_to_schema(daily_rows)
 
+        records = crud.list_records(self.db, user_id, limit=500)
         latest_metrics: Dict[str, float] = {}
         for row in records:
             if row.heart_rate_bpm and "heart_rate_bpm" not in latest_metrics:
@@ -128,7 +221,7 @@ class HealthAggregator:
 
         wearable_sources = [s for s in sources if s in ("apple_health", "google_fit", "ble")]
         if not wearable_sources:
-            return {"health_records": [], "users": []}
+            return {"records_by_user": {}, "users": []}
 
         orchestrator = RealIngestionOrchestrator(sources=wearable_sources)
         collection = orchestrator.collect_all(patient_id=user_id)
@@ -142,23 +235,38 @@ class HealthAggregator:
         telemetry_rows = []
         for rec in all_records:
             telemetry_rows.append({
-                "event_id": rec.event_id,
                 "patient_id": rec.patient_id,
                 "source": rec.source.value if hasattr(rec.source, "value") else str(rec.source),
                 "metric_type": rec.metric_type.value if hasattr(rec.metric_type, "value") else str(rec.metric_type),
                 "metric_value": rec.metric_value,
-                "unit": rec.unit,
                 "vendor": rec.vendor,
                 "timestamp_utc": rec.timestamp_utc,
             })
 
-        health_records = crud.telemetry_rows_to_health_records(telemetry_rows)
-        users = list({r["user_id"] for r in health_records})
+        buckets = crud.telemetry_rows_to_health_records(telemetry_rows)
+        records_by_user: Dict[str, Dict[str, list]] = {}
 
+        for bucket in buckets:
+            uid = bucket["user_id"]
+            source = bucket["source"]
+            rec = {
+                "timestamp": bucket["timestamp"],
+                "steps": bucket.get("steps", 0),
+                "heart_rate_bpm": bucket.get("heart_rate_bpm"),
+                "hrv": bucket.get("hrv"),
+                "spo2": bucket.get("spo2"),
+                "calories_burned": bucket.get("calories_burned", 0),
+                "sleep_duration_min": bucket.get("sleep_duration_min", 0),
+                "weight": bucket.get("weight"),
+                "body_fat": bucket.get("body_fat"),
+            }
+            records_by_user.setdefault(uid, {}).setdefault(source, []).append(rec)
+
+        users = list(records_by_user.keys())
         return {
             "collected": len(all_records),
             "users": users,
-            "health_records": health_records,
+            "records_by_user": records_by_user,
             "source_results": collection.get("sources", {}),
         }
 
@@ -181,21 +289,16 @@ class HealthAggregator:
             try:
                 baseline = bridge.sync_patient(uid)
                 now = datetime.now(timezone.utc)
-                record = {
-                    "record_id": str(uuid.uuid4()),
-                    "user_id": uid,
-                    "source": "fhir",
+                self.normalize_and_save(self.db, [{
                     "timestamp": now,
-                    "date": now.strftime("%Y-%m-%d"),
                     "raw_data": {
                         "conditions": baseline.clinical_conditions,
                         "medications": baseline.medications,
                         "risk_factor": baseline.risk_factor,
                         "fhir_live": bridge.client.is_live,
                     },
-                }
-                crud.upsert_health_record(self.db, record)
-                synced[uid] = record["raw_data"]
+                }], "fhir", uid)
+                synced[uid] = baseline.clinical_conditions
             except Exception as e:
                 logger.warning("FHIR sync falhou para %s: %s", uid, e)
 
@@ -232,15 +335,10 @@ class HealthAggregator:
                 continue
             pred = wrapper.predict_single(X[-1])
             now = datetime.now(timezone.utc)
-            record = {
-                "record_id": str(uuid.uuid4()),
-                "user_id": uid,
-                "source": "tcn",
+            self.normalize_and_save(self.db, [{
                 "timestamp": now,
-                "date": now.strftime("%Y-%m-%d"),
                 "raw_data": pred,
-            }
-            crud.upsert_health_record(self.db, record)
+            }], "tcn", uid)
             predictions[uid] = pred
 
         return {"status": "ok", "predictions": predictions}
@@ -249,18 +347,14 @@ class HealthAggregator:
     def _stub_ingestion(user_id: Optional[str], sources: List[str]) -> Dict:
         uid = user_id or "PAT-STUB-001"
         now = datetime.now(timezone.utc)
-        rows = [{
-            "patient_id": uid,
-            "source": "ble",
-            "vendor": "samsung",
-            "metric_type": "heart_rate",
-            "metric_value": 72.0,
-            "timestamp_utc": now,
-        }]
-        health_records = crud.telemetry_rows_to_health_records(rows)
+        rec = {
+            "timestamp": now,
+            "heart_rate_bpm": 72.0,
+            "spo2": 97.0,
+        }
         return {
             "collected": 1,
             "users": [uid],
-            "health_records": health_records,
+            "records_by_user": {uid: {"samsung": [rec]}},
             "source_results": {s: {"status": "stub"} for s in sources},
         }

@@ -8,6 +8,7 @@ Uso:
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -74,8 +75,15 @@ def get_summary(user_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/users/{user_id}/daily", response_model=List[schemas.DailyAggregate])
-def get_daily(user_id: str, source: Optional[str] = None, db: Session = Depends(get_db)):
-    return crud.daily_aggregation(db, user_id, source=source)
+def get_daily(
+    user_id: str,
+    days: int = 30,
+    db: Session = Depends(get_db),
+):
+    end = datetime.utcnow()
+    start = end - timedelta(days=days)
+    rows = HealthAggregator.get_daily_aggregate(db, user_id, start, end)
+    return HealthAggregator.daily_to_schema(rows)
 
 
 @app.post("/aggregate", response_model=schemas.UserHealthSummary)
