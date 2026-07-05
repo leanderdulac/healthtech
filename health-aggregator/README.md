@@ -74,12 +74,11 @@ curl -X POST http://localhost:8090/aggregate \
 
 ## Banco de dados
 
-| Ambiente | URL |
-|----------|-----|
-| Local (default) | `sqlite:///./data/aggregator.db` |
-| PostgreSQL | `postgresql+psycopg2://user:pass@host:5432/health_aggregator` |
+PostgreSQL via `DATABASE_URL` no `.env` (veja `.env.example`):
 
-Configure via `DATABASE_URL` no `.env` (veja `.env.example`).
+```
+postgresql://user:password@localhost/health_agg
+```
 
 ### Migrações Alembic
 

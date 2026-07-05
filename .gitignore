@@ -11,9 +11,6 @@ env/
 # Arquivos de sistema
 .DS_Store
 
-# Health Aggregator — SQLite local
-health-aggregator/data/
-
 # Dados regeneráveis em runtime (não versionar)
 data/lakehouse/
 data/bigquery_simulation/
