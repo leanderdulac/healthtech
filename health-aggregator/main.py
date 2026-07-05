@@ -53,8 +53,8 @@ def list_users(db: Session = Depends(get_db)):
 
 
 @app.post("/records", response_model=schemas.HealthRecordResponse)
-def create_record(payload: schemas.HealthRecordCreate, db: Session = Depends(get_db)):
-    return crud.create_health_record(db, payload)
+def create_record_endpoint(payload: schemas.HealthRecordCreate, db: Session = Depends(get_db)):
+    return crud.create_record(db, crud.record_from_schema(payload))
 
 
 @app.get("/records/{user_id}", response_model=List[schemas.HealthRecordResponse])

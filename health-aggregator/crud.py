@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 import models
 import schemas
+from models import HealthRecord
 
 SOURCE_MAP = {
     "apple_health": "apple",
@@ -25,28 +26,19 @@ def normalize_source(source: str) -> str:
     return SOURCE_MAP.get(source.lower(), source.lower())
 
 
-def create_health_record(db: Session, payload: schemas.HealthRecordCreate) -> models.HealthRecord:
-    ts = payload.timestamp
-    row = models.HealthRecord(
-        record_id=str(uuid.uuid4()),
-        user_id=payload.user_id,
-        source=normalize_source(payload.source),
-        timestamp=ts,
-        date=payload.date or ts.strftime("%Y-%m-%d"),
-        steps=payload.steps,
-        heart_rate_bpm=payload.heart_rate_bpm,
-        hrv=payload.hrv,
-        spo2=payload.spo2,
-        calories_burned=payload.calories_burned,
-        sleep_duration_min=payload.sleep_duration_min,
-        weight=payload.weight,
-        body_fat=payload.body_fat,
-        raw_data=payload.raw_data,
-    )
-    db.add(row)
+def create_record(db: Session, record: dict) -> HealthRecord:
+    db_record = HealthRecord(**record)
+    db.add(db_record)
     db.commit()
-    db.refresh(row)
-    return row
+    db.refresh(db_record)
+    return db_record
+
+
+def record_from_schema(payload: schemas.HealthRecordCreate) -> dict:
+    data = payload.model_dump()
+    data["source"] = normalize_source(data["source"])
+    data["date"] = payload.timestamp.strftime("%Y-%m-%d")
+    return data
 
 
 def upsert_health_record(db: Session, data: Dict) -> models.HealthRecord:
@@ -63,13 +55,8 @@ def upsert_health_record(db: Session, data: Dict) -> models.HealthRecord:
             db.refresh(existing)
             return existing
 
-    row = models.HealthRecord(**{k: v for k, v in data.items() if hasattr(models.HealthRecord, k)})
-    if not row.record_id:
-        row.record_id = str(uuid.uuid4())
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return row
+    filtered = {k: v for k, v in data.items() if hasattr(HealthRecord, k)}
+    return create_record(db, filtered)
 
 
 def bulk_upsert_health_records(db: Session, records: List[Dict]) -> int:
