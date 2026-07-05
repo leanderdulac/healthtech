@@ -40,6 +40,12 @@ cp .env.example .env   # configure variáveis GCP e SECRET_SALT
 | `python run_hemodynamics_analysis.py` | Análise hemodinâmica grad/div/curl |
 | `python run_clinical_prediction.py` | Predição clínica multimodal (fuzzy + ghost) |
 | `python run_temporal_training.py` | Treino TCN+LSTM ghost+fuzzy (6h/24h/72h) |
+| `python run_real_ingestion.py` | Ingestão real (Apple Health / Google Fit / BLE) |
+| `python run_clinical_sync.py` | Sync FHIR Server → baseline clínico |
+| `python run_conformal_calibration.py` | Calibração conformal nos TCNs |
+| `python run_clinical_validation.py` | Validação clínica (métricas + relatório) |
+| `python run_vertex_deploy.py` | Deploy dos 3 TCNs no Vertex AI |
+| `python run_production_pipeline.py` | Pipeline de produção F17 completo |
 
 ## Estrutura do projeto
 
@@ -59,7 +65,8 @@ healthtech-main/
 │   ├── scraping/               # Scraper teses USP
 │   ├── ontology/               # Ontologia médica integrada
 │   ├── hemodynamics/           # Análise vascular grad/div/curl
-│   ├── clinical_intelligence/  # Predição clínica fuzzy + ghost signals
+│   ├── clinical_intelligence/  # Predição clínica fuzzy + ghost + conformal
+│   ├── ingestion/real/         # Ingestão wearable real (Apple/Google/BLE)
 │   ├── security/               # Anonimização FHIR
 │   └── utils/                  # Geradores de dados
 └── docs/

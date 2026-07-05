@@ -31,6 +31,7 @@ class VertexIntegrationResult:
     ontology: Dict = field(default_factory=dict)
     hemodynamics: Dict = field(default_factory=dict)
     clinical_intelligence: Dict = field(default_factory=dict)
+    production: Dict = field(default_factory=dict)
     exports: Dict = field(default_factory=dict)
 
 
@@ -122,6 +123,9 @@ class VertexIntegrationOrchestrator:
         logger.info("=== FASE 8: Inteligência Clínica Preditiva ===")
         result.clinical_intelligence = self._run_clinical_prediction(result)
 
+        logger.info("=== FASE 9: Framework de Produção (F17) ===")
+        result.production = self._run_production_framework(result)
+
         result.exports = {
             "training_csv": result.training.get("csv_path"),
             "batch_jsonl": result.batch.get("jsonl_path"),
@@ -133,9 +137,31 @@ class VertexIntegrationOrchestrator:
             "ontology_codesystem": result.ontology.get("codesystem_path"),
             "hemodynamics": result.hemodynamics.get("output_dir"),
             "clinical_intelligence": result.clinical_intelligence.get("output_dir"),
+            "production": result.production,
+            "clinical_validation": result.production.get("validation", {}).get("report_path"),
+            "conformal_calibration": result.production.get("conformal", {}).get("path"),
         }
 
         return result
+
+    def _run_production_framework(self, result: VertexIntegrationResult) -> Dict:
+        from src.integrations.production.orchestrator import ProductionOrchestrator
+
+        prod = ProductionOrchestrator(
+            lakehouse_config=self.lakehouse_config,
+            vertex_config=self.vertex_config,
+        )
+        patient_ids = result.datalake.patients if result.datalake else []
+        prod_result = prod.run_production_pipeline(
+            patient_ids=patient_ids,
+            run_ingestion=True,
+            run_clinical_sync=True,
+            run_conformal=True,
+            run_validation=True,
+            run_vertex_deploy=False,
+            use_simulated_datalake_if_empty=False,
+        )
+        return prod_result.to_dict()
 
     def _run_clinical_prediction(self, result: VertexIntegrationResult) -> Dict:
         from src.clinical_intelligence.pipeline import ClinicalIntelligencePipeline

@@ -107,7 +107,7 @@ class SilverToGoldTransformer:
 
             resting_hr = hr[hr.get("activity_context", pd.Series()) == "resting"]["metric_value"]
             if resting_hr.empty and not hr.empty:
-                resting_hr = hr.nsmallest(max(1, len(hr) // 4))["metric_value"]
+                resting_hr = hr.nsmallest(max(1, len(hr) // 4), "metric_value")["metric_value"]
 
             sleep_hours = len(group[group.get("sleep_context", pd.Series()) != "awake"]) * (
                 self.config.reconciliation_window_seconds / 3600

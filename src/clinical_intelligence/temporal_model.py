@@ -357,6 +357,7 @@ class TemporalModelWrapper:
         if sequence.ndim == 2:
             sequence = sequence[np.newaxis, ...]
         pred = self.predict(sequence)[0]
+        intervals = self._conformal_intervals(pred)
         return {
             "prob_6h": round(float(pred[0]), 4),
             "prob_24h": round(float(pred[1]), 4),
@@ -364,7 +365,33 @@ class TemporalModelWrapper:
             "max_probability": round(float(pred.max()), 4),
             "horizon_at_risk": ["6h", "24h", "72h"][int(pred.argmax())],
             "modo": "MLP-fallback (ghost+fuzzy)" if self._use_fallback else "TCN+BiLSTM (ghost+fuzzy)",
+            "conformal_intervals": intervals,
         }
+
+    def _conformal_intervals(self, pred: np.ndarray) -> Dict[str, List[float]]:
+        cal_path = self.model_dir / "conformal_calibration.json"
+        if not cal_path.exists():
+            margin = 0.15
+            labels = ["6h", "24h", "72h"]
+            return {
+                labels[i]: [round(max(0, float(pred[i]) - margin), 4),
+                            round(min(1, float(pred[i]) + margin), 4)]
+                for i in range(min(3, len(pred)))
+            }
+
+        with open(cal_path) as f:
+            cal = json.load(f)
+        q_map = cal.get("q_hat", {})
+        names = ["event_6h", "event_24h", "event_72h"]
+        labels = ["6h", "24h", "72h"]
+        result = {}
+        for i, (name, label) in enumerate(zip(names, labels)):
+            if i >= len(pred):
+                break
+            q = q_map.get(name, 0.15)
+            p = float(pred[i])
+            result[label] = [round(max(0.0, p - q), 4), round(min(1.0, p + q), 4)]
+        return result
 
     @staticmethod
     def _metrics_single(p_h: np.ndarray, y_h: np.ndarray) -> Dict:

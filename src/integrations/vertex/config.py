@@ -36,6 +36,18 @@ class VertexConfig:
     machine_type: str = field(
         default_factory=lambda: os.getenv("VERTEX_MACHINE_TYPE", "n1-standard-4")
     )
+    tcn_endpoint_id: str = field(
+        default_factory=lambda: os.getenv("VERTEX_TCN_ENDPOINT_ID", "endpoint-placeholder")
+    )
+    gcs_model_bucket: str = field(
+        default_factory=lambda: os.getenv("GCS_MODEL_BUCKET", "")
+    )
+    serving_container: str = field(
+        default_factory=lambda: os.getenv(
+            "VERTEX_SERVING_CONTAINER",
+            "us-docker.pkg.dev/vertex-ai/prediction/pytorch-gpu.2-0:latest",
+        )
+    )
 
     local_export_dir: Path = field(
         default_factory=lambda: Path("data/vertex_exports")

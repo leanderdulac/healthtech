@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **F17** — Framework de produção (`src/integrations/production/`, `run_production_pipeline.py`)
+- Ingestão real: Apple Health, Google Fit, BLE (`src/ingestion/real/`, `run_real_ingestion.py`)
+- Integração clínica FHIR Server (`src/integrations/clinical/`, `run_clinical_sync.py`)
+- Deploy Vertex AI dos 3 TCNs (`src/integrations/vertex/deploy/`, `run_vertex_deploy.py`)
+- Conformal prediction multi-horizonte (`run_conformal_calibration.py`)
+- Validação clínica com relatório JSON (`run_clinical_validation.py`)
+- Fase 9 no VertexIntegrationOrchestrator
 - **F16** — Modelo temporal TCN+BiLSTM com features ghost+fuzzy (`run_temporal_training.py`)
 - Predição multi-horizonte: 6h, 24h, 72h com BCE ponderada e early stopping
 - **F15** — Inteligência clínica preditiva multimodal (`src/clinical_intelligence/`, `run_clinical_prediction.py`)

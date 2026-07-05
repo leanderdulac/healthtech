@@ -28,14 +28,18 @@ class VertexOnlinePipeline:
         self.feature_builder = feature_builder
         self.local_model = local_model or LocalAnomalyModel(config.local_model_dir)
         self.temporal_model = TemporalModelWrapper(config.local_model_dir)
-        self.temporal_builder = TemporalFeatureBuilder(seq_len=32, subsample=60, feature_stride=4)
+        self.temporal_builder = TemporalFeatureBuilder(seq_len=32, subsample=30, feature_stride=4)
         self._vertex_detector: Optional[VertexOnlineDetector] = None
 
+        self._tcn_endpoint_id = config.tcn_endpoint_id
         if config.is_gcp_configured:
+            endpoint = config.tcn_endpoint_id
+            if "placeholder" in endpoint:
+                endpoint = config.endpoint_id
             self._vertex_detector = VertexOnlineDetector(
                 project=config.project_id,
                 location=config.location,
-                endpoint_id=config.endpoint_id,
+                endpoint_id=endpoint,
             )
 
     @property

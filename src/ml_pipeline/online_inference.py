@@ -36,6 +36,9 @@ class VertexOnlineDetector:
 
     def processar_features(self, features: dict) -> dict:
         """Envia features completas do datalake para o Vertex AI Endpoint."""
+        if features.get("sequence") and self.is_ready:
+            return self._predict_tcn_sequence(features)
+
         instance = {
             "bpm": float(features.get("bpm", 0)),
             "spo2": float(features.get("spo2", 97)),
@@ -51,6 +54,8 @@ class VertexOnlineDetector:
             try:
                 response = self._call_vertex_predict([instance])
                 prediction = response.predictions[0]
+                if isinstance(prediction, dict) and "prob_6h" in prediction:
+                    return self._format_tcn_response(prediction, features, instance)
                 if isinstance(prediction, (list, tuple)) and len(prediction) >= 2:
                     is_anomalia, score = prediction[0], prediction[1]
                 elif isinstance(prediction, dict):
@@ -84,4 +89,30 @@ class VertexOnlineDetector:
             "timestamp": features.get("timestamp"),
             "status": "ALERTA CRÍTICO (Mock)" if is_anomalia_mock else "Normal",
             "modo": "Simulação (Esqueleto)",
+        }
+
+    def _predict_tcn_sequence(self, features: dict) -> dict:
+        try:
+            response = self._call_vertex_predict([{"sequence": features["sequence"]}])
+            prediction = response.predictions[0]
+            return self._format_tcn_response(prediction, features, {})
+        except GoogleAPIError as api_err:
+            logger.error("Erro TCN Vertex: %s", api_err)
+            return {"alerta": False, "modo": "Vertex-TCN-failed", "error": str(api_err)}
+
+    @staticmethod
+    def _format_tcn_response(prediction: dict, features: dict, instance: dict) -> dict:
+        max_prob = float(prediction.get("max_probability", 0))
+        alerta = bool(prediction.get("alerta", max_prob > 0.5))
+        return {
+            "alerta": alerta,
+            "score": max_prob,
+            "temporal": prediction,
+            "valor_atual": instance.get("bpm") or features.get("bpm"),
+            "spo2": instance.get("spo2") or features.get("spo2"),
+            "patient_id": features.get("patient_id"),
+            "timestamp": features.get("timestamp"),
+            "status": f"ALERTA PREDITIVO ({prediction.get('horizon_at_risk', 'N/A')})" if alerta else "Normal",
+            "modo": prediction.get("modo", "Vertex-TCN"),
+            "conformal_intervals": prediction.get("conformal_intervals"),
         }

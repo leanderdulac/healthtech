@@ -1,3 +1,4 @@
+import json
 import logging
 from collections import defaultdict
 from datetime import date
@@ -43,6 +44,8 @@ class TelemetryIngestor:
             result = self.validator.validate_bronze(record)
             record.quality_flags = result.flags
             row = record.to_dict()
+            if isinstance(row.get("raw_payload"), dict):
+                row["raw_payload"] = json.dumps(row["raw_payload"], ensure_ascii=False)
 
             if result.is_valid:
                 valid_count += 1

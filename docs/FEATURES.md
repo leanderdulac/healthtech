@@ -390,6 +390,36 @@ python run_temporal_training.py --skip-pipeline  # usa datalake existente
 
 ---
 
+## F17 — Framework de Produção
+
+**Objetivo:** Ingestão real, dados clínicos FHIR, deploy Vertex dos 3 TCNs, conformal prediction e validação clínica.
+
+**Componentes:**
+
+| Pilar | Módulo | Descrição |
+|-------|--------|-----------|
+| Ingestão real | `src/ingestion/real/` | Apple Health XML/JSON, Google Fit API/cache, BLE HR |
+| Clínico FHIR | `src/integrations/clinical/` | Cliente REST R4, bridge → `PatientBaseline` |
+| Deploy Vertex | `src/integrations/vertex/deploy/` | Predictor TCN, packager, endpoint manager |
+| Conformal | `src/clinical_intelligence/conformal/` | Split conformal multi-horizonte (90% cobertura) |
+| Validação | `src/clinical_intelligence/validation/` | Sensibilidade, especificidade, PPV, NPV |
+| Orquestrador | `src/integrations/production/` | Pipeline F17 unificado |
+
+**Execução:**
+```bash
+python run_real_ingestion.py                    # Wearables reais → Bronze → Silver → Gold
+python run_clinical_sync.py --patient-ids ID    # FHIR → baseline clínico
+python run_conformal_calibration.py             # Intervalos conformais nos TCNs
+python run_clinical_validation.py                 # Relatório em data/clinical_validation/
+python run_vertex_deploy.py --smoke-only          # Teste local do predictor
+python run_vertex_deploy.py --deploy              # Upload GCS + Vertex Endpoint
+python run_production_pipeline.py                 # Pipeline F17 completo
+```
+
+**Integração:** Fase 9 no `VertexIntegrationOrchestrator`.
+
+---
+
 ## F11 — Reconciliação Multi-sensor (Legado)
 
 **Objetivo:** Deduplicar leituras de múltiplos sensores em janelas temporais.
@@ -410,4 +440,6 @@ F02 (Simulação) → F01 (Datalake) → F03 (Quality Gates)
 F07 (Anonimização) → F08 (FHIR)
 F12 (Scraper USP) → F13 (Ontologia) → F05 (Treino ML) + F08 (FHIR)
 F13 (Ontologia) → F14 (Hemodinâmica) → F15 (Predição Clínica) → F08 (FHIR Flags)
+F16 (TCN temporal) → F17 (Produção) → Vertex Endpoint + Conformal + Validação
+F17 (Ingestão real) → F01 (Datalake) | F17 (FHIR) → F15 (Fusão clínica)
 ```
