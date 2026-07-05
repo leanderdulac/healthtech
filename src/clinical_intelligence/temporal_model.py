@@ -101,37 +101,68 @@ if TORCH_AVAILABLE:
                 nn.Linear(64, 1),
             )
 
-            self.heads = nn.ModuleList([
-                nn.Sequential(
-                    nn.Linear(lstm_hidden * 2, 64),
-                    nn.ReLU(),
-                    nn.Dropout(dropout),
-                    nn.Linear(64, 1),
-                )
-                for _ in range(n_horizons)
-            ])
+            lstm_dim = lstm_hidden * 2
+            tcn_dim = tcn_channels * 2
+
+            self.head_6h = nn.Sequential(
+                nn.Linear(lstm_dim, 64), nn.ReLU(), nn.Dropout(dropout), nn.Linear(64, 1),
+            )
+            self.head_24h = nn.Sequential(
+                nn.Linear(lstm_dim + tcn_dim, 96), nn.ReLU(), nn.Dropout(dropout), nn.Linear(96, 1),
+            )
+            self.head_72h = nn.Sequential(
+                nn.Linear(lstm_dim + tcn_dim, 96), nn.ReLU(), nn.Dropout(dropout), nn.Linear(96, 1),
+            )
 
         def forward(self, x: torch.Tensor) -> torch.Tensor:
-            batch, seq, feat = x.shape
             projected = self.input_proj(x)
-            tcn_in = projected.transpose(1, 2)
-            tcn_out = self.tcn(tcn_in).transpose(1, 2)
+            tcn_out = self.tcn(projected.transpose(1, 2)).transpose(1, 2)
+            tcn_ctx = tcn_out.mean(dim=1)
 
             lstm_out, _ = self.lstm(tcn_out)
-
             attn_weights = F.softmax(self.attention(lstm_out), dim=1)
-            context = (attn_weights * lstm_out).sum(dim=1)
+            lstm_ctx = (attn_weights * lstm_out).sum(dim=1)
 
-            outputs = []
-            for head in self.heads:
-                outputs.append(torch.sigmoid(head(context)))
-            return torch.cat(outputs, dim=1)
+            fused = torch.cat([lstm_ctx, tcn_ctx], dim=1)
+            out_6h = torch.sigmoid(self.head_6h(lstm_ctx))
+            out_24h = torch.sigmoid(self.head_24h(fused))
+            out_72h = torch.sigmoid(self.head_72h(fused))
+            return torch.cat([out_6h, out_24h, out_72h], dim=1)
+
+    class SingleHorizonTCN(nn.Module):
+        """Modelo dedicado por horizonte — evita colapso de heads longos."""
+
+        def __init__(self, n_features: int, tcn_channels: int = 64, lstm_hidden: int = 96, dropout: float = 0.2):
+            super().__init__()
+            self.n_features = n_features
+            self.input_proj = nn.Linear(n_features, tcn_channels)
+            self.tcn = nn.Sequential(
+                TCNBlock(tcn_channels, tcn_channels, 3, 1, dropout),
+                TCNBlock(tcn_channels, tcn_channels * 2, 3, 2, dropout),
+                TCNBlock(tcn_channels * 2, tcn_channels * 2, 3, 4, dropout),
+            )
+            self.lstm = nn.LSTM(tcn_channels * 2, lstm_hidden, 2, batch_first=True, bidirectional=True, dropout=dropout)
+            self.head = nn.Sequential(
+                nn.Linear(lstm_hidden * 2 + tcn_channels * 2, 64),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(64, 1),
+            )
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            proj = self.input_proj(x)
+            tcn_out = self.tcn(proj.transpose(1, 2)).transpose(1, 2)
+            tcn_ctx = tcn_out.mean(dim=1)
+            lstm_out, _ = self.lstm(tcn_out)
+            lstm_ctx = lstm_out[:, -1, :]
+            return torch.sigmoid(self.head(torch.cat([lstm_ctx, tcn_ctx], dim=1)))
 
 
 class TemporalModelWrapper:
     """Wrapper de treino/inferência com fallback sklearn se PyTorch indisponível."""
 
     MODEL_FILENAME = "temporal_tcn_lstm.pt"
+    HORIZON_MODEL_TEMPLATE = "temporal_horizon_{}.pt"
     FALLBACK_FILENAME = "temporal_mlp_fallback.pkl"
     SCALER_FILENAME = "temporal_scaler.pkl"
     META_FILENAME = "temporal_model_meta.json"
@@ -140,6 +171,7 @@ class TemporalModelWrapper:
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self._model = None
+        self._horizon_models: List = []
         self._fallback_models = None
         self._scaler = None
         self._meta: Dict = {}
@@ -177,111 +209,121 @@ class TemporalModelWrapper:
         self._scaler.fit(flat)
         X_scaled = self._scaler.transform(flat).reshape(n_samples, seq_len, n_features)
 
-        split = int(n_samples * (1 - val_split))
-        if split < 2:
-            split = max(1, n_samples - 1)
-
-        X_train, X_val = X_scaled[:split], X_scaled[split:]
-        y_train, y_val = y[:split], y[split:]
+        from sklearn.model_selection import train_test_split
+        try:
+            X_train, X_val, y_train, y_val = train_test_split(
+                X_scaled, y, test_size=val_split, random_state=42,
+                stratify=y[:, 1] if y[:, 1].sum() > 5 else None,
+            )
+        except ValueError:
+            split = int(n_samples * (1 - val_split))
+            X_train, X_val = X_scaled[:split], X_scaled[split:]
+            y_train, y_val = y[:split], y[split:]
 
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
-        self._model = TCNLSTMTemporalModel(
-            n_features=n_features,
-            seq_len=seq_len,
-            n_horizons=y.shape[1],
-        ).to(self._device)
-
-        pos_weights = []
-        for h in range(y.shape[1]):
-            pos = y_train[:, h].sum()
-            neg = len(y_train) - pos
-            pos_weights.append(neg / max(pos, 1.0))
-        pos_weight = torch.tensor(pos_weights, device=self._device)
-
-        optimizer = torch.optim.AdamW(self._model.parameters(), lr=learning_rate, weight_decay=1e-4)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, factor=0.5)
+        horizon_names = ["event_6h", "event_24h", "event_72h"]
+        self._horizon_models = []
+        all_metrics = {}
+        total_epochs = 0
 
         X_train_t = torch.tensor(X_train, dtype=torch.float32, device=self._device)
-        y_train_t = torch.tensor(y_train, dtype=torch.float32, device=self._device)
         X_val_t = torch.tensor(X_val, dtype=torch.float32, device=self._device) if len(X_val) > 0 else None
-        y_val_t = torch.tensor(y_val, dtype=torch.float32, device=self._device) if len(y_val) > 0 else None
 
-        best_val_loss = float("inf")
-        patience_counter = 0
-        history = []
+        for h, h_name in enumerate(horizon_names[: y.shape[1]]):
+            model_h = SingleHorizonTCN(n_features=n_features).to(self._device)
+            y_h_train = torch.tensor(y_train[:, h], dtype=torch.float32, device=self._device)
+            y_h_val = torch.tensor(y_val[:, h], dtype=torch.float32, device=self._device) if len(y_val) > 0 else None
 
-        for epoch in range(epochs):
-            self._model.train()
-            perm = torch.randperm(len(X_train_t))
-            epoch_loss = 0.0
-            n_batches = 0
+            pos = y_train[:, h].sum()
+            neg = len(y_train) - pos
+            pos_w = min((neg / max(pos, 1.0)) * (1.5 if h == 0 else 3.0), 25.0)
 
-            for i in range(0, len(X_train_t), batch_size):
-                idx = perm[i:i + batch_size]
-                batch_x = X_train_t[idx]
-                batch_y = y_train_t[idx]
+            optimizer = torch.optim.AdamW(model_h.parameters(), lr=learning_rate, weight_decay=1e-4)
+            best_loss = float("inf")
+            patience = 0
+            epochs_run = 0
 
-                optimizer.zero_grad()
-                pred = self._model(batch_x)
-                loss = F.binary_cross_entropy(pred, batch_y, weight=pos_weight.unsqueeze(0))
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self._model.parameters(), 1.0)
-                optimizer.step()
-                epoch_loss += loss.item()
-                n_batches += 1
+            for epoch in range(epochs):
+                model_h.train()
+                perm = torch.randperm(len(X_train_t))
+                epoch_loss = 0.0
+                n_batches = 0
+                for i in range(0, len(X_train_t), batch_size):
+                    idx = perm[i:i + batch_size]
+                    bx, by = X_train_t[idx], y_h_train[idx]
+                    optimizer.zero_grad()
+                    pred = model_h(bx).squeeze(-1)
+                    bce = F.binary_cross_entropy(pred, by, reduction="none")
+                    sw = torch.where(by == 1, pos_w, 1.0)
+                    loss = (bce * sw).mean()
+                    loss.backward()
+                    optimizer.step()
+                    epoch_loss += loss.item()
+                    n_batches += 1
 
-            avg_loss = epoch_loss / max(n_batches, 1)
+                val_loss = epoch_loss / max(n_batches, 1)
+                if X_val_t is not None and y_h_val is not None and len(X_val_t) > 0:
+                    model_h.eval()
+                    with torch.no_grad():
+                        vp = model_h(X_val_t).squeeze(-1)
+                        vb = F.binary_cross_entropy(vp, y_h_val, reduction="none")
+                        vs = torch.where(y_h_val == 1, pos_w, 1.0)
+                        val_loss = (vb * vs).mean().item()
 
-            val_loss = avg_loss
-            if X_val_t is not None and len(X_val_t) > 0:
-                self._model.eval()
-                with torch.no_grad():
-                    val_pred = self._model(X_val_t)
-                    val_loss = F.binary_cross_entropy(val_pred, y_val_t, weight=pos_weight.unsqueeze(0)).item()
+                epochs_run = epoch + 1
+                if val_loss < best_loss:
+                    best_loss = val_loss
+                    patience = 0
+                    path = self.model_dir / self.HORIZON_MODEL_TEMPLATE.format(h_name)
+                    torch.save({"state": model_h.state_dict(), "n_features": n_features}, path)
+                else:
+                    patience += 1
+                    if patience >= 12:
+                        break
 
-            scheduler.step(val_loss)
-            history.append({"epoch": epoch + 1, "train_loss": avg_loss, "val_loss": val_loss})
+            path = self.model_dir / self.HORIZON_MODEL_TEMPLATE.format(h_name)
+            if path.exists():
+                ckpt = torch.load(path, map_location=self._device, weights_only=False)
+                model_h.load_state_dict(ckpt["state"])
+            model_h.eval()
+            self._horizon_models.append(model_h)
+            total_epochs += epochs_run
 
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                patience_counter = 0
-                self._save_checkpoint()
-            else:
-                patience_counter += 1
-                if patience_counter >= 10:
-                    logger.info("Early stopping na época %d", epoch + 1)
-                    break
+            with torch.no_grad():
+                preds = model_h(torch.tensor(X_scaled, dtype=torch.float32, device=self._device)).squeeze(-1).cpu().numpy()
+            all_metrics[h_name] = self._metrics_single(preds, y[:, h])
 
-        self._load_checkpoint()
-        metrics = self._evaluate(X_scaled, y)
+        self._model = None
+        with open(self.model_dir / self.SCALER_FILENAME, "wb") as f:
+            pickle.dump(self._scaler, f)
 
         self._meta = {
-            "architecture": "TCN+BiLSTM",
+            "architecture": "TCN-per-horizon",
             "n_features": n_features,
             "seq_len": seq_len,
-            "n_horizons": y.shape[1],
-            "horizon_names": ["event_6h", "event_24h", "event_72h"],
-            "train_samples": split,
-            "val_samples": n_samples - split,
-            "metrics": metrics,
-            "history": history[-5:],
+            "horizon_names": horizon_names,
+            "train_samples": len(y_train),
+            "val_samples": len(y_val),
+            "metrics": all_metrics,
         }
         self._save_meta()
 
         return {
             "status": "trained",
-            "architecture": "TCN+BiLSTM",
+            "architecture": "TCN-per-horizon (6h/24h/72h)",
             "samples": n_samples,
-            "epochs_run": len(history),
-            "metrics": metrics,
-            "model_path": str(self.model_dir / self.MODEL_FILENAME),
+            "epochs_run": total_epochs,
+            "metrics": all_metrics,
+            "model_path": str(self.model_dir),
         }
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        if self._fallback_models is None and self._model is None:
+        if self._fallback_models is None and self._model is None and not self._horizon_models:
             self._load_checkpoint()
         if self._use_fallback and self._fallback_models:
             return self._predict_fallback(X)
+        if self._horizon_models:
+            return self._predict_horizon_ensemble(X)
         if self._model is None:
             return np.zeros((len(X), 3))
 
@@ -297,6 +339,20 @@ class TemporalModelWrapper:
             pred = self._model(X_t).cpu().numpy()
         return pred
 
+    def _predict_horizon_ensemble(self, X: np.ndarray) -> np.ndarray:
+        n_samples, seq_len, n_features = X.shape
+        flat = X.reshape(-1, n_features)
+        if self._scaler:
+            flat = self._scaler.transform(flat)
+        X_scaled = flat.reshape(n_samples, seq_len, n_features)
+        X_t = torch.tensor(X_scaled, dtype=torch.float32, device=self._device)
+        cols = []
+        for model_h in self._horizon_models:
+            model_h.eval()
+            with torch.no_grad():
+                cols.append(model_h(X_t).squeeze(-1).cpu().numpy())
+        return np.column_stack(cols) if cols else np.zeros((len(X), 3))
+
     def predict_single(self, sequence: np.ndarray) -> Dict:
         if sequence.ndim == 2:
             sequence = sequence[np.newaxis, ...]
@@ -310,27 +366,30 @@ class TemporalModelWrapper:
             "modo": "MLP-fallback (ghost+fuzzy)" if self._use_fallback else "TCN+BiLSTM (ghost+fuzzy)",
         }
 
+    @staticmethod
+    def _metrics_single(p_h: np.ndarray, y_h: np.ndarray) -> Dict:
+        thresh = 0.5
+        if 0 < y_h.sum() < len(y_h):
+            thresh = float(np.percentile(p_h, 100 * (1 - y_h.mean())))
+            thresh = max(0.15, min(0.85, thresh))
+        tp = ((p_h > thresh) & (y_h > 0.5)).sum()
+        fp = ((p_h > thresh) & (y_h < 0.5)).sum()
+        fn = ((p_h <= thresh) & (y_h > 0.5)).sum()
+        precision = tp / max(tp + fp, 1)
+        recall = tp / max(tp + fn, 1)
+        f1 = 2 * precision * recall / max(precision + recall, 1e-6)
+        return {
+            "precision": round(float(precision), 3),
+            "recall": round(float(recall), 3),
+            "f1": round(float(f1), 3),
+            "positive_rate": round(float(y_h.mean()), 3),
+            "threshold": round(float(thresh), 3),
+        }
+
     def _evaluate(self, X: np.ndarray, y: np.ndarray) -> Dict:
         pred = self.predict(X)
-
-        metrics = {}
         horizon_names = ["event_6h", "event_24h", "event_72h"]
-        for h, name in enumerate(horizon_names):
-            y_h = y[:, h]
-            p_h = pred[:, h]
-            tp = ((p_h > 0.5) & (y_h > 0.5)).sum()
-            fp = ((p_h > 0.5) & (y_h < 0.5)).sum()
-            fn = ((p_h <= 0.5) & (y_h > 0.5)).sum()
-            precision = tp / max(tp + fp, 1)
-            recall = tp / max(tp + fn, 1)
-            f1 = 2 * precision * recall / max(precision + recall, 1e-6)
-            metrics[name] = {
-                "precision": round(float(precision), 3),
-                "recall": round(float(recall), 3),
-                "f1": round(float(f1), 3),
-                "positive_rate": round(float(y_h.mean()), 3),
-            }
-        return metrics
+        return {name: self._metrics_single(pred[:, h], y[:, h]) for h, name in enumerate(horizon_names)}
 
     def _train_fallback(self, X: np.ndarray, y: np.ndarray) -> Dict:
         from sklearn.neural_network import MLPClassifier
@@ -406,6 +465,9 @@ class TemporalModelWrapper:
         return np.column_stack(preds)
 
     def _save_checkpoint(self) -> None:
+        if self._scaler:
+            with open(self.model_dir / self.SCALER_FILENAME, "wb") as f:
+                pickle.dump(self._scaler, f)
         if self._model is None:
             return
         torch.save({
@@ -414,11 +476,24 @@ class TemporalModelWrapper:
             "seq_len": self._model.seq_len,
             "n_horizons": self._model.n_horizons,
         }, self.model_dir / self.MODEL_FILENAME)
-        if self._scaler:
-            with open(self.model_dir / self.SCALER_FILENAME, "wb") as f:
-                pickle.dump(self._scaler, f)
 
     def _load_checkpoint(self) -> bool:
+        horizon_names = ["event_6h", "event_24h", "event_72h"]
+        paths = [self.model_dir / self.HORIZON_MODEL_TEMPLATE.format(n) for n in horizon_names]
+        if all(p.exists() for p in paths):
+            self._horizon_models = []
+            for p in paths:
+                ckpt = torch.load(p, map_location=self._device, weights_only=False)
+                m = SingleHorizonTCN(n_features=ckpt["n_features"]).to(self._device)
+                m.load_state_dict(ckpt["state"])
+                m.eval()
+                self._horizon_models.append(m)
+            scaler_path = self.model_dir / self.SCALER_FILENAME
+            if scaler_path.exists():
+                with open(scaler_path, "rb") as f:
+                    self._scaler = pickle.load(f)
+            return True
+
         fb_path = self.model_dir / self.FALLBACK_FILENAME
         if fb_path.exists():
             with open(fb_path, "rb") as f:

@@ -45,23 +45,41 @@ class TemporalFeatureBuilder:
     def __init__(
         self,
         seq_len: int = 32,
-        subsample: int = 15,
-        feature_stride: int = 3,
+        subsample: int = 60,
+        feature_stride: int = 4,
         horizon_steps: Optional[Dict[str, int]] = None,
+        reconciliation_seconds: int = 5,
+        exclusive_horizons: bool = True,
     ):
         self.seq_len = seq_len
         self.subsample = subsample
         self.feature_stride = feature_stride
-        self.horizon_steps = horizon_steps or {
-            "event_6h": 8,
-            "event_24h": 24,
-            "event_72h": 48,
-        }
+        self.reconciliation_seconds = reconciliation_seconds
+        self.exclusive_horizons = exclusive_horizons
+        self.minutes_per_step = (subsample * reconciliation_seconds) / 60.0
+        self.horizon_steps = horizon_steps or self._default_horizon_steps()
         self.processor = WearableSignalProcessor()
         self.ghost_detector = GhostSignalDetector()
         self.fuzzy_engine = FuzzyClinicalEngine()
         self.prognostic = PrognosticEngine()
         self.pipeline = ClinicalIntelligencePipeline()
+
+    def _default_horizon_steps(self) -> Dict[str, int]:
+        """Converte horas reais em passos temporais conforme subsample."""
+        def steps(hours: float) -> int:
+            return max(1, int(hours * 60 / self.minutes_per_step))
+
+        return {
+            "event_6h": steps(6),
+            "event_24h": steps(24),
+            "event_72h": steps(72),
+        }
+
+    def horizon_summary(self) -> Dict[str, str]:
+        return {
+            name: f"{steps} passos ≈ {steps * self.minutes_per_step / 60:.1f}h"
+            for name, steps in self.horizon_steps.items()
+        }
 
     def build_from_datalake(
         self,
@@ -88,6 +106,11 @@ class TemporalFeatureBuilder:
 
             X, y = self.build_patient_sequences(vitals, baseline, hemo)
             if len(X) == 0:
+                logger.warning(
+                    "Sem sequências para %s (vitals=%d, min_necessário≈%d)",
+                    profile.patient_id, len(vitals),
+                    self.horizon_steps["event_72h"] + self.seq_len + 10,
+                )
                 continue
 
             all_X.append(X)
@@ -107,25 +130,37 @@ class TemporalFeatureBuilder:
         hemodynamic_score: float = 0.0,
     ) -> Tuple[np.ndarray, np.ndarray]:
         vitals_df = self._prepare_vitals(vitals_df)
+        self._calibrate_horizons_from_timestamps(vitals_df)
         feature_matrix = self._compute_feature_matrix(vitals_df, baseline, hemodynamic_score)
-        labels = self._compute_labels(vitals_df)
+        risk_series = self._compute_risk_series(vitals_df, baseline)
 
         sequences_X, sequences_y = [], []
-        max_horizon = max(self.horizon_steps.values())
+        h6 = self.horizon_steps["event_6h"]
+        h24 = self.horizon_steps["event_24h"]
+        h72 = self.horizon_steps["event_72h"]
+        max_end = len(feature_matrix) - h72
 
-        for end_idx in range(self.seq_len, len(feature_matrix) - max_horizon):
+        for end_idx in range(self.seq_len, max_end):
             start_idx = end_idx - self.seq_len
             seq = feature_matrix[start_idx:end_idx]
             if np.any(np.isnan(seq)) or np.any(np.isinf(seq)):
                 continue
 
-            label_vec = []
-            for h_name in HORIZON_NAMES:
-                h_steps = self.horizon_steps[h_name]
-                min_run = 2 if h_name == "event_6h" else 3
-                label_vec.append(
-                    1.0 if self._future_event(labels, end_idx, h_steps, min_run) else 0.0
-                )
+            current_risk = float(risk_series[end_idx])
+            window_6h = risk_series[end_idx:end_idx + h6]
+            window_24h = risk_series[end_idx + h6:end_idx + h24]
+            window_72h = risk_series[end_idx + h24:end_idx + h72]
+
+            label_vec = [
+                1.0 if (len(window_6h) > 0 and window_6h.max() > 0.50 and window_6h.mean() > 0.38) else 0.0,
+                1.0 if (len(window_24h) > 0 and window_24h.mean() > 0.36 and window_24h.max() > 0.48) else 0.0,
+                1.0 if (
+                    len(window_72h) > 0
+                    and window_72h.mean() > 0.34
+                    and window_72h.max() > 0.44
+                    and current_risk < 0.30
+                ) else 0.0,
+            ]
 
             sequences_X.append(seq)
             sequences_y.append(label_vec)
@@ -154,6 +189,16 @@ class TemporalFeatureBuilder:
             vitals_df["is_anomaly"] = False
 
         return vitals_df
+
+    def _calibrate_horizons_from_timestamps(self, vitals_df: pd.DataFrame) -> None:
+        """Calibra passos temporais a partir dos timestamps reais (não assume 5s)."""
+        if len(vitals_df) < 2:
+            return
+        ts = pd.to_datetime(vitals_df["window_start"])
+        delta_min = ts.diff().dropna().dt.total_seconds().median() / 60.0
+        if delta_min > 0:
+            self.minutes_per_step = float(delta_min)
+            self.horizon_steps = self._default_horizon_steps()
 
     def _compute_feature_matrix(
         self,
@@ -300,29 +345,22 @@ class TemporalFeatureBuilder:
 
         return vec
 
-    def _compute_labels(self, vitals_df: pd.DataFrame) -> np.ndarray:
-        hr = vitals_df["heart_rate"].values
-        spo2 = vitals_df["spo2"].values
-        stress = vitals_df.get("stress_index", pd.Series(0, index=vitals_df.index)).values
+    def _compute_risk_series(
+        self, vitals_df: pd.DataFrame, baseline: PatientBaseline,
+    ) -> np.ndarray:
+        """Score de risco contínuo [0,1] alinhado com ghost/fuzzy semantics."""
+        hr = vitals_df["heart_rate"].values.astype(float)
+        spo2 = vitals_df["spo2"].values.astype(float)
+        hrv = vitals_df.get("hrv", pd.Series(baseline.baseline_hrv, index=vitals_df.index)).values.astype(float)
+        stress = vitals_df.get("stress_index", pd.Series(0, index=vitals_df.index)).values.astype(float)
+        anomaly = vitals_df["is_anomaly"].astype(float).values
 
-        severe = (
-            (hr > 130) | (hr < 40) | (spo2 < 90) | (stress > 85)
-        )
-        moderate = vitals_df["is_anomaly"].astype(bool).values & (
-            (hr > 115) | (spo2 < 93)
-        )
-        return severe | moderate
+        hr_risk = np.clip((hr - baseline.resting_hr - 8) / 45, 0, 1)
+        spo2_risk = np.clip((baseline.baseline_spo2 - 1.5 - spo2) / 10, 0, 1)
+        hrv_risk = np.clip((baseline.baseline_hrv - hrv) / baseline.baseline_hrv, 0, 1)
+        stress_risk = np.clip(stress / 100, 0, 1)
 
-    def _future_event(self, labels: np.ndarray, start: int, steps: int, min_run: int = 2) -> bool:
-        window = labels[start:start + steps]
-        if not window.any():
-            return False
-        run = 0
-        for v in window:
-            if v:
-                run += 1
-                if run >= min_run:
-                    return True
-            else:
-                run = 0
-        return False
+        return np.clip(
+            0.30 * hr_risk + 0.30 * spo2_risk + 0.20 * hrv_risk + 0.10 * stress_risk + 0.10 * anomaly,
+            0, 1,
+        )

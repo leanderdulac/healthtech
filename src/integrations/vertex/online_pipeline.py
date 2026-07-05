@@ -28,7 +28,7 @@ class VertexOnlinePipeline:
         self.feature_builder = feature_builder
         self.local_model = local_model or LocalAnomalyModel(config.local_model_dir)
         self.temporal_model = TemporalModelWrapper(config.local_model_dir)
-        self.temporal_builder = TemporalFeatureBuilder(seq_len=32, subsample=12, feature_stride=4)
+        self.temporal_builder = TemporalFeatureBuilder(seq_len=32, subsample=60, feature_stride=4)
         self._vertex_detector: Optional[VertexOnlineDetector] = None
 
         if config.is_gcp_configured:

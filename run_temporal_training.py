@@ -36,7 +36,10 @@ def main():
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--seq-len", type=int, default=32)
     parser.add_argument("--patients", type=int, default=5)
-    parser.add_argument("--hours", type=float, default=24.0)
+    parser.add_argument("--hours", type=float, default=80.0,
+                        help="Horas de telemetria (mín. ~80h para horizonte 72h + seq_len)")
+    parser.add_argument("--subsample", type=int, default=30,
+                        help="Subsample vitals (30 ≈ 5min/step com HR 10s)")
     parser.add_argument("--skip-pipeline", action="store_true", help="Usar datalake existente")
     args = parser.parse_args()
 
@@ -57,7 +60,7 @@ def main():
             num_patients=args.patients,
             hours=args.hours,
             hr_interval_seconds=10,
-            anomaly_probability=0.06,
+            anomaly_probability=0.08,
             seed=42,
         )
         start_time = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -75,7 +78,15 @@ def main():
         profiles = sim.patient_profiles
 
     print_section("FASE 2: EXTRAÇÃO DE SEQUÊNCIAS GHOST+FUZZY")
-    builder = TemporalFeatureBuilder(seq_len=args.seq_len, subsample=12, feature_stride=4)
+    builder = TemporalFeatureBuilder(
+        seq_len=args.seq_len,
+        subsample=args.subsample,
+        feature_stride=4,
+        exclusive_horizons=True,
+    )
+    print(f"  Resolução temporal : {builder.minutes_per_step:.1f} min/passo")
+    for name, desc in builder.horizon_summary().items():
+        print(f"  {name}: {desc}")
     X, y, patient_ids = builder.build_from_datalake(
         query_engine=orchestrator.query_engine,
         patient_profiles=profiles,

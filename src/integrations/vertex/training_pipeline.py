@@ -96,7 +96,7 @@ class VertexTrainingPipeline:
         if not profiles:
             return {"status": "SKIPPED", "reason": "no_profiles"}
 
-        builder = TemporalFeatureBuilder(seq_len=32, subsample=12, feature_stride=4)
+        builder = TemporalFeatureBuilder(seq_len=32, subsample=30, feature_stride=4, exclusive_horizons=True)
         X, y, _ = builder.build_from_datalake(
             self.feature_builder.query_engine,
             profiles,

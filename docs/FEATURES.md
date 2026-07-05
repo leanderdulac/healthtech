@@ -375,7 +375,9 @@ python run_clinical_prediction.py
 
 **Arquitetura:**
 ```
-Input (B, 32, 24) → TCN[d=1,2,4] → BiLSTM(2L) → Attention → 3×sigmoid(6h/24h/72h)
+Input (B, 32, 24) → 3×TCN dedicado (6h / 24h / 72h) → sigmoid por horizonte
+Labels exclusivos: risco em [0-6h], [6-24h], [24-72h] com ghost+fuzzy
+Calibração temporal automática via timestamps reais do wearable
 ```
 
 **Execução:**
