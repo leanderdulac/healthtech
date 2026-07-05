@@ -1,64 +1,76 @@
 """
-Health Aggregator — API REST para agregação multimodal de saúde.
+Health Data Aggregator API
 
 Uso:
   cd health-aggregator
-  uvicorn main:app --reload --port 8090
+  uvicorn main:app --reload --port 8000
 """
 
-import logging
-from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
+import models  # noqa: F401 — registra tabelas no Base
 import crud
 import schemas
-from aggregator import HEALTHTECH_ROOT, HealthAggregator
-from database import get_db, init_db
-from models import AggregationRun, HealthRecord
+from aggregator import HealthAggregator
+from database import Base, engine, get_db
+from models import AggregationRun
+from schemas import DailyAggregate, HealthRecordCreate
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI(title="Health Data Aggregator API")
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    init_db()
-    logger.info("Health Aggregator iniciado — healthtech root: %s", HEALTHTECH_ROOT)
-    yield
+Base.metadata.create_all(bind=engine)
 
 
-app = FastAPI(
-    title="Health Aggregator",
-    description="Agrega telemetria wearable (apple/google/samsung), FHIR e TCN em health_records",
-    version="2.0.0",
-    lifespan=lifespan,
-)
+@app.post("/ingest/")
+async def ingest_records(records: list[HealthRecordCreate], db: Session = Depends(get_db)):
+    """Recebe dados de qualquer fonte e normaliza."""
+    for record in records:
+        HealthAggregator.normalize_and_save(
+            db,
+            [record.model_dump()],
+            record.source,
+            record.user_id,
+        )
+    return {"status": "success", "ingested": len(records)}
 
 
-@app.get("/health", response_model=schemas.HealthResponse)
-def health_check():
-    return schemas.HealthResponse(
-        status="ok",
-        healthtech_root=str(HEALTHTECH_ROOT) if HEALTHTECH_ROOT.exists() else None,
-    )
+@app.get("/aggregate/daily/{user_id}", response_model=list[DailyAggregate])
+async def get_aggregate(
+    user_id: str,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    db: Session = Depends(get_db),
+):
+    if not start_date:
+        start_date = datetime.now() - timedelta(days=30)
+    if not end_date:
+        end_date = datetime.now()
+
+    rows = HealthAggregator.get_daily_aggregate(db, user_id, start_date, end_date)
+    return HealthAggregator.daily_to_schema(rows)
 
 
-@app.get("/users", response_model=List[str])
-def list_users(db: Session = Depends(get_db)):
-    return crud.list_user_ids(db)
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "Health Aggregator"}
 
+
+# --- Endpoints estendidos (integração Healthtech) ---
 
 @app.post("/records", response_model=schemas.HealthRecordResponse)
-def create_record_endpoint(payload: schemas.HealthRecordCreate, db: Session = Depends(get_db)):
+async def create_record_endpoint(
+    payload: HealthRecordCreate,
+    db: Session = Depends(get_db),
+):
     return crud.create_record(db, crud.record_from_schema(payload))
 
 
 @app.get("/records/{user_id}", response_model=List[schemas.HealthRecordResponse])
-def get_records(
+async def get_records(
     user_id: str,
     source: Optional[str] = None,
     date: Optional[str] = None,
@@ -68,26 +80,12 @@ def get_records(
     return crud.list_records(db, user_id, source=source, date=date, limit=limit)
 
 
-@app.get("/users/{user_id}/summary", response_model=schemas.UserHealthSummary)
-def get_summary(user_id: str, db: Session = Depends(get_db)):
-    agg = HealthAggregator(db)
-    return agg.build_summary(user_id)
-
-
-@app.get("/users/{user_id}/daily", response_model=List[schemas.DailyAggregate])
-def get_daily(
-    user_id: str,
-    days: int = 30,
+@app.post("/aggregate", response_model=schemas.UserHealthSummary)
+async def run_full_aggregation(
+    payload: schemas.AggregateRequest,
     db: Session = Depends(get_db),
 ):
-    end = datetime.utcnow()
-    start = end - timedelta(days=days)
-    rows = HealthAggregator.get_daily_aggregate(db, user_id, start, end)
-    return HealthAggregator.daily_to_schema(rows)
-
-
-@app.post("/aggregate", response_model=schemas.UserHealthSummary)
-def run_aggregation(payload: schemas.AggregateRequest, db: Session = Depends(get_db)):
+    """Pipeline completo: Apple/Google/BLE + FHIR + TCN."""
     agg = HealthAggregator(db)
     try:
         return agg.aggregate(payload)
@@ -96,13 +94,10 @@ def run_aggregation(payload: schemas.AggregateRequest, db: Session = Depends(get
 
 
 @app.get("/runs", response_model=List[schemas.AggregationRunRead])
-def list_runs(limit: int = 20, db: Session = Depends(get_db)):
+async def list_runs(limit: int = 20, db: Session = Depends(get_db)):
     return [crud.run_to_schema(r) for r in crud.list_runs(db, limit=limit)]
 
 
-@app.get("/runs/{run_id}", response_model=schemas.AggregationRunRead)
-def get_run(run_id: int, db: Session = Depends(get_db)):
-    row = db.query(AggregationRun).filter(AggregationRun.id == run_id).first()
-    if not row:
-        raise HTTPException(404, "Run não encontrado")
-    return crud.run_to_schema(row)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

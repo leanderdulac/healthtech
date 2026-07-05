@@ -46,7 +46,7 @@ cp .env.example .env   # configure variáveis GCP e SECRET_SALT
 | `python run_clinical_validation.py` | Validação clínica (métricas + relatório) |
 | `python run_vertex_deploy.py` | Deploy dos 3 TCNs no Vertex AI |
 | `python run_production_pipeline.py` | Pipeline de produção F17 completo |
-| `cd health-aggregator && uvicorn main:app --port 8090` | API REST de agregação multimodal |
+| `cd health-aggregator && uvicorn main:app --port 8000` | API REST de agregação multimodal |
 
 ## Estrutura do projeto
 

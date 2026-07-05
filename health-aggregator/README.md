@@ -31,28 +31,40 @@ pip install -r ../requirements.txt
 ## Execução
 
 ```bash
-uvicorn main:app --reload --port 8090
+uvicorn main:app --reload --port 8000
+# ou
+python main.py
 ```
 
-Documentação interativa: http://localhost:8090/docs
+Documentação interativa: http://localhost:8000/docs
 
 ## Endpoints
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/health` | Health check |
-| GET | `/users` | Listar user_ids com registros |
-| POST | `/records` | Criar health_record |
-| GET | `/records/{user_id}` | Registros por usuário (filtro source/date) |
-| GET | `/users/{id}/summary` | Visão unificada + agregação diária |
-| GET | `/users/{id}/daily` | Agregação por dia (steps, HR, SpO2…) |
-| POST | `/aggregate` | Executar agregação multi-fonte |
+| POST | `/ingest/` | Ingestão em lote (normaliza e salva) |
+| GET | `/aggregate/daily/{user_id}` | Agregação diária (pandas + overall_score) |
+| POST | `/records` | Criar registro único |
+| GET | `/records/{user_id}` | Listar registros |
+| POST | `/aggregate` | Pipeline Healthtech (wearables + FHIR + TCN) |
 | GET | `/runs` | Histórico de agregações |
 
 ## Exemplo — agregação completa
 
 ```bash
-curl -X POST http://localhost:8090/aggregate \
+curl -X POST http://localhost:8000/ingest/ \
+  -H "Content-Type: application/json" \
+  -d '[{
+    "user_id": "user-123",
+    "source": "apple",
+    "timestamp": "2026-07-05T10:00:00",
+    "steps": 8500,
+    "heart_rate_bpm": 68,
+    "spo2": 97.5
+  }]'
+
+curl -X POST http://localhost:8000/aggregate \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "PAT-APPLE-001",
