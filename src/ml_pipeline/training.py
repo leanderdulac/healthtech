@@ -21,9 +21,9 @@ def orquestrar_custom_training(project_id: str, location: str, gcs_staging_bucke
     # Obs: `train_script.py` seria o arquivo contendo a lógica real de fit (Isolation Forest, etc)
     job = aiplatform.CustomTrainingJob(
         display_name="healthtech_anomaly_training_job",
-        script_path="src/ml_pipeline/train_anomaly_model.py",
+        script_path="src/ml_pipeline/train_script.py", # Reutilizando a lógica base
         container_uri=container_uri,
-        requirements=["pandas>=2.0.3", "scikit-learn>=1.3.0", "google-cloud-storage"],
+        requirements=["pandas==2.0.3", "google-cloud-bigquery", "scikit-learn", "joblib"],
     )
     
     logger.info("Submetendo o CustomTrainingJob para a fila do Vertex AI...")

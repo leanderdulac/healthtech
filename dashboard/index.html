@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthTech Advanced UI — Telemetria Fisiológica</title>
+    <!-- Fonte Premium -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap">
+    <!-- Icones Material -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
+    <!-- Folha de Estilos Customizada -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Chart.js para Gráficos Fluidos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="header-logo">
+                <span class="material-icons-round logo-icon">insights</span>
+                <h1>HealthTech <span class="badge">BIOMEDICAL PHYSICS</span></h1>
+            </div>
+            <div class="connection-status" id="ws-status">
+                <span class="status-indicator red"></span>
+                <span class="status-text">Desconectado</span>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <div class="main-layout">
+            <!-- SIDEBAR CONTROLS -->
+            <aside class="sidebar">
+                <div class="card card-controls">
+                    <h2><span class="material-icons-round">settings</span> Configurações</h2>
+                    
+                    <div class="control-group">
+                        <label>Simulação de Telemetria</label>
+                        <div class="btn-row">
+                            <button id="btn-start" class="btn btn-primary btn-glow">
+                                <span class="material-icons-round">play_arrow</span> Iniciar
+                            </button>
+                            <button id="btn-stop" class="btn btn-secondary" disabled>
+                                <span class="material-icons-round">pause</span> Pausar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="filter-select">Filtragem Física de Ruído</label>
+                        <select id="filter-select" class="form-select">
+                            <option value="Sem Filtro">Sem Filtragem (Fusional Cru)</option>
+                            <option value="Wavelet">Filtro Wavelet (DWT db4)</option>
+                            <option value="Butterworth">Passa-Baixa Butterworth</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="kalman-select">Filtro de Kalman (Estados Latentes)</label>
+                        <select id="kalman-select" class="form-select">
+                            <option value="EKF">Kalman Estendido (EKF)</option>
+                            <option value="UKF">Kalman Unscented (UKF)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- PESQUISA RAG / USP -->
+                <div class="card card-search">
+                    <h2><span class="material-icons-round">search</span> RAG USP Search</h2>
+                    <p class="search-desc">Busque na base de teses de saúde da USP e ontologias clínicas.</p>
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="Ex: arritmia por wearable...">
+                        <button id="btn-search" class="btn btn-search-icon">
+                            <span class="material-icons-round">search</span>
+                        </button>
+                    </div>
+                    <div class="search-results" id="search-results-box">
+                        <div class="no-results">Pronto para buscar...</div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- DASHBOARD GRID -->
+            <main class="dashboard-grid">
+                <!-- GRID CARDS: SINAIS VITAIS -->
+                <section class="vitals-section">
+                    <!-- BPM Card -->
+                    <div class="card metric-card border-blue" id="card-bpm">
+                        <div class="metric-header">
+                            <span class="metric-title">Frequência Cardíaca</span>
+                            <span class="material-icons-round icon-blue">favorite</span>
+                        </div>
+                        <div class="metric-value"><span id="val-bpm">--</span> <span class="unit">BPM</span></div>
+                        <div class="metric-sub" id="sub-bpm">Sensores: Watch & Band</div>
+                    </div>
+
+                    <!-- Pressão Arterial Card -->
+                    <div class="card metric-card border-green" id="card-bp">
+                        <div class="metric-header">
+                            <span class="metric-title">Pressão Arterial (Fantasma)</span>
+                            <span class="material-icons-round icon-green">speed</span>
+                        </div>
+                        <div class="metric-value"><span id="val-bp">-- / --</span> <span class="unit">mmHg</span></div>
+                        <div class="metric-sub" id="sub-bp">Intervalo: -- - -- (95%)</div>
+                    </div>
+
+                    <!-- SpO2 Card -->
+                    <div class="card metric-card border-yellow" id="card-spo2">
+                        <div class="metric-header">
+                            <span class="metric-title">Oxigenação (SpO₂ Fantasma)</span>
+                            <span class="material-icons-round icon-yellow">opacity</span>
+                        </div>
+                        <div class="metric-value"><span id="val-spo2">--</span> <span class="unit">%</span></div>
+                        <div class="metric-sub" id="sub-spo2">Status: --</div>
+                    </div>
+
+                    <!-- Glicose Card -->
+                    <div class="card metric-card border-red" id="card-glucose">
+                        <div class="metric-header">
+                            <span class="metric-title">Glicose Sanguínea (Fantasma)</span>
+                            <span class="material-icons-round icon-red">bubble_chart</span>
+                        </div>
+                        <div class="metric-value"><span id="val-glucose">--</span> <span class="unit">mg/dL</span></div>
+                        <div class="metric-sub" id="sub-glucose">Status: --</div>
+                    </div>
+                </section>
+
+                <!-- CHARTS PANEL -->
+                <section class="charts-section">
+                    <div class="card chart-card">
+                        <h3>Frequência Cardíaca — Filtragem Wavelet & Reconciliação Bayesiana</h3>
+                        <div class="chart-container">
+                            <canvas id="chart-hr"></canvas>
+                        </div>
+                    </div>
+                    <div class="card chart-card">
+                        <h3>Dados Fantasmas — Pressão Arterial Estimada (PAS / PAD)</h3>
+                        <div class="chart-container">
+                            <canvas id="chart-bp"></canvas>
+                        </div>
+                    </div>
+                    <div class="card chart-card">
+                        <h3>Sinais Ocultos Fisiológicos — Oxigenação & Glicose Sanguínea</h3>
+                        <div class="chart-container">
+                            <canvas id="chart-oxygen"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CLINICAL ONTOLOGY BRIDGE -->
+                <section class="ontology-section">
+                    <div class="card card-ontology">
+                        <h2><span class="material-icons-round">dns</span> Classificação Probabilística (Rede Bayesiana)</h2>
+                        <div class="ontology-bars" id="ontology-bars-box">
+                            <div class="ontology-bar-item">
+                                <span class="category-name">Cardiovascular</span>
+                                <div class="progress-container">
+                                    <div class="progress-bar" id="bar-cardiovascular" style="width: 5%"></div>
+                                </div>
+                                <span class="category-pct" id="pct-cardiovascular">5.0%</span>
+                            </div>
+                            <div class="ontology-bar-item">
+                                <span class="category-name">Respiratório</span>
+                                <div class="progress-container">
+                                    <div class="progress-bar" id="bar-respiratory" style="width: 5%"></div>
+                                </div>
+                                <span class="category-pct" id="pct-respiratory">5.0%</span>
+                            </div>
+                            <div class="ontology-bar-item">
+                                <span class="category-name">Metabólico</span>
+                                <div class="progress-container">
+                                    <div class="progress-bar" id="bar-metabolic" style="width: 5%"></div>
+                                </div>
+                                <span class="category-pct" id="pct-metabolic">5.0%</span>
+                            </div>
+                            <div class="ontology-bar-item">
+                                <span class="category-name">Neurológico Autônomo</span>
+                                <div class="progress-container">
+                                    <div class="progress-bar" id="bar-neurological" style="width: 5%"></div>
+                                </div>
+                                <span class="category-pct" id="pct-neurological">5.0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card card-codes">
+                        <h2><span class="material-icons-round">code</span> Codificação Médica (Interoperabilidade)</h2>
+                        <div class="codes-grid">
+                            <div class="code-badge-group">
+                                <strong>ICD-10 (CID-10):</strong>
+                                <div class="badges" id="badges-icd10">
+                                    <span class="badge-code">Aguardando...</span>
+                                </div>
+                            </div>
+                            <div class="code-badge-group">
+                                <strong>SNOMED-CT:</strong>
+                                <div class="badges" id="badges-snomed">
+                                    <span class="badge-code">Aguardando...</span>
+                                </div>
+                            </div>
+                            <div class="code-badge-group">
+                                <strong>MeSH:</strong>
+                                <div class="badges" id="badges-mesh">
+                                    <span class="badge-code">Aguardando...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Script da Aplicação -->
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" width="100%" height="100%">
+    <!-- Filtros de Glow (Efeito Neon) -->
+    <defs>
+        <linearGradient id="grad-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#0284c7;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#0ea5e9;stop-opacity:1" />
+        </linearGradient>
+        <linearGradient id="grad-green" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#059669;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+        </linearGradient>
+        <linearGradient id="grad-yellow" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#d97706;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+        </linearGradient>
+        <linearGradient id="grad-red" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#dc2626;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#ef4444;stop-opacity:1" />
+        </linearGradient>
+        
+        <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="glow-yellow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+    </defs>
+
+    <!-- Fundo Escuro -->
+    <rect width="1000" height="650" fill="#090b10" rx="15" />
+    <rect width="990" height="640" x="5" y="5" fill="none" stroke="#1e293b" stroke-width="2" rx="10" />
+
+    <!-- Título Principal -->
+    <text x="500" y="45" fill="#f8fafc" font-family="Outfit, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" letter-spacing="1">
+        FLUXO MATEMÁTICO — SAÚDE RESPONSIVA
+    </text>
+    <text x="500" y="70" fill="#64748b" font-family="Outfit, sans-serif" font-size="14" text-anchor="middle">
+        Pipeline Biomédico de Processamento, Fusão e Estimativa de Sinais Ocultos
+    </text>
+
+    <!-- 1. BLOCO DE ENTRADA (SINAIS DE SENSORES) -->
+    <g transform="translate(60, 120)">
+        <rect width="250" height="110" fill="#0f172a" stroke="url(#grad-blue)" stroke-width="2" rx="12" filter="url(#glow-blue)" />
+        <text x="20" y="30" fill="#38bdf8" font-family="Outfit, sans-serif" font-size="14" font-weight="bold">1. ENTRADA DE WEARABLES</text>
+        <text x="20" y="55" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="12">Frequência Cardíaca Bruta: z_k</text>
+        <text x="20" y="75" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="12">Ruído Estocástico Fisiológico</text>
+        <text x="20" y="95" fill="#64748b" font-family="Outfit, sans-serif" font-size="10">Pixel Watch &amp; Fitbit Band</text>
+    </g>
+
+    <!-- Linha de conexão 1 -> 2 -->
+    <path d="M 310 175 L 380 175" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" fill="none" stroke-dasharray="4" />
+
+    <!-- 2. BLOCO FUSÃO BAYESIANA (BLUE) -->
+    <g transform="translate(390, 120)">
+        <rect width="250" height="110" fill="#0f172a" stroke="url(#grad-blue)" stroke-width="2" rx="12" filter="url(#glow-blue)" />
+        <text x="20" y="30" fill="#38bdf8" font-family="Outfit, sans-serif" font-size="14" font-weight="bold">2. FUSÃO BAYESIANA (BLUE)</text>
+        <text x="20" y="55" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="11" font-family="monospace">x_fused = Σ(w_i * z_i)</text>
+        <text x="20" y="75" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="11" font-family="monospace">w_i = (1/σ²_i) / Σ(1/σ²_j)</text>
+        <text x="20" y="95" fill="#64748b" font-family="Outfit, sans-serif" font-size="10">Variância adaptativa via EWMA</text>
+    </g>
+
+    <!-- Linha de conexão 2 -> 3 -->
+    <path d="M 640 175 L 710 175" stroke="#38bdf8" stroke-width="2" fill="none" />
+
+    <!-- 3. BLOCO FILTRAGEM WAVELET (DWT) -->
+    <g transform="translate(720, 120)">
+        <rect width="220" height="110" fill="#0f172a" stroke="url(#grad-blue)" stroke-width="2" rx="12" filter="url(#glow-blue)" />
+        <text x="20" y="30" fill="#38bdf8" font-family="Outfit, sans-serif" font-size="14" font-weight="bold">3. DENOISING DWT</text>
+        <text x="20" y="55" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="12">Wavelet db4 &amp; Soft Threshold</text>
+        <text x="20" y="75" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="11" font-family="monospace">λ = σ * sqrt(2 * ln(N))</text>
+        <text x="20" y="95" fill="#64748b" font-family="Outfit, sans-serif" font-size="10">Remoção de artefatos de movimento</text>
+    </g>
+
+    <!-- Curva de conexão 3 -> 4 -->
+    <path d="M 830 230 L 830 290 L 500 290 L 500 340" stroke="#10b981" stroke-width="2" fill="none" />
+
+    <!-- 4. BLOCO KALMAN FILTER (DADOS FANTASMAS) -->
+    <g transform="translate(350, 350)">
+        <rect width="300" height="130" fill="#0f172a" stroke="url(#grad-green)" stroke-width="2" rx="12" filter="url(#glow-green)" />
+        <text x="20" y="30" fill="#34d399" font-family="Outfit, sans-serif" font-size="14" font-weight="bold">4. FILTRO DE KALMAN (EKF / UKF)</text>
+        <text x="20" y="55" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="12">Estimativa de Variáveis Ocultas (Fantasmas):</text>
+        <text x="20" y="75" fill="#38bdf8" font-family="Outfit, sans-serif" font-size="11" font-weight="bold">PAS / PAD | SpO₂ | Glicose | Tono Vagal</text>
+        <text x="20" y="95" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="11" font-family="monospace">x_k = f(x_k-1) + w_k  |  z_k = h(x_k) + v_k</text>
+        <text x="20" y="115" fill="#64748b" font-family="Outfit, sans-serif" font-size="10">Homeostase via processo Ornstein-Uhlenbeck</text>
+    </g>
+
+    <!-- Linha de conexão 4 -> 5 -->
+    <path d="M 350 415 L 290 415" stroke="#f59e0b" stroke-width="2" fill="none" />
+    <path d="M 650 415 L 710 415" stroke="#ef4444" stroke-width="2" fill="none" />
+
+    <!-- 5. BLOCO DETECTOR DE ANOMALIAS (MAHALANOBIS) -->
+    <g transform="translate(60, 350)">
+        <rect width="220" height="130" fill="#0f172a" stroke="url(#grad-yellow)" stroke-width="2" rx="12" filter="url(#glow-yellow)" />
+        <text x="20" y="30" fill="#fbbf24" font-family="Outfit, sans-serif" font-size="14" font-weight="bold">5. ANOMALIAS (MAHALANOBIS)</text>
+        <text x="20" y="55" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="12">Distância Multivariada Escalar</text>
+        <text x="20" y="75" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="11" font-family="monospace">D_M² = (x-μ)ᵀ Σ⁻¹ (x-μ)</text>
+        <text x="20" y="95" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="11" font-family="monospace">D_M² ~ χ²(p) → p-value</text>
+        <text x="20" y="115" fill="#64748b" font-family="Outfit, sans-serif" font-size="10">Alarme se p-value &lt; 0.01</text>
+    </g>
+
+    <!-- 6. BLOCO REDE BAYESIANA DIAGNÓSTICA -->
+    <g transform="translate(720, 350)">
+        <rect width="220" height="130" fill="#0f172a" stroke="url(#grad-red)" stroke-width="2" rx="12" filter="url(#glow-red)" />
+        <text x="20" y="30" fill="#f87171" font-family="Outfit, sans-serif" font-size="14" font-weight="bold">6. REDE BAYESIANA</text>
+        <text x="20" y="55" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="11" font-family="monospace">P(C_i|x) ∝ P(x|C_i)*P(C_i)</text>
+        <text x="20" y="75" fill="#cbd5e1" font-family="Outfit, sans-serif" font-size="12">Ponte Ontológica Clínica</text>
+        <text x="20" y="95" fill="#38bdf8" font-family="Outfit, sans-serif" font-size="11" font-weight="bold">ICD-10 | SNOMED | MeSH</text>
+        <text x="20" y="115" fill="#64748b" font-family="Outfit, sans-serif" font-size="10">Corpus de Teses da USP (RAG)</text>
+    </g>
+
+    <!-- Marcador de Seta -->
+    <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
+        </marker>
+    </defs>
+</svg>

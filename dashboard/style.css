@@ -1,0 +1,524 @@
+/* ==========================================================================
+   HealthTech Telemetry Dashboard Style — Dark Mode Glassmorphism
+   ========================================================================== */
+
+/* Resets e Configurações Globais */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #080a0f;
+    color: #e2e8f0;
+    font-family: 'Outfit', sans-serif;
+    line-height: 1.5;
+    overflow-x: hidden;
+}
+
+/* Estrutura Principal */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+/* HEADER */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 25px;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+}
+
+.header-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-icon {
+    font-size: 2.2rem;
+    color: #0ea5e9;
+    filter: drop-shadow(0 0 8px rgba(14, 165, 233, 0.6));
+}
+
+.header-logo h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #f8fafc;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.badge {
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: rgba(14, 165, 233, 0.15);
+    color: #38bdf8;
+    padding: 4px 8px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 6px;
+    letter-spacing: 1px;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 30px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-indicator.red {
+    background-color: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+}
+
+.status-indicator.green {
+    background-color: #10b981;
+    box-shadow: 0 0 8px #10b981;
+}
+
+.status-indicator.yellow {
+    background-color: #f59e0b;
+    box-shadow: 0 0 8px #f59e0b;
+}
+
+/* LAYOUT PRINCIPAL */
+.main-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    flex-grow: 1;
+}
+
+/* CARDS GLASSMORPHISM */
+.card {
+    background: rgba(17, 24, 39, 0.45);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    margin-bottom: 20px;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.card h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #38bdf8;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card h2 span {
+    font-size: 1.3rem;
+}
+
+/* SIDEBAR CONTROLS */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+}
+
+.control-group {
+    margin-bottom: 18px;
+}
+
+.control-group label {
+    display: block;
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+/* Botões */
+.btn-row {
+    display: flex;
+    gap: 10px;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 1;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+}
+
+.btn-secondary {
+    background: rgba(71, 85, 105, 0.3);
+    color: #cbd5e1;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: rgba(71, 85, 105, 0.5);
+    color: #f8fafc;
+}
+
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-glow {
+    box-shadow: 0 0 15px rgba(2, 132, 199, 0.4);
+}
+
+.btn-glow:hover {
+    box-shadow: 0 0 25px rgba(14, 165, 233, 0.6);
+}
+
+/* Inputs e Selects */
+.form-select {
+    width: 100%;
+    padding: 10px 12px;
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-family: inherit;
+    font-size: 0.9rem;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.form-select:focus {
+    border-color: #38bdf8;
+}
+
+/* PESQUISA RAG */
+.search-desc {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: -10px;
+    margin-bottom: 15px;
+}
+
+.search-box {
+    display: flex;
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 2px;
+    margin-bottom: 15px;
+    overflow: hidden;
+}
+
+.search-box input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 10px 12px;
+    color: #e2e8f0;
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.btn-search-icon {
+    flex: 0 0 42px;
+    padding: 0;
+    border-radius: 6px;
+    background: rgba(14, 165, 233, 0.15);
+    color: #38bdf8;
+}
+
+.btn-search-icon:hover {
+    background: #0ea5e9;
+    color: #fff;
+}
+
+.search-results {
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 250px;
+    overflow-y: auto;
+    font-size: 0.8rem;
+    border: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.no-results {
+    color: #64748b;
+    text-align: center;
+    padding: 10px;
+}
+
+.result-item {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+
+.result-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.result-title {
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+}
+
+.result-meta {
+    font-size: 0.7rem;
+    color: #38bdf8;
+    margin-bottom: 4px;
+}
+
+.result-text {
+    color: #94a3b8;
+    line-height: 1.4;
+}
+
+/* DASHBOARD GRID */
+.dashboard-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* SINAIS VITAIS */
+.vitals-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+}
+
+.metric-card {
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+}
+
+.metric-card.border-blue::before { background-color: #0ea5e9; }
+.metric-card.border-green::before { background-color: #10b981; }
+.metric-card.border-yellow::before { background-color: #f59e0b; }
+.metric-card.border-red::before { background-color: #ef4444; }
+
+.metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.metric-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-header span:last-child {
+    font-size: 1.4rem;
+}
+
+.icon-blue { color: #0ea5e9; filter: drop-shadow(0 0 4px rgba(14, 165, 233, 0.4)); }
+.icon-green { color: #10b981; filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.4)); }
+.icon-yellow { color: #f59e0b; filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.4)); }
+.icon-red { color: #ef4444; filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.4)); }
+
+.metric-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.metric-value .unit {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #64748b;
+}
+
+.metric-sub {
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+/* CHARTS SECTION */
+.charts-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+.chart-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 15px;
+}
+
+.chart-container {
+    position: relative;
+    height: 250px;
+    width: 100%;
+}
+
+/* ONTOLOGY SECTION */
+.ontology-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* Barras de Probabilidade */
+.ontology-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ontology-bar-item {
+    display: grid;
+    grid-template-columns: 140px 1fr 50px;
+    align-items: center;
+    gap: 12px;
+}
+
+.category-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #94a3b8;
+}
+
+.progress-container {
+    height: 8px;
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #0284c7, #0ea5e9);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px rgba(14, 165, 233, 0.6);
+}
+
+.category-pct {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    text-align: right;
+}
+
+/* Códigos Clínicos */
+.codes-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.code-badge-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.code-badge-group strong {
+    font-size: 0.8rem;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.badge-code {
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.badge-code:hover {
+    background: rgba(56, 189, 248, 0.25);
+}
+
+/* Responsividade */
+@media (max-width: 1024px) {
+    .main-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .ontology-section {
+        grid-template-columns: 1fr;
+    }
+}
