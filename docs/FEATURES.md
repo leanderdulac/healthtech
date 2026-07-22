@@ -420,6 +420,49 @@ python run_production_pipeline.py                 # Pipeline F17 completo
 
 ---
 
+## F18 — Dashboard, Signal Processing Avançado e Rede Bayesiana
+
+**Objetivo:** Interface operacional + algoritmos de sinal de nível produção e diagnóstico ontológico.
+
+**Componentes:**
+- `dashboard/` — UI glassmórfica (HTML/JS) + Streamlit (`app.py`)
+- `src/api_server.py` — FastAPI, WebSocket `/ws/telemetry`, busca RAG
+- `src/signal_processing/` — Wavelet, Butterworth, fusão bayesiana de sensores
+- `src/phantom_data/` — EKF/UKF, motor de estados latentes, HRV
+- `src/anomaly_detection/` — ensemble temporal
+- `src/ontology/clinical_ontology_mapper.py` + rede bayesiana de hipóteses
+- `Dockerfile` + `deploy_to_gcp.sh` — Cloud Run
+
+**Execução:**
+```bash
+uvicorn src.api_server:app --port 8080
+streamlit run dashboard/app.py
+```
+
+**Auth:** header `X-API-Key` (REST); WebSocket `?api_key=...`
+
+---
+
+## F19 — Hardening de Segurança, Testes e CI
+
+**Objetivo:** APIs e deploy seguros por default; regressão automatizada.
+
+**Componentes:**
+- `src/security/auth.py` — API key, CORS, validação de `SECRET_SALT`
+- `tests/` — auth, anonimização FHIR, quality gates, hemodinâmica, aggregator
+- `.github/workflows/ci.yml` — pytest + validação Dockerfile
+- `requirements-dev.txt`, `pytest.ini`
+
+**Variáveis:** `ENVIRONMENT`, `API_KEY`, `SECRET_SALT`, `AUTH_DISABLED`, `CORS_ORIGINS`
+
+**Execução:**
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+---
+
 ## F11 — Reconciliação Multi-sensor (Legado)
 
 **Objetivo:** Deduplicar leituras de múltiplos sensores em janelas temporais.
@@ -442,4 +485,6 @@ F12 (Scraper USP) → F13 (Ontologia) → F05 (Treino ML) + F08 (FHIR)
 F13 (Ontologia) → F14 (Hemodinâmica) → F15 (Predição Clínica) → F08 (FHIR Flags)
 F16 (TCN temporal) → F17 (Produção) → Vertex Endpoint + Conformal + Validação
 F17 (Ingestão real) → F01 (Datalake) | F17 (FHIR) → F15 (Fusão clínica)
+F18 (Dashboard + phantom + bayes) → F15/F16 (sinais) + deploy Cloud Run
+F19 (Auth/CI) → F18 APIs + F07 anonimização
 ```

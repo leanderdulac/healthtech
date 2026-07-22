@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **Hardening de segurança** — `src/security/auth.py` (API key `X-API-Key`, CORS restrito, validação de `SECRET_SALT`)
+- Auth nas APIs `health-aggregator` e `src/api_server.py` (REST + WebSocket `?api_key=`)
+- Endpoint público `/api/health` e `/health` para probes
+- Suite de testes `tests/` + `pytest.ini` + `requirements-dev.txt`
+- CI GitHub Actions (`.github/workflows/ci.yml`)
+- Dockerfile multi-stage com usuário não-root, HEALTHCHECK e uvicorn
+- Deploy GCP exige `API_KEY`/`SECRET_SALT`; auth pública opt-in (`ALLOW_UNAUTHENTICATED`)
+- **F18** — Dashboard glassmórfico, signal processing avançado, phantom data EKF/UKF, rede bayesiana, anomaly ensemble
 - **F17** — Framework de produção (`src/integrations/production/`, `run_production_pipeline.py`)
 - Ingestão real: Apple Health, Google Fit, BLE (`src/ingestion/real/`, `run_real_ingestion.py`)
 - Integração clínica FHIR Server (`src/integrations/clinical/`, `run_clinical_sync.py`)
@@ -43,11 +51,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 - `bigquery_setup.py` provisiona schema FHIR nativo
 - `data_generator.py` gera recursos FHIR com códigos LOINC
 - `fluxo-completo.mmd` atualizado com fases FHIR
+- Anonimização FHIR: remove `city` do endereço (minimização LGPD)
+- `health-aggregator` default DB = SQLite local; PostgreSQL via `DATABASE_URL`
+- `requirements.txt` sem duplicatas; ranges alinhados ao aggregator
+- `.gitignore` ignora `data/chroma_db/` e `data/lake/`
 
 ### Fixed
 - Compatibilidade `fhir.resources` v7 (R4) via `src/fhir/compat.py`
 - IDs de Device normalizados para pattern FHIR `[A-Za-z0-9\-.]+`
 - Import circular entre `datalake` e `fhir` resolvido com lazy import
+- `datetime.utcnow()` substituído por `datetime.now(timezone.utc)` no aggregator/API
 
 ---
 

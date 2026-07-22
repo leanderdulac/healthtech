@@ -19,7 +19,7 @@ from typing import Dict, Any, Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -28,6 +28,13 @@ from pydantic import BaseModel
 # Garantir imports corretos
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from src.security.auth import (
+    cors_allow_credentials,
+    get_cors_origins,
+    require_api_key,
+    validate_secret_salt,
+    verify_api_key,
+)
 from src.data_warehouse.datalake_manager import DataLakeManager
 from src.ml_pipeline.slm_search_engine import SLMSearchEngine
 from src.ml_pipeline.online_inference import VertexOnlineDetector
@@ -41,16 +48,17 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="HealthTech Advanced API Server",
     description="Servidor de telemetria biométrica, processamento de sinais e dados fantasmas.",
-    version="2.0.0"
+    version="2.1.0"
 )
 
-# Habilitar CORS para permitir requisições do frontend local
+# CORS restrito (nunca * com credentials). Configure CORS_ORIGINS em produção.
+_cors_origins = get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins or ["http://localhost:8080"],
+    allow_credentials=cors_allow_credentials(),
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*", "X-API-Key"],
 )
 
 # Montar diretório de frontend estático
@@ -117,9 +125,15 @@ class SearchQuery(BaseModel):
     n_results: int = 3
 
 
+@app.get("/api/health")
+def health_probe():
+    """Probe público para orquestradores (Cloud Run / k8s)."""
+    return {"status": "healthy", "service": "HealthTech API"}
+
+
 @app.get("/api/status")
-def get_status():
-    """Retorna o status atual dos motores do sistema."""
+def get_status(_api_key: Optional[str] = Depends(require_api_key)):
+    """Retorna o status atual dos motores do sistema (requer API key)."""
     df_lake = dl_manager.load_latest_knowledge()
     return {
         "status": "online",
@@ -135,7 +149,10 @@ def get_status():
 
 
 @app.post("/api/search")
-def search_literature(search: SearchQuery):
+def search_literature(
+    search: SearchQuery,
+    _api_key: Optional[str] = Depends(require_api_key),
+):
     """Busca literatura nas teses da USP via SLM (RAG)."""
     if not search.query:
         raise HTTPException(status_code=400, detail="A consulta (query) não pode estar vazia.")
@@ -162,7 +179,7 @@ def search_literature(search: SearchQuery):
 
 
 @app.post("/api/reindex")
-def reindex_data_lake():
+def reindex_data_lake(_api_key: Optional[str] = Depends(require_api_key)):
     """Re-indexa o Data Lake no banco vetorial ChromaDB."""
     try:
         slm_engine.index_datalake(dl_manager)
@@ -305,7 +322,7 @@ async def telemetry_stream_loop():
             try:
                 row_to_insert = [{
                     "patient_id": "SECURE_PATIENT_001",
-                    "timestamp": datetime.datetime.utcnow().isoformat(),
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     "heart_rate_bpm": int(round(bpm_clean)),
                     "sensors_used": ["pixel_watch", "fitbit_band"],
                     "is_anomaly": bool(is_anomaly)
@@ -387,13 +404,25 @@ async def telemetry_stream_loop():
 @app.on_event("startup")
 async def startup_event():
     """Inicializa tarefas em segundo plano no arranque do app."""
+    validate_secret_salt(raise_in_production=True)
     asyncio.create_task(telemetry_stream_loop())
-    logger.info("Serviço de streaming de telemetria inicializado no background.")
+    logger.info(
+        "Serviço de streaming de telemetria inicializado (CORS=%s).",
+        get_cors_origins(),
+    )
 
 
 @app.websocket("/ws/telemetry")
-async def websocket_endpoint(websocket: WebSocket):
-    """Canal WebSocket para comunicação bidirecional de dados e controle."""
+async def websocket_endpoint(
+    websocket: WebSocket,
+    api_key: Optional[str] = Query(default=None),
+):
+    """Canal WebSocket. Auth via query ?api_key=... (browsers não enviam X-API-Key em WS)."""
+    header_key = websocket.headers.get("x-api-key")
+    if not verify_api_key(api_key or header_key):
+        await websocket.close(code=4401, reason="API key inválida ou ausente")
+        return
+
     await manager.connect(websocket)
     try:
         # Enviar estado de configuração atual

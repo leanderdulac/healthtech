@@ -24,14 +24,28 @@ Diagramas detalhados em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) e [`docs/
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # configure variáveis GCP e SECRET_SALT
+# opcional (dev/CI):
+pip install -r requirements-dev.txt
+cp .env.example .env   # configure GCP, SECRET_SALT e API_KEY
 ```
+
+### Segurança (obrigatório em produção)
+
+| Variável | Descrição |
+|----------|-----------|
+| `ENVIRONMENT` | `development` ou `production` |
+| `SECRET_SALT` | Salt forte para hash de IDs FHIR (`openssl rand -hex 32`) |
+| `API_KEY` | Chave para header `X-API-Key` nas APIs |
+| `AUTH_DISABLED` | `true` só em dev local (ignorado em production) |
+| `CORS_ORIGINS` | Origens permitidas, separadas por vírgula |
+
+Endpoints `/health` e `/api/health` são públicos (probes). Demais rotas exigem API key quando configurada.
 
 ## Execução
 
 | Comando | Descrição |
 |---------|-----------|
-| `python main_simulation.py` | Pipeline completo (redireciona para Vertex) |
+| `python main_simulation.py` | Demo de sinais avançados + phantom + ontologia |
 | `python run_datalake_pipeline.py` | Datalake + FHIR + extração |
 | `python run_vertex_integration.py` | Pipeline completo (ML + FHIR + Predição) |
 | `python run_fhir_export.py` | Exportação FHIR dedicada |
@@ -47,34 +61,36 @@ cp .env.example .env   # configure variáveis GCP e SECRET_SALT
 | `python run_vertex_deploy.py` | Deploy dos 3 TCNs no Vertex AI |
 | `python run_production_pipeline.py` | Pipeline de produção F17 completo |
 | `cd health-aggregator && uvicorn main:app --port 8000` | API REST de agregação multimodal |
+| `uvicorn src.api_server:app --port 8080` | API + dashboard + WebSocket telemetria |
+| `streamlit run dashboard/app.py` | Dashboard Streamlit MLOps |
+| `pytest` | Suite de testes unitários |
 
 ## Estrutura do projeto
 
 ```
 healthtech-main/
-├── main_simulation.py          # Entry point unificado
-├── run_datalake_pipeline.py    # Pipeline datalake
-├── run_vertex_integration.py   # Integração Vertex AI
-├── run_fhir_export.py          # Exportação FHIR R4
+├── main_simulation.py          # Demo sinais + phantom + ontologia
+├── run_*.py                    # Entry points por feature
 ├── requirements.txt
-├── .env.example
+├── requirements-dev.txt
+├── Dockerfile                  # Cloud Run (non-root + healthcheck)
+├── deploy_to_gcp.sh
+├── tests/                      # Pytest (auth, FHIR, quality, hemodynamics)
+├── dashboard/                  # UI glassmórfica + Streamlit
+├── health-aggregator/          # API REST agregação multimodal
 ├── src/
+│   ├── api_server.py           # FastAPI + WebSocket dashboard
 │   ├── datalake/               # Lakehouse Medallion
-│   ├── fhir/                   # Interoperabilidade HL7 FHIR R4
+│   ├── fhir/                   # HL7 FHIR R4
 │   ├── integrations/           # BigQuery + Vertex AI
-│   ├── ml_pipeline/            # Treino e inferência
-│   ├── scraping/               # Scraper teses USP
-│   ├── ontology/               # Ontologia médica integrada
-│   ├── hemodynamics/           # Análise vascular grad/div/curl
-│   ├── clinical_intelligence/  # Predição clínica fuzzy + ghost + conformal
-│   ├── ingestion/real/         # Ingestão wearable real (Apple/Google/BLE)
-│   ├── security/               # Anonimização FHIR
-│   └── utils/                  # Geradores de dados
+│   ├── ml_pipeline/            # Treino, inferência, RAG
+│   ├── signal_processing/      # Wavelet, Butterworth, fusão
+│   ├── phantom_data/           # EKF/UKF + HRV
+│   ├── anomaly_detection/      # Ensemble temporal
+│   ├── clinical_intelligence/  # Fuzzy + ghost + TCN + conformal
+│   ├── security/               # Auth API + anonimização FHIR
+│   └── ...
 └── docs/
-    ├── ARCHITECTURE.md         # Arquitetura e fluxos
-    ├── FEATURES.md             # Documentação por feature
-    ├── CHANGELOG.md            # Histórico de versões
-    └── diagrams/               # Diagramas Mermaid/SVG
 ```
 
 ## Artefatos gerados

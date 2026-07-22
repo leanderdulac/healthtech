@@ -37,7 +37,7 @@ class HealthAggregator:
             if isinstance(ts, str):
                 ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
             if ts is None:
-                ts = datetime.utcnow()
+                ts = datetime.now(timezone.utc)
 
             record = HealthRecord(
                 user_id=user_id,
@@ -177,7 +177,7 @@ class HealthAggregator:
         sources: Optional[List[str]] = None,
         days: int = 30,
     ) -> schemas.UserHealthSummary:
-        end = datetime.utcnow()
+        end = datetime.now(timezone.utc)
         start = end - timedelta(days=days)
         daily_rows = self.get_daily_aggregate(self.db, user_id, start, end)
         daily = self.daily_to_schema(daily_rows)

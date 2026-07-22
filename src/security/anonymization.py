@@ -1,8 +1,9 @@
 import copy
 import hashlib
-import os
 
 from dotenv import load_dotenv
+
+from src.security.auth import validate_secret_salt
 
 load_dotenv()
 
@@ -19,6 +20,7 @@ def anonimizar_paciente_fhir(paciente_fhir: dict) -> dict:
       - Generaliza birthDate para ano
       - Substitui identificadores por hash deterministico (longitudinal)
       - Adiciona meta.security com codigo HTEST
+      - Em produção, SECRET_SALT fraco levanta RuntimeError
     """
     paciente_anonimizado = copy.deepcopy(paciente_fhir)
 
@@ -40,7 +42,7 @@ def anonimizar_paciente_fhir(paciente_fhir: dict) -> dict:
 
     if "identifier" in paciente_anonimizado:
         id_original = str(paciente_anonimizado["identifier"][0].get("value", ""))
-        salt = os.getenv("SECRET_SALT", "default-salt")
+        salt = validate_secret_salt(raise_in_production=True)
         hash_id = hashlib.sha256((id_original + salt).encode("utf-8")).hexdigest()
         paciente_anonimizado["identifier"] = [
             {
@@ -52,11 +54,10 @@ def anonimizar_paciente_fhir(paciente_fhir: dict) -> dict:
         paciente_anonimizado["id"] = hash_id[:16]
 
     if "address" in paciente_anonimizado:
+        # Minimização: mantém apenas estado/país (sem cidade) para reduzir re-identificação
         para_manter = []
         for addr in paciente_anonimizado["address"]:
             novo_addr = {"use": "home", "type": "physical"}
-            if "city" in addr:
-                novo_addr["city"] = addr["city"]
             if "state" in addr:
                 novo_addr["state"] = addr["state"]
             if "country" in addr:

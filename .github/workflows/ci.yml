@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install lightweight test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Core + test stack (evita torch/chromadb pesados no CI unitário)
+          pip install \
+            "pandas>=2.0.3,<2.3" \
+            "numpy>=1.24.3,<2.0" \
+            "pyarrow>=14.0.0" \
+            "scikit-learn>=1.3.0,<1.6" \
+            "python-dotenv>=1.0.0" \
+            "pydantic>=2.9.0" \
+            "fastapi>=0.115.0,<0.116" \
+            "httpx>=0.27.0" \
+            "sqlalchemy==2.0.35" \
+            "pytest>=8.0.0" \
+            "pytest-cov>=5.0.0" \
+            "ruff>=0.5.0"
+
+      - name: Ruff (lint crítico)
+        run: |
+          ruff check src/security src/datalake/quality src/hemodynamics/operators.py \
+            health-aggregator/main.py health-aggregator/database.py \
+            tests --select E,F,I --ignore E501 || true
+
+      - name: Pytest
+        env:
+          ENVIRONMENT: development
+          SECRET_SALT: ci-test-salt-not-for-production-32b
+          AUTH_DISABLED: "false"
+        run: |
+          pytest tests/ -v --tb=short \
+            --cov=src.security --cov=src.datalake.quality \
+            --cov=src.hemodynamics.operators \
+            --cov-report=term-missing
+
+  docker-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Dockerfile exists and has non-root user
+        run: |
+          test -f Dockerfile
+          grep -q 'USER appuser' Dockerfile
+          grep -q 'uvicorn' Dockerfile
+          grep -q 'HEALTHCHECK' Dockerfile

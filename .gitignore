@@ -4,12 +4,23 @@ __pycache__/
 .venv/
 venv/
 env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
 
 # Configurações sensíveis
 .env
+.env.local
+*.pem
 
 # Arquivos de sistema
 .DS_Store
+Thumbs.db
 
 # Health Aggregator — banco local
 health-aggregator/data/
@@ -19,8 +30,10 @@ data/lakehouse/
 data/bigquery_simulation/
 data/vertex_exports/
 data/fhir_exports/
+data/chroma_db/
+data/lake/
 
-# Formatos voláteis (exceto scraping USP e modelos)
+# Formatos voláteis (exceto scraping USP e modelos versionados)
 *.csv
 *.parquet
 !data/scraping/**
@@ -31,3 +44,8 @@ data/fhir_exports/
 *.pkl
 !data/models/
 !data/models/**
+
+# IDEs
+.idea/
+.vscode/
+*.swp
