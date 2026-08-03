@@ -39,6 +39,16 @@ Técnicas Implementadas:
            - Ruído: Componente residual de alta frequência
            - SNR: Razão sinal-ruído em dB
 
+    4. **Filtro Sigmoidal de Ruído de Microclima**:
+       Utiliza funções sigmoides ajustáveis para discriminar e atenuar surtos
+       transitórios causados por ruídos externos (dor súbita, pico de estresse emocional
+       ou artefatos de movimento do microclima do wearable), impedindo falsos alarmes
+       em modelos hemodinâmicos profundos.
+       
+       Formulação:
+           w(t) = 1 / (1 + exp(α · (|dI/dt| - θ)))
+           sinal_atenuado(t) = sinal(t) · w(t) + baseline(t) · (1 - w(t))
+
 Referências:
     - Donoho, D.L. & Johnstone, I.M. (1994). Ideal spatial adaptation by wavelet
       shrinkage. Biometrika.
@@ -452,6 +462,66 @@ class ButterworthFilter:
         )
 
         return filtered
+
+
+class SigmoidalMicroclimateNoiseFilter:
+    """
+    Filtro Sigmoidal para Atenuação de Ruídos Transitórios de Microclima.
+
+    Utiliza uma curva sigmoide suave para identificar e atenuar picos agudos
+    gerados por dor repentina, alteração do contato pele-sensor ou estresse
+    emocional transiente.
+
+    Formulação:
+        1. Derivada de variância local (dI/dt) ou gradiente instantâneo
+        2. Máscara sigmoidal de atenuação:
+           w(t) = 1 / (1 + exp(alpha * (|dI/dt| - threshold)))
+        3. Recuperação ponderada do baseline fisiológico:
+           sinal_filtrado = sinal * w + baseline * (1 - w)
+    """
+
+    def __init__(
+        self,
+        alpha: float = 5.0,
+        threshold: float = 2.5,
+        window_size: int = 5,
+    ) -> None:
+        self.alpha: float = alpha
+        self.threshold: float = threshold
+        self.window_size: int = window_size
+
+    def filter_transient_noise(
+        self,
+        signal_data: np.ndarray,
+        baseline: Optional[np.ndarray] = None,
+    ) -> dict[str, np.ndarray]:
+        sig = np.asarray(signal_data, dtype=np.float64)
+        n = len(sig)
+
+        if baseline is None:
+            # Estimativa de baseline por média móvel
+            kernel = np.ones(self.window_size) / self.window_size
+            base = np.convolve(sig, kernel, mode="same")
+        else:
+            base = np.asarray(baseline, dtype=np.float64)
+
+        # Desvio Z-score em relação ao baseline (ruído transiente de microclima)
+        residual = np.abs(sig - base)
+        std_res = np.std(residual) if np.std(residual) > 1e-6 else 1.0
+        z_score = residual / std_res
+
+        # Peso sigmoidal: próximo de 1 para sinal limpo, próximo de 0 para ruído transiente (outlier)
+        weights = 1.0 / (1.0 + np.exp(self.alpha * (z_score - self.threshold)))
+
+        # Sinal filtrado por combinação linear
+        filtered_sig = sig * weights + base * (1.0 - weights)
+        noise_attenuated = (sig - base) * (1.0 - weights)
+
+        return {
+            "filtered_signal": filtered_sig,
+            "weights": weights,
+            "attenuated_noise": noise_attenuated,
+        }
 
 
 def decompose_signal_components(
