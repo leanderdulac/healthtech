@@ -1,5 +1,9 @@
 import logging
 import os
+import sys
+
+# Garantir imports da raiz do projeto
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from dotenv import load_dotenv
 from google.api_core.exceptions import GoogleAPIError
@@ -51,7 +55,9 @@ def provision_bigquery_datalake(project_id: str, location: str = "US"):
       3. wearable_biometrics — compatibilidade retroativa (legado)
     """
     try:
-        client = bigquery.Client(project=project_id, location=location)
+        from src.utils.gcp_auth import get_gcp_credentials
+        creds, proj = get_gcp_credentials(project_id)
+        client = bigquery.Client(project=proj or project_id, location=location, credentials=creds)
     except Exception as e:
         logger.warning("Não foi possível instanciar cliente do BigQuery localmente: %s", e)
         return

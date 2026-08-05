@@ -80,7 +80,9 @@ class VertexTCNEndpointManager:
             logger.warning("google-cloud-storage não instalado — simulando URI GCS")
             return f"gs://{self.gcs_model_bucket}/{gcs_prefix}"
 
-        client = storage.Client(project=self.config.project_id)
+        from src.utils.gcp_auth import get_gcp_credentials
+        creds, proj = get_gcp_credentials(self.config.project_id)
+        client = storage.Client(project=proj or self.config.project_id, credentials=creds)
         bucket_name = self.gcs_model_bucket.replace("gs://", "")
         bucket = client.bucket(bucket_name)
 

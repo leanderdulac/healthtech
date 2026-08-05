@@ -39,7 +39,9 @@ class BigQueryBridge:
     def _get_client(self):
         if self._client is None:
             from google.cloud import bigquery
-            self._client = bigquery.Client(project=self.project_id, location=self.location)
+            from src.utils.gcp_auth import get_gcp_credentials
+            creds, proj = get_gcp_credentials(self.project_id)
+            self._client = bigquery.Client(project=proj or self.project_id, location=self.location, credentials=creds)
         return self._client
 
     def provision(self) -> Dict:

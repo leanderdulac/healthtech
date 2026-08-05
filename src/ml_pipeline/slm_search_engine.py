@@ -103,11 +103,10 @@ class SLMSearchEngine:
             logger.info("Sincronização GCS ChromaDB: GCS_STAGING_BUCKET não configurado. Ignorando download.")
             return
         
-        try:
-            import google.auth
-            google.auth.default()
-        except Exception:
-            logger.info("Credentials GCP (ADC) não encontradas no ambiente local. Pulando download do GCS.")
+        from src.utils.gcp_auth import get_gcp_credentials
+        creds, _ = get_gcp_credentials()
+        if not creds:
+            logger.info("Credentials GCP não encontradas no ambiente local. Pulando download do GCS.")
             return
 
         logger.info(f"Sincronização GCS: Tentando baixar ChromaDB do bucket: {bucket_name}...")
@@ -115,7 +114,7 @@ class SLMSearchEngine:
             from google.cloud import storage
             import tarfile
             
-            storage_client = storage.Client()
+            storage_client = storage.Client(credentials=creds)
             bucket = storage_client.bucket(bucket_name)
             blob = bucket.blob("chroma_db/chroma_db.tar.gz")
             
@@ -139,11 +138,10 @@ class SLMSearchEngine:
             logger.info("Sincronização GCS ChromaDB: GCS_STAGING_BUCKET não configurado. Ignorando upload.")
             return
             
-        try:
-            import google.auth
-            google.auth.default()
-        except Exception:
-            logger.info("Credentials GCP (ADC) não encontradas no ambiente local. Pulando upload para GCS.")
+        from src.utils.gcp_auth import get_gcp_credentials
+        creds, _ = get_gcp_credentials()
+        if not creds:
+            logger.info("Credentials GCP não encontradas no ambiente local. Pulando upload para GCS.")
             return
 
         logger.info(f"Sincronização GCS: Comprimindo e enviando ChromaDB para o bucket: {bucket_name}...")
@@ -155,7 +153,7 @@ class SLMSearchEngine:
             with tarfile.open(archive_path, "w:gz") as tar:
                 tar.add(self.db_path, arcname=os.path.basename(self.db_path))
                 
-            storage_client = storage.Client()
+            storage_client = storage.Client(credentials=creds)
             bucket = storage_client.bucket(bucket_name)
             blob = bucket.blob("chroma_db/chroma_db.tar.gz")
             blob.upload_from_filename(archive_path)

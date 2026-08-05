@@ -100,7 +100,9 @@ if gcp_project:
     logger.info(f"Conectando ao Google BigQuery no projeto '{gcp_project}'...")
     try:
         from google.cloud import bigquery
-        bq_client = bigquery.Client(project=gcp_project)
+        from src.utils.gcp_auth import get_gcp_credentials
+        creds, proj = get_gcp_credentials(gcp_project)
+        bq_client = bigquery.Client(project=proj or gcp_project, credentials=creds)
     except Exception as e:
         logger.error(f"Erro ao instanciar cliente do BigQuery: {e}")
         
@@ -256,6 +258,231 @@ def bmo_hrv_metrics(
     hrv = HRVAnalyzer()
     metrics = hrv.compute_bmo_domain(np.array(req.rr_intervals))
     return metrics
+
+
+# =====================================================================
+# INGESTÃO DE TELEMETRIA E MONITORAMENTO DE WEARABLES DE PULSO
+# =====================================================================
+
+patient_engines: Dict[str, PhantomDataEngine] = {}
+patient_history: Dict[str, list[dict]] = {}
+
+
+class WearableTelemetryRequest(BaseModel):
+    patient_id: str
+    device_id: Optional[str] = "wrist_wearable"
+    timestamp: Optional[str] = None
+    heart_rate: float
+    hrv_rmssd: Optional[float] = 40.0
+    skin_temp: Optional[float] = 33.0
+    spo2: Optional[float] = 98.0
+    activity_level: Optional[float] = 0.0
+    ppg_signal: Optional[list[float]] = None
+    filter_type: Optional[str] = "BMO"
+
+
+class WearableBatchIngestRequest(BaseModel):
+    patient_id: str
+    readings: list[WearableTelemetryRequest]
+
+
+def get_patient_engine(patient_id: str, use_ukf: bool = False) -> PhantomDataEngine:
+    if patient_id not in patient_engines:
+        patient_engines[patient_id] = PhantomDataEngine(dt=1.0, use_ukf=use_ukf)
+    return patient_engines[patient_id]
+
+
+@app.post("/api/v1/wearables/ingest")
+def ingest_wearable_reading(
+    req: WearableTelemetryRequest,
+    _api_key: Optional[str] = Depends(require_api_key),
+):
+    """
+    Endpoint principal para recepção de telemetria enviada por wearables no pulso dos pacientes
+    (ex: Smartwatches, Smartbands, sensores PPG de pulso).
+    
+    Aplica denoising (BMO/Wavelet), inferência de dados fantasmas (Pressão Arterial, Glicose, SpO2, Tônus Vagal),
+    detecção de anomalias em tempo real e geração de código diagnóstico de ontologia médica (CID-10/SNOMED CT).
+    """
+    if req.heart_rate <= 0 or req.heart_rate > 300:
+        raise HTTPException(status_code=400, detail="Frequência cardíaca fora dos limites fisiológicos válidos (1-300 BPM).")
+
+    # 1. Denoising do Sinal Heart Rate / PPG se fornecido
+    bpm_clean = req.heart_rate
+    bmo_metrics = {}
+    if req.ppg_signal and len(req.ppg_signal) >= 4:
+        analyzer = BMOAnalyzer()
+        bmo_metrics = analyzer.multiscale_bmo_profile(np.array(req.ppg_signal))
+        if req.filter_type == "BMO":
+            denoiser = BMODenoiser(window_size=8, alpha=0.5)
+            filtered_ppg = denoiser.denoise(np.array(req.ppg_signal))
+            bpm_clean = float(np.mean(filtered_ppg)) if np.mean(filtered_ppg) > 30 else req.heart_rate
+
+    # 2. Inferência de Dados Fantasmas via Filtro de Kalman por Paciente
+    engine = get_patient_engine(req.patient_id, use_ukf=sim_config.use_ukf)
+    wearable_data = {
+        'heart_rate': bpm_clean,
+        'hrv_rmssd': req.hrv_rmssd or 40.0,
+        'skin_temp': req.skin_temp or 33.0,
+        'activity_level': req.activity_level or 0.0
+    }
+    phantom_res = engine.process_reading(wearable_data)
+    states = phantom_res['states']
+
+    # 3. Detecção de Anomalias Fisiológicas
+    anomaly_res = {"alerta": False, "score": 0.0, "modo": "Deteção Local"}
+    if vertex_detector:
+        try:
+            anomaly_res = vertex_detector.processar_nova_leitura(bpm_clean)
+        except Exception as e:
+            logger.error(f"Erro no Vertex AI: {e}")
+    else:
+        is_anomalia = bpm_clean > 100 or bpm_clean < 40 or (req.spo2 is not None and req.spo2 < 92)
+        anomaly_res = {
+            "alerta": bool(is_anomalia),
+            "score": 0.95 if is_anomalia else 0.05,
+            "modo": "Deteção Local BMO"
+        }
+
+    # 4. Diagnóstico Ontológico e Rede Bayesiana
+    current_phantom = {k: v['estimate'] for k, v in states.items()}
+    hrv_metrics = {'rmssd': req.hrv_rmssd or 40.0}
+    
+    hypotheses = bayes_net.generate_diagnostic_hypotheses(
+        phantom_data=current_phantom,
+        hrv_metrics=hrv_metrics,
+        anomaly_score=anomaly_res,
+        top_k=3
+    )
+
+    report = report_generator.generate_patient_report(
+        patient_id=req.patient_id,
+        phantom_data=current_phantom,
+        hrv_metrics=hrv_metrics,
+        anomaly_score=anomaly_res
+    )
+
+    ts = req.timestamp or datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    processed_frame = {
+        "patient_id": req.patient_id,
+        "device_id": req.device_id,
+        "timestamp": ts,
+        "raw_telemetry": {
+            "heart_rate_bpm": req.heart_rate,
+            "hrv_rmssd_ms": req.hrv_rmssd,
+            "skin_temp_celsius": req.skin_temp,
+            "spo2_percent": req.spo2,
+            "activity_level": req.activity_level
+        },
+        "cleaned_telemetry": {
+            "heart_rate_clean": round(bpm_clean, 2),
+            "filter_applied": req.filter_type,
+            "bmo_metrics": bmo_metrics
+        },
+        "phantom_data": {
+            name: {
+                "estimate": round(details['estimate'], 2),
+                "ci_lower": round(details['ci_lower'], 2),
+                "ci_upper": round(details['ci_upper'], 2),
+                "reliable": details['reliable']
+            } for name, details in states.items()
+        },
+        "anomaly_detection": anomaly_res,
+        "diagnostic_hypotheses": [
+            {
+                "category": h['category'],
+                "probability": round(h['posterior_probability'], 4),
+                "severity": h['severity']
+            } for h in hypotheses
+        ],
+        "clinical_codes": report['clinical_codes']
+    }
+
+    if req.patient_id not in patient_history:
+        patient_history[req.patient_id] = []
+    patient_history[req.patient_id].append(processed_frame)
+    if len(patient_history[req.patient_id]) > 100:
+        patient_history[req.patient_id].pop(0)
+
+    if bq_client:
+        try:
+            row_to_insert = [{
+                "patient_id": req.patient_id,
+                "timestamp": ts,
+                "heart_rate_bpm": int(round(bpm_clean)),
+                "sensors_used": [req.device_id],
+                "is_anomaly": bool(anomaly_res["alerta"])
+            }]
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(
+                None, 
+                safe_insert_bq, 
+                bq_client,
+                f"{gcp_project}.healthtech_datalake.wearable_biometrics", 
+                row_to_insert
+            )
+        except Exception as bq_err:
+            logger.error(f"Erro ao agendar gravação no BigQuery: {bq_err}")
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(manager.broadcast_json({"type": "patient_ingest", "data": processed_frame}))
+    except RuntimeError:
+        pass
+
+    return processed_frame
+
+
+@app.post("/api/v1/wearables/batch-ingest")
+def batch_ingest_wearables(
+    batch: WearableBatchIngestRequest,
+    _api_key: Optional[str] = Depends(require_api_key),
+):
+    """
+    Ingestão em lote para sincronização periódica de leituras acumuladas por wearables no pulso.
+    """
+    results = []
+    for reading in batch.readings:
+        reading.patient_id = batch.patient_id
+        res = ingest_wearable_reading(reading, _api_key=_api_key)
+        results.append(res)
+    return {
+        "status": "success",
+        "patient_id": batch.patient_id,
+        "processed_count": len(results),
+        "latest_result": results[-1] if results else None
+    }
+
+
+@app.get("/api/v1/wearables/patient/{patient_id}/latest")
+def get_latest_patient_telemetry(
+    patient_id: str,
+    _api_key: Optional[str] = Depends(require_api_key),
+):
+    """
+    Retorna o último estado fisiológico e dados fantasmas inferidos para o paciente especificado.
+    """
+    history = patient_history.get(patient_id)
+    if not history:
+        raise HTTPException(status_code=404, detail=f"Nenhum dado encontrado para o paciente '{patient_id}'.")
+    return history[-1]
+
+
+@app.get("/api/v1/wearables/patient/{patient_id}/history")
+def get_patient_telemetry_history(
+    patient_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    _api_key: Optional[str] = Depends(require_api_key),
+):
+    """
+    Retorna o histórico recente de leituras do paciente.
+    """
+    history = patient_history.get(patient_id)
+    if not history:
+        raise HTTPException(status_code=404, detail=f"Nenhum histórico encontrado para o paciente '{patient_id}'.")
+    return {"patient_id": patient_id, "total_records": len(history), "records": history[-limit:]}
+
 
 
 

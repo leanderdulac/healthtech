@@ -495,6 +495,179 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.key === "Enter") performSearch();
     });
 
+    // ========================================================================
+    // 6. CONTROLADOR DE ABAS DA NAVEGAÇÃO
+    // ========================================================================
+    const navButtons = document.querySelectorAll(".nav-btn");
+    const tabContents = document.querySelectorAll(".tab-content");
+    const apiBaseUrlSpan = document.getElementById("api-base-url");
+    if (apiBaseUrlSpan) apiBaseUrlSpan.textContent = API_URL;
+
+    navButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const targetTab = btn.getAttribute("data-tab");
+            
+            navButtons.forEach(b => b.classList.remove("active"));
+            tabContents.forEach(c => c.classList.remove("active"));
+
+            btn.classList.add("active");
+            const activeContent = document.getElementById(`view-${targetTab}`);
+            if (activeContent) activeContent.classList.add("active");
+        });
+    });
+
+    // Cópia de API Key
+    const btnCopyKey = document.getElementById("btn-copy-key");
+    const apiKeyDisplay = document.getElementById("api-key-display");
+    const copyFeedback = document.getElementById("copy-feedback");
+
+    if (btnCopyKey && apiKeyDisplay) {
+        btnCopyKey.addEventListener("click", () => {
+            navigator.clipboard.writeText(apiKeyDisplay.value).then(() => {
+                copyFeedback.textContent = "✓ Chave copiada para a área de transferência!";
+                setTimeout(() => { copyFeedback.textContent = ""; }, 3000);
+            });
+        });
+    }
+
+    // Testador de Conexão com API
+    const btnCheckStatus = document.getElementById("btn-check-status");
+    const apiHealthBadge = document.getElementById("api-health-badge");
+
+    if (btnCheckStatus) {
+        btnCheckStatus.addEventListener("click", async () => {
+            btnCheckStatus.disabled = true;
+            btnCheckStatus.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Testando...';
+            try {
+                const res = await fetch(`${API_URL}/api/health`);
+                if (res.ok) {
+                    apiHealthBadge.textContent = "Online (200 OK)";
+                    apiHealthBadge.className = "badge-status green";
+                } else {
+                    apiHealthBadge.textContent = `Erro (${res.status})`;
+                    apiHealthBadge.className = "badge-status red";
+                }
+            } catch (e) {
+                apiHealthBadge.textContent = "Instável / Off-line";
+                apiHealthBadge.className = "badge-status red";
+            } finally {
+                btnCheckStatus.disabled = false;
+                btnCheckStatus.innerHTML = '<span class="material-icons-round">refresh</span> Testar Conexão Agora';
+            }
+        });
+    }
+
+    // ========================================================================
+    // 7. SIMULADOR INTERATIVO DE INGESTÃO DE WEARABLE
+    // ========================================================================
+    const simulatorForm = document.getElementById("simulator-form");
+    const simResponseJson = document.getElementById("sim-response-json");
+
+    if (simulatorForm && simResponseJson) {
+        simulatorForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const submitBtn = simulatorForm.querySelector("button[type='submit']");
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="material-icons-round">hourglass_empty</span> Processando BMO & EKF...';
+            simResponseJson.textContent = "// Enviando requisição de telemetria biométrica...";
+
+            const payload = {
+                patient_id: document.getElementById("sim-patient-id").value,
+                device_id: document.getElementById("sim-device-id").value,
+                heart_rate: parseFloat(document.getElementById("sim-hr").value),
+                hrv_rmssd: parseFloat(document.getElementById("sim-hrv").value),
+                skin_temp: parseFloat(document.getElementById("sim-temp").value),
+                filter_type: document.getElementById("sim-filter").value
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/api/v1/wearables/ingest`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-API-Key": apiKey
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                simResponseJson.textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                simResponseJson.textContent = JSON.stringify({ error: err.message, note: "Verifique se a API está rodando localmente ou no Cloud Run." }, null, 2);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span class="material-icons-round">send</span> Enviar Telemetria para API';
+            }
+        });
+    }
+
+    // ========================================================================
+    // 8. ALTERNÂNCIA DE SNIPPETS DE CÓDIGO (cURL, Python, JS)
+    // ========================================================================
+    const codeTabBtns = document.querySelectorAll(".code-tab-btn");
+    const codeSnippetBlock = document.getElementById("code-snippet");
+
+    const snippets = {
+        curl: `curl -X POST "${API_URL}/api/v1/wearables/ingest" \\
+     -H "X-API-Key: healthtech_live_key_2026" \\
+     -H "Content-Type: application/json" \\
+     -d '{
+       "patient_id": "PAT-PULSO-101",
+       "device_id": "smartwatch_pulso_v1",
+       "heart_rate": 78.5,
+       "hrv_rmssd": 42.0,
+       "skin_temp": 33.2,
+       "filter_type": "BMO"
+     }'`,
+        python: `import requests
+
+url = "${API_URL}/api/v1/wearables/ingest"
+headers = {
+    "X-API-Key": "healthtech_live_key_2026",
+    "Content-Type": "application/json"
+}
+payload = {
+    "patient_id": "PAT-PULSO-101",
+    "device_id": "smartwatch_pulso_v1",
+    "heart_rate": 78.5,
+    "hrv_rmssd": 42.0,
+    "skin_temp": 33.2,
+    "filter_type": "BMO"
+}
+
+response = requests.post(url, json=payload, headers=headers)
+print(response.json())`,
+        js: `const response = await fetch("${API_URL}/api/v1/wearables/ingest", {
+    method: "POST",
+    headers: {
+        "X-API-Key": "healthtech_live_key_2026",
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+        patient_id: "PAT-PULSO-101",
+        device_id: "smartwatch_pulso_v1",
+        heart_rate: 78.5,
+        hrv_rmssd: 42.0,
+        skin_temp: 33.2,
+        filter_type: "BMO"
+    })
+});
+
+const data = await response.json();
+console.log(data);`
+    };
+
+    codeTabBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            codeTabBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            const lang = btn.getAttribute("data-lang");
+            if (codeSnippetBlock && snippets[lang]) {
+                codeSnippetBlock.textContent = snippets[lang];
+            }
+        });
+    });
+
     // Logger Simples
     const logger = {
         info: (msg) => console.log(`%c[INFO] ${msg}`, "color: #0ea5e9"),
@@ -505,3 +678,4 @@ document.addEventListener("DOMContentLoaded", () => {
     // Conectar ao WebSocket na inicialização
     connectWebSocket();
 });
+

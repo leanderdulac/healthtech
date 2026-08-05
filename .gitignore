@@ -49,3 +49,5 @@ data/lake/
 .idea/
 .vscode/
 *.swp
+*.tar.gz
+

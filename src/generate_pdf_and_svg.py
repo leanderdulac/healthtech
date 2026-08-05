@@ -337,8 +337,8 @@ def generate_pdf():
     # ── SEÇÃO 6: PONTE BAYESIANA E ONTOLOGIA ──
     story.append(Paragraph("6. Rede Diagnóstica Bayesiana &amp; Ontologia USP", h1_style))
     story.append(Paragraph(
-        "A inferência clínica é efetuada no espaço de probabilidade posterior das patologias (\(C_i\)) usando "
-        "as variáveis fantasmas estimadas \(\mathbf{x}\) e métricas de HRV:", body_style))
+        "A inferência clínica é efetuada no espaço de probabilidade posterior das patologias (C_i) usando "
+        "as variáveis fantasmas estimadas (x) e métricas de HRV:", body_style))
     story.append(Paragraph("P(C_i | x) = P(x | C_i) * P(C_i) / &Sigma; [ P(x | C_j) * P(C_j) ]", formula_style))
     story.append(Paragraph(
         "A verossimilhança gaussiana de risco é modulada a partir da distância das estimativas aos limites normais "

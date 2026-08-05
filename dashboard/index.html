@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Saúde Responsiva — Telemetria Fisiológica & Biomédica</title>
+    <title>Saúde Responsiva — Telemetria Fisiológica & API Wearables</title>
     <!-- Fonte Premium -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap">
     <!-- Icones Material -->
@@ -21,195 +21,441 @@
                 <span class="material-icons-round logo-icon">insights</span>
                 <h1>Saúde Responsiva <span class="badge">BIOMEDICAL PHYSICS</span></h1>
             </div>
+
+            <!-- NAVEGAÇÃO DE ABAS DA APLICAÇÃO -->
+            <nav class="header-nav">
+                <button class="nav-btn active" data-tab="dashboard">
+                    <span class="material-icons-round">dashboard</span> Painel Principal
+                </button>
+                <button class="nav-btn" data-tab="api-access">
+                    <span class="material-icons-round">key</span> Acesso à API
+                </button>
+                <button class="nav-btn" data-tab="api-docs">
+                    <span class="material-icons-round">menu_book</span> Documentação da API
+                </button>
+            </nav>
+
             <div class="connection-status" id="ws-status">
                 <span class="status-indicator red"></span>
                 <span class="status-text">Desconectado</span>
             </div>
         </header>
 
-        <!-- MAIN LAYOUT -->
-        <div class="main-layout">
-            <!-- SIDEBAR CONTROLS -->
-            <aside class="sidebar">
-                <div class="card card-controls">
-                    <h2><span class="material-icons-round">settings</span> Configurações</h2>
+        <!-- VIEW 1: PAINEL PRINCIPAL (DASHBOARD) -->
+        <div id="view-dashboard" class="tab-content active">
+            <div class="main-layout">
+                <!-- SIDEBAR CONTROLS -->
+                <aside class="sidebar">
+                    <div class="card card-controls">
+                        <h2><span class="material-icons-round">settings</span> Configurações</h2>
+                        
+                        <div class="control-group">
+                            <label>Simulação de Telemetria</label>
+                            <div class="btn-row">
+                                <button id="btn-start" class="btn btn-primary btn-glow">
+                                    <span class="material-icons-round">play_arrow</span> Iniciar
+                                </button>
+                                <button id="btn-stop" class="btn btn-secondary" disabled>
+                                    <span class="material-icons-round">pause</span> Pausar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="filter-select">Filtragem Física de Ruído</label>
+                            <select id="filter-select" class="form-select">
+                                <option value="Sem Filtro">Sem Filtragem (Fusional Cru)</option>
+                                <option value="Wavelet">Filtro Wavelet (DWT db4)</option>
+                                <option value="Butterworth">Passa-Baixa Butterworth</option>
+                                <option value="BMO">BMO Adaptativo (Oscilação Média Limitada)</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <label for="kalman-select">Filtro de Kalman (Estados Latentes)</label>
+                            <select id="kalman-select" class="form-select">
+                                <option value="EKF">Kalman Estendido (EKF)</option>
+                                <option value="UKF">Kalman Unscented (UKF)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- PESQUISA RAG / USP -->
+                    <div class="card card-search">
+                        <h2><span class="material-icons-round">search</span> RAG USP Search</h2>
+                        <p class="search-desc">Busque na base de teses de saúde da USP e ontologias clínicas.</p>
+                        <div class="search-box">
+                            <input type="text" id="search-input" placeholder="Ex: arritmia por wearable...">
+                            <button id="btn-search" class="btn btn-search-icon">
+                                <span class="material-icons-round">search</span>
+                            </button>
+                        </div>
+                        <div class="search-results" id="search-results-box">
+                            <div class="no-results">Pronto para buscar...</div>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- DASHBOARD GRID -->
+                <main class="dashboard-grid">
+                    <!-- SINAIS VITAIS -->
+                    <section class="vitals-section">
+                        <!-- BPM Card -->
+                        <div class="card metric-card border-blue" id="card-bpm">
+                            <div class="metric-header">
+                                <span class="metric-title">Frequência Cardíaca</span>
+                                <span class="material-icons-round icon-blue">favorite</span>
+                            </div>
+                            <div class="metric-value"><span id="val-bpm">--</span> <span class="unit">BPM</span></div>
+                            <div class="metric-sub" id="sub-bpm">Sensores: Watch & Band</div>
+                        </div>
+
+                        <!-- Pressão Arterial Card -->
+                        <div class="card metric-card border-green" id="card-bp">
+                            <div class="metric-header">
+                                <span class="metric-title">Pressão Arterial (Fantasma)</span>
+                                <span class="material-icons-round icon-green">speed</span>
+                            </div>
+                            <div class="metric-value"><span id="val-bp">-- / --</span> <span class="unit">mmHg</span></div>
+                            <div class="metric-sub" id="sub-bp">Intervalo: -- - -- (95%)</div>
+                        </div>
+
+                        <!-- SpO2 Card -->
+                        <div class="card metric-card border-yellow" id="card-spo2">
+                            <div class="metric-header">
+                                <span class="metric-title">Oxigenação (SpO₂ Fantasma)</span>
+                                <span class="material-icons-round icon-yellow">opacity</span>
+                            </div>
+                            <div class="metric-value"><span id="val-spo2">--</span> <span class="unit">%</span></div>
+                            <div class="metric-sub" id="sub-spo2">Status: --</div>
+                        </div>
+
+                        <!-- Glicose Card -->
+                        <div class="card metric-card border-red" id="card-glucose">
+                            <div class="metric-header">
+                                <span class="metric-title">Glicose Sanguínea (Fantasma)</span>
+                                <span class="material-icons-round icon-red">bubble_chart</span>
+                            </div>
+                            <div class="metric-value"><span id="val-glucose">--</span> <span class="unit">mg/dL</span></div>
+                            <div class="metric-sub" id="sub-glucose">Status: --</div>
+                        </div>
+                    </section>
+
+                    <!-- CHARTS PANEL -->
+                    <section class="charts-section">
+                        <div class="card chart-card">
+                            <h3>Frequência Cardíaca — Filtragem Wavelet & Reconciliação Bayesiana</h3>
+                            <div class="chart-container">
+                                <canvas id="chart-hr"></canvas>
+                            </div>
+                        </div>
+                        <div class="card chart-card">
+                            <h3>Dados Fantasmas — Pressão Arterial Estimada (PAS / PAD)</h3>
+                            <div class="chart-container">
+                                <canvas id="chart-bp"></canvas>
+                            </div>
+                        </div>
+                        <div class="card chart-card">
+                            <h3>Sinais Ocultos Fisiológicos — Oxigenação & Glicose Sanguínea</h3>
+                            <div class="chart-container">
+                                <canvas id="chart-oxygen"></canvas>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CLINICAL ONTOLOGY BRIDGE -->
+                    <section class="ontology-section">
+                        <div class="card card-ontology">
+                            <h2><span class="material-icons-round">dns</span> Classificação Probabilística (Rede Bayesiana)</h2>
+                            <div class="ontology-bars" id="ontology-bars-box">
+                                <div class="ontology-bar-item">
+                                    <span class="category-name">Cardiovascular</span>
+                                    <div class="progress-container">
+                                        <div class="progress-bar" id="bar-cardiovascular" style="width: 5%"></div>
+                                    </div>
+                                    <span class="category-pct" id="pct-cardiovascular">5.0%</span>
+                                </div>
+                                <div class="ontology-bar-item">
+                                    <span class="category-name">Respiratório</span>
+                                    <div class="progress-container">
+                                        <div class="progress-bar" id="bar-respiratory" style="width: 5%"></div>
+                                    </div>
+                                    <span class="category-pct" id="pct-respiratory">5.0%</span>
+                                </div>
+                                <div class="ontology-bar-item">
+                                    <span class="category-name">Metabólico</span>
+                                    <div class="progress-container">
+                                        <div class="progress-bar" id="bar-metabolic" style="width: 5%"></div>
+                                    </div>
+                                    <span class="category-pct" id="pct-metabolic">5.0%</span>
+                                </div>
+                                <div class="ontology-bar-item">
+                                    <span class="category-name">Neurológico Autônomo</span>
+                                    <div class="progress-container">
+                                        <div class="progress-bar" id="bar-neurological" style="width: 5%"></div>
+                                    </div>
+                                    <span class="category-pct" id="pct-neurological">5.0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card card-codes">
+                            <h2><span class="material-icons-round">code</span> Codificação Médica (Interoperabilidade)</h2>
+                            <div class="codes-grid">
+                                <div class="code-badge-group">
+                                    <strong>ICD-10 (CID-10):</strong>
+                                    <div class="badges" id="badges-icd10">
+                                        <span class="badge-code">Aguardando...</span>
+                                    </div>
+                                </div>
+                                <div class="code-badge-group">
+                                    <strong>SNOMED-CT:</strong>
+                                    <div class="badges" id="badges-snomed">
+                                        <span class="badge-code">Aguardando...</span>
+                                    </div>
+                                </div>
+                                <div class="code-badge-group">
+                                    <strong>MeSH:</strong>
+                                    <div class="badges" id="badges-mesh">
+                                        <span class="badge-code">Aguardando...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </div>
+
+        <!-- VIEW 2: ACESSO À API & GESTÃO DE CREDENCIAIS -->
+        <div id="view-api-access" class="tab-content">
+            <div class="api-grid">
+                <!-- CARD: CREDENCIAIS DA API -->
+                <div class="card">
+                    <h2><span class="material-icons-round">vpn_key</span> Chave de API & Credenciais de Acesso</h2>
+                    <p class="section-desc">Utilize esta chave de API para autenticar as requisições enviadas pela plataforma de monitoramento de wearables.</p>
                     
-                    <div class="control-group">
-                        <label>Simulação de Telemetria</label>
-                        <div class="btn-row">
-                            <button id="btn-start" class="btn btn-primary btn-glow">
-                                <span class="material-icons-round">play_arrow</span> Iniciar
-                            </button>
-                            <button id="btn-stop" class="btn btn-secondary" disabled>
-                                <span class="material-icons-round">pause</span> Pausar
+                    <div class="api-key-box">
+                        <label>Sua API Key Ativa</label>
+                        <div class="key-input-group">
+                            <input type="text" id="api-key-display" readonly value="healthtech_live_key_2026">
+                            <button id="btn-copy-key" class="btn btn-primary">
+                                <span class="material-icons-round">content_copy</span> Copiar
                             </button>
                         </div>
+                        <span id="copy-feedback" class="feedback-text"></span>
                     </div>
 
-                    <div class="control-group">
-                        <label for="filter-select">Filtragem Física de Ruído</label>
-                        <select id="filter-select" class="form-select">
-                            <option value="Sem Filtro">Sem Filtragem (Fusional Cru)</option>
-                            <option value="Wavelet">Filtro Wavelet (DWT db4)</option>
-                            <option value="Butterworth">Passa-Baixa Butterworth</option>
-                            <option value="BMO">BMO Adaptativo (Oscilação Média Limitada)</option>
-                        </select>
-
-                    </div>
-
-                    <div class="control-group">
-                        <label for="kalman-select">Filtro de Kalman (Estados Latentes)</label>
-                        <select id="kalman-select" class="form-select">
-                            <option value="EKF">Kalman Estendido (EKF)</option>
-                            <option value="UKF">Kalman Unscented (UKF)</option>
-                        </select>
+                    <div class="api-info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Host Base da API:</span>
+                            <span class="info-value" id="api-base-url">http://localhost:8000</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Tipo de Autenticação:</span>
+                            <span class="info-value">Header <code>X-API-Key</code> ou Query <code>?api_key=</code></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Formato dos Envios:</span>
+                            <span class="info-value">JSON (<code>application/json</code>)</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- PESQUISA RAG / USP -->
-                <div class="card card-search">
-                    <h2><span class="material-icons-round">search</span> RAG USP Search</h2>
-                    <p class="search-desc">Busque na base de teses de saúde da USP e ontologias clínicas.</p>
-                    <div class="search-box">
-                        <input type="text" id="search-input" placeholder="Ex: arritmia por wearable...">
-                        <button id="btn-search" class="btn btn-search-icon">
-                            <span class="material-icons-round">search</span>
-                        </button>
+                <!-- CARD: STATUS DO SERVIDOR E GCP -->
+                <div class="card">
+                    <h2><span class="material-icons-round">dns</span> Status dos Motores do Backend</h2>
+                    <div class="status-list">
+                        <div class="status-row">
+                            <span>Status da API Server</span>
+                            <span id="api-health-badge" class="badge-status green">Online (200 OK)</span>
+                        </div>
+                        <div class="status-row">
+                            <span>Motor de Denoising BMO</span>
+                            <span class="badge-status green">Ativo</span>
+                        </div>
+                        <div class="status-row">
+                            <span>Filtro de Kalman (Dados Fantasmas)</span>
+                            <span class="badge-status green">EKF / UKF Operacional</span>
+                        </div>
+                        <div class="status-row">
+                            <span>Persistência no BigQuery Data Lake</span>
+                            <span id="bq-status-badge" class="badge-status blue">Conectado (GCP)</span>
+                        </div>
+                        <div class="status-row">
+                            <span>Rede Bayesiana Diagnóstica</span>
+                            <span class="badge-status green">Ativa</span>
+                        </div>
                     </div>
-                    <div class="search-results" id="search-results-box">
-                        <div class="no-results">Pronto para buscar...</div>
+                    <button id="btn-check-status" class="btn btn-secondary" style="margin-top: 15px;">
+                        <span class="material-icons-round">refresh</span> Testar Conexão Agora
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 3: DOCUMENTAÇÃO INTERATIVA E WEARABLES -->
+        <div id="view-api-docs" class="tab-content">
+            <div class="docs-container">
+                <!-- CABEÇALHO DA DOCUMENTAÇÃO -->
+                <div class="card card-docs-header">
+                    <div class="docs-header-content">
+                        <div>
+                            <h2><span class="material-icons-round">description</span> Guia de Integração de Wearables de Pulso</h2>
+                            <p>Esta API recebe dados biométricos em tempo real de smartwatches e smartbands de pulso (Apple Watch, Galaxy Watch, Fitbit, Pixel Watch, Garmin), aplica filtragem física de ruído (BMO / Oscilação Média Limitada), infere dados fantasmas (Pressão Arterial, Oxigenação, Glicose e Tônus Vagal) e gera alertas clínicos instantâneos.</p>
+                        </div>
+                        <a href="/docs" target="_blank" class="btn btn-primary btn-glow">
+                            <span class="material-icons-round">open_in_new</span> Abrir Swagger OpenAPI (/docs)
+                        </a>
                     </div>
                 </div>
-            </aside>
 
-            <!-- DASHBOARD GRID -->
-            <main class="dashboard-grid">
-                <!-- GRID CARDS: SINAIS VITAIS -->
-                <section class="vitals-section">
-                    <!-- BPM Card -->
-                    <div class="card metric-card border-blue" id="card-bpm">
-                        <div class="metric-header">
-                            <span class="metric-title">Frequência Cardíaca</span>
-                            <span class="material-icons-round icon-blue">favorite</span>
-                        </div>
-                        <div class="metric-value"><span id="val-bpm">--</span> <span class="unit">BPM</span></div>
-                        <div class="metric-sub" id="sub-bpm">Sensores: Watch & Band</div>
-                    </div>
-
-                    <!-- Pressão Arterial Card -->
-                    <div class="card metric-card border-green" id="card-bp">
-                        <div class="metric-header">
-                            <span class="metric-title">Pressão Arterial (Fantasma)</span>
-                            <span class="material-icons-round icon-green">speed</span>
-                        </div>
-                        <div class="metric-value"><span id="val-bp">-- / --</span> <span class="unit">mmHg</span></div>
-                        <div class="metric-sub" id="sub-bp">Intervalo: -- - -- (95%)</div>
-                    </div>
-
-                    <!-- SpO2 Card -->
-                    <div class="card metric-card border-yellow" id="card-spo2">
-                        <div class="metric-header">
-                            <span class="metric-title">Oxigenação (SpO₂ Fantasma)</span>
-                            <span class="material-icons-round icon-yellow">opacity</span>
-                        </div>
-                        <div class="metric-value"><span id="val-spo2">--</span> <span class="unit">%</span></div>
-                        <div class="metric-sub" id="sub-spo2">Status: --</div>
-                    </div>
-
-                    <!-- Glicose Card -->
-                    <div class="card metric-card border-red" id="card-glucose">
-                        <div class="metric-header">
-                            <span class="metric-title">Glicose Sanguínea (Fantasma)</span>
-                            <span class="material-icons-round icon-red">bubble_chart</span>
-                        </div>
-                        <div class="metric-value"><span id="val-glucose">--</span> <span class="unit">mg/dL</span></div>
-                        <div class="metric-sub" id="sub-glucose">Status: --</div>
-                    </div>
-                </section>
-
-                <!-- CHARTS PANEL -->
-                <section class="charts-section">
-                    <div class="card chart-card">
-                        <h3>Frequência Cardíaca — Filtragem Wavelet & Reconciliação Bayesiana</h3>
-                        <div class="chart-container">
-                            <canvas id="chart-hr"></canvas>
-                        </div>
-                    </div>
-                    <div class="card chart-card">
-                        <h3>Dados Fantasmas — Pressão Arterial Estimada (PAS / PAD)</h3>
-                        <div class="chart-container">
-                            <canvas id="chart-bp"></canvas>
-                        </div>
-                    </div>
-                    <div class="card chart-card">
-                        <h3>Sinais Ocultos Fisiológicos — Oxigenação & Glicose Sanguínea</h3>
-                        <div class="chart-container">
-                            <canvas id="chart-oxygen"></canvas>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- CLINICAL ONTOLOGY BRIDGE -->
-                <section class="ontology-section">
-                    <div class="card card-ontology">
-                        <h2><span class="material-icons-round">dns</span> Classificação Probabilística (Rede Bayesiana)</h2>
-                        <div class="ontology-bars" id="ontology-bars-box">
-                            <div class="ontology-bar-item">
-                                <span class="category-name">Cardiovascular</span>
-                                <div class="progress-container">
-                                    <div class="progress-bar" id="bar-cardiovascular" style="width: 5%"></div>
-                                </div>
-                                <span class="category-pct" id="pct-cardiovascular">5.0%</span>
+                <!-- ENDPOINTS DISPONÍVEIS -->
+                <div class="card">
+                    <h2><span class="material-icons-round">api</span> Endpoints da API REST & WebSocket</h2>
+                    <div class="endpoints-list">
+                        <!-- Endpoint 1 -->
+                        <div class="endpoint-card">
+                            <div class="endpoint-header">
+                                <span class="method post">POST</span>
+                                <span class="endpoint-path">/api/v1/wearables/ingest</span>
+                                <span class="endpoint-desc">Ingestão individual de leitura de wearable de pulso</span>
                             </div>
-                            <div class="ontology-bar-item">
-                                <span class="category-name">Respiratório</span>
-                                <div class="progress-container">
-                                    <div class="progress-bar" id="bar-respiratory" style="width: 5%"></div>
-                                </div>
-                                <span class="category-pct" id="pct-respiratory">5.0%</span>
+                            <div class="endpoint-body">
+                                <p>Recebe telemetria de pulso (BPM, HRV, Temp, SpO2, Sinal PPG bruto) e retorna a análise completa com dados fantasmas e diagnósticos.</p>
                             </div>
-                            <div class="ontology-bar-item">
-                                <span class="category-name">Metabólico</span>
-                                <div class="progress-container">
-                                    <div class="progress-bar" id="bar-metabolic" style="width: 5%"></div>
-                                </div>
-                                <span class="category-pct" id="pct-metabolic">5.0%</span>
+                        </div>
+
+                        <!-- Endpoint 2 -->
+                        <div class="endpoint-card">
+                            <div class="endpoint-header">
+                                <span class="method post">POST</span>
+                                <span class="endpoint-path">/api/v1/wearables/batch-ingest</span>
+                                <span class="endpoint-desc">Ingestão em lote de leituras acumuladas</span>
                             </div>
-                            <div class="ontology-bar-item">
-                                <span class="category-name">Neurológico Autônomo</span>
-                                <div class="progress-container">
-                                    <div class="progress-bar" id="bar-neurological" style="width: 5%"></div>
-                                </div>
-                                <span class="category-pct" id="pct-neurological">5.0%</span>
+                            <div class="endpoint-body">
+                                <p>Sincroniza múltiplos registros de leituras acumuladas offline por dispositivos no pulso dos pacientes.</p>
+                            </div>
+                        </div>
+
+                        <!-- Endpoint 3 -->
+                        <div class="endpoint-card">
+                            <div class="endpoint-header">
+                                <span class="method get">GET</span>
+                                <span class="endpoint-path">/api/v1/wearables/patient/{patient_id}/latest</span>
+                                <span class="endpoint-desc">Obtém a última leitura e estado do paciente</span>
+                            </div>
+                            <div class="endpoint-body">
+                                <p>Retorna o estado fisiológico mais recente e as estimativas de pressão arterial e glicose inferidas.</p>
+                            </div>
+                        </div>
+
+                        <!-- Endpoint 4 -->
+                        <div class="endpoint-card">
+                            <div class="endpoint-header">
+                                <span class="method post">POST</span>
+                                <span class="endpoint-path">/api/v1/signal/bmo-analysis</span>
+                                <span class="endpoint-desc">Análise de Oscilação Média Limitada (BMO / VMO)</span>
+                            </div>
+                            <div class="endpoint-body">
+                                <p>Analisa o perfil de oscilação multiescala e norma BMO de um sinal de pulso bruto (PPG).</p>
+                            </div>
+                        </div>
+
+                        <!-- Endpoint 5 -->
+                        <div class="endpoint-card">
+                            <div class="endpoint-header">
+                                <span class="method ws">WS</span>
+                                <span class="endpoint-path">/ws/telemetry?api_key={key}</span>
+                                <span class="endpoint-desc">Stream contínuo de telemetria em tempo real</span>
+                            </div>
+                            <div class="endpoint-body">
+                                <p>Canal de WebSocket para transmissão ao vivo dos dados processados diretamente para dashboards e centrais médicas.</p>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="card card-codes">
-                        <h2><span class="material-icons-round">code</span> Codificação Médica (Interoperabilidade)</h2>
-                        <div class="codes-grid">
-                            <div class="code-badge-group">
-                                <strong>ICD-10 (CID-10):</strong>
-                                <div class="badges" id="badges-icd10">
-                                    <span class="badge-code">Aguardando...</span>
+                <!-- SIMULADOR INTERATIVO DE ENVIO -->
+                <div class="card">
+                    <h2><span class="material-icons-round">play_circle</span> Testador Interativo de Ingestão de Wearable</h2>
+                    <p class="section-desc">Envie um pacote de teste de leitura de pulso para a API e veja a resposta gerada em tempo real com os Dados Fantasmas inferidos.</p>
+                    
+                    <div class="simulator-layout">
+                        <form id="simulator-form" class="sim-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>ID do Paciente</label>
+                                    <input type="text" id="sim-patient-id" value="PAT-PULSO-101" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Dispositivo (Wearable)</label>
+                                    <input type="text" id="sim-device-id" value="pixel_watch_pro" required>
                                 </div>
                             </div>
-                            <div class="code-badge-group">
-                                <strong>SNOMED-CT:</strong>
-                                <div class="badges" id="badges-snomed">
-                                    <span class="badge-code">Aguardando...</span>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Frequência Cardíaca (BPM)</label>
+                                    <input type="number" id="sim-hr" value="78" step="0.1" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>HRV RMSSD (ms)</label>
+                                    <input type="number" id="sim-hrv" value="42" step="0.1" required>
                                 </div>
                             </div>
-                            <div class="code-badge-group">
-                                <strong>MeSH:</strong>
-                                <div class="badges" id="badges-mesh">
-                                    <span class="badge-code">Aguardando...</span>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Temperatura da Pele (°C)</label>
+                                    <input type="number" id="sim-temp" value="33.2" step="0.1" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Filtro de Ruído</label>
+                                    <select id="sim-filter" class="form-select">
+                                        <option value="BMO" selected>BMO Adaptativo</option>
+                                        <option value="Wavelet">Wavelet</option>
+                                        <option value="Butterworth">Butterworth</option>
+                                    </select>
                                 </div>
                             </div>
+
+                            <button type="submit" class="btn btn-primary btn-glow" style="margin-top: 10px;">
+                                <span class="material-icons-round">send</span> Enviar Telemetria para API
+                            </button>
+                        </form>
+
+                        <div class="sim-response-box">
+                            <label>Resposta da API (JSON)</label>
+                            <pre id="sim-response-json">// A resposta em tempo real aparecerá aqui após o envio...</pre>
                         </div>
                     </div>
-                </section>
-            </main>
+                </div>
+
+                <!-- CÓDIGOS DE EXEMPLO -->
+                <div class="card">
+                    <h2><span class="material-icons-round">code</span> Exemplo de Código para Integração</h2>
+                    <div class="code-tabs">
+                        <button class="code-tab-btn active" data-lang="curl">cURL</button>
+                        <button class="code-tab-btn" data-lang="python">Python</button>
+                        <button class="code-tab-btn" data-lang="js">JavaScript / Node.js</button>
+                    </div>
+
+                    <pre id="code-snippet" class="code-block">
+curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
+     -H "X-API-Key: healthtech_live_key_2026" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "patient_id": "PAT-PULSO-101",
+       "device_id": "smartwatch_pulso_v1",
+       "heart_rate": 78.5,
+       "hrv_rmssd": 42.0,
+       "skin_temp": 33.2,
+       "filter_type": "BMO"
+     }'
+                    </pre>
+                </div>
+            </div>
         </div>
     </div>
 
