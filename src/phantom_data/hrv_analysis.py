@@ -764,11 +764,35 @@ class HRVAnalyzer:
             logger.warning("Falha na análise não-linear: %s", e)
             report["nonlinear"] = {"error": str(e)}
 
+        # BMO (Bounded Mean Oscillation)
+        try:
+            report["bmo_domain"] = self.compute_bmo_domain(rr)
+        except Exception as e:
+            logger.warning("Falha na análise BMO: %s", e)
+            report["bmo_domain"] = {"error": str(e)}
+
         logger.info(
             "Análise completa de HRV concluída: N=%d, duração=%.1fs",
             len(rr), duration_s,
         )
         return report
+
+    def compute_bmo_domain(self, rr_intervals: np.ndarray) -> Dict[str, float]:
+        """
+        Calcula as métricas de HRV no domínio BMO (Bounded Mean Oscillation).
+        Mede a oscilação média multiescala dos intervalos R-R sem distorção por batimentos ectópicos.
+        """
+        from src.signal_processing.bmo_analysis import BMOAnalyzer
+        rr = self._validate_rr(rr_intervals)
+        bmo = BMOAnalyzer(default_scales=[4, 8, 16, 32])
+        profile = bmo.multiscale_bmo_profile(rr)
+        return {
+            "bmo_norm": float(profile["bmo_norm"]),
+            "vmo_index": float(profile["vmo_index"]),
+            "bmo_mo_scale_4": float(profile["scale_mean_oscillations"].get(4, 0.0)),
+            "bmo_mo_scale_16": float(profile["scale_mean_oscillations"].get(16, 0.0)),
+        }
+
 
 
 if __name__ == "__main__":

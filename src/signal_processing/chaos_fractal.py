@@ -178,13 +178,29 @@ class FractalChaosAnalyzer:
         lle = float(np.mean(divergence))
         return float(np.clip(lle, -2.0, 5.0))
 
+    def bmo_roughness_spectrum(self, series: np.ndarray) -> Dict[str, float]:
+        """
+        Calcula a rugosidade multiescala via Espaço BMO (Bounded Mean Oscillation).
+        """
+        from .bmo_analysis import BMOAnalyzer
+        bmo = BMOAnalyzer()
+        profile = bmo.multiscale_bmo_profile(series)
+        return {
+            "bmo_norm": float(profile["bmo_norm"]),
+            "vmo_index": float(profile["vmo_index"]),
+        }
+
     def analyze(self, series: np.ndarray) -> Dict[str, float]:
         """
-        Análise completa de Caos e Geometria Fractal.
+        Análise completa de Caos, Geometria Fractal e Oscilação BMO.
         """
+        bmo_metrics = self.bmo_roughness_spectrum(series)
         return {
             "higuchi_fd": self.higuchi_fractal_dimension(series),
             "katz_fd": self.katz_fractal_dimension(series),
             "hurst_exponent": self.hurst_exponent(series),
             "lyapunov_lle": self.local_lyapunov_exponent(series),
+            "bmo_norm": bmo_metrics["bmo_norm"],
+            "vmo_index": bmo_metrics["vmo_index"],
         }
+

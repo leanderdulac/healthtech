@@ -964,7 +964,8 @@ class OntologyEnrichedReport:
             return {"available": False, "summary": "Scores de anomalia não disponíveis."}
 
         high_anomalies = {
-            k: v for k, v in anomaly_score.items() if v > 0.7
+            k: v for k, v in anomaly_score.items()
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0.7
         }
 
         return {

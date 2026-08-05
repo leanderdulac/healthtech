@@ -103,6 +103,13 @@ class SLMSearchEngine:
             logger.info("Sincronização GCS ChromaDB: GCS_STAGING_BUCKET não configurado. Ignorando download.")
             return
         
+        try:
+            import google.auth
+            google.auth.default()
+        except Exception:
+            logger.info("Credentials GCP (ADC) não encontradas no ambiente local. Pulando download do GCS.")
+            return
+
         logger.info(f"Sincronização GCS: Tentando baixar ChromaDB do bucket: {bucket_name}...")
         try:
             from google.cloud import storage
@@ -123,7 +130,7 @@ class SLMSearchEngine:
             else:
                 logger.info("Nenhum backup do ChromaDB encontrado no GCS. Iniciando com base vazia.")
         except Exception as e:
-            logger.error(f"Erro ao baixar ChromaDB do GCS: {e}")
+            logger.warning(f"Aviso na sincronização GCS (não bloqueante): {e}")
 
     def upload_db_to_gcs(self):
         """Comprime e envia o ChromaDB atualizado para o GCS."""
@@ -132,6 +139,13 @@ class SLMSearchEngine:
             logger.info("Sincronização GCS ChromaDB: GCS_STAGING_BUCKET não configurado. Ignorando upload.")
             return
             
+        try:
+            import google.auth
+            google.auth.default()
+        except Exception:
+            logger.info("Credentials GCP (ADC) não encontradas no ambiente local. Pulando upload para GCS.")
+            return
+
         logger.info(f"Sincronização GCS: Comprimindo e enviando ChromaDB para o bucket: {bucket_name}...")
         try:
             from google.cloud import storage
@@ -148,7 +162,7 @@ class SLMSearchEngine:
             os.remove(archive_path)
             logger.info("ChromaDB enviado para o GCS com sucesso!")
         except Exception as e:
-            logger.error(f"Erro ao enviar ChromaDB para o GCS: {e}")
+            logger.warning(f"Aviso no upload do ChromaDB para GCS (não bloqueante): {e}")
 
     def _fallback_encode(self, texts: list[str]) -> np.ndarray:
         """

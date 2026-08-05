@@ -37,17 +37,18 @@ from src.security.auth import (
 )
 from src.data_warehouse.datalake_manager import DataLakeManager
 from src.ml_pipeline.slm_search_engine import SLMSearchEngine
-from src.ml_pipeline.online_inference import VertexOnlineDetector
-from src.signal_processing import WaveletDenoiser, ButterworthFilter, AdaptiveSensorFusion
+from src.signal_processing import WaveletDenoiser, ButterworthFilter, AdaptiveSensorFusion, BMOAnalyzer
+from src.signal_processing.noise_separation import BMODenoiser
 from src.phantom_data import PhantomDataEngine, HRVAnalyzer
 from src.ontology import ClinicalOntologyMapper, BayesianDiagnosticNetwork, OntologyEnrichedReport
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="HealthTech Advanced API Server",
-    description="Servidor de telemetria biométrica, processamento de sinais e dados fantasmas.",
+    title="Saúde Responsiva — Plataforma Biomédica API",
+    description="Servidor de telemetria biométrica, processamento de sinais e dados fantasmas em tempo real.",
     version="2.1.0"
 )
 
@@ -77,10 +78,15 @@ gcs_staging_bucket = os.getenv("GCS_STAGING_BUCKET")
 vertex_endpoint = os.getenv("VERTEX_ENDPOINT_ID")
 
 # Inicializar gerenciadores compartilhados
-# Se tivermos GCS staging bucket configurado, usar como caminho do Data Lake
-lake_path = f"gs://{gcs_staging_bucket.replace('gs://', '').strip()}" if gcs_staging_bucket else 'data/lake'
-dl_manager = DataLakeManager(lake_path=lake_path)
-slm_engine = SLMSearchEngine()
+# Inicialização lazy do SLMSearchEngine para não travar a inicialização do container no Cloud Run
+slm_engine_instance: Optional[SLMSearchEngine] = None
+
+def get_slm_engine() -> SLMSearchEngine:
+    global slm_engine_instance
+    if slm_engine_instance is None:
+        logger.info("Inicializando SLMSearchEngine (lazy load)...")
+        slm_engine_instance = SLMSearchEngine()
+    return slm_engine_instance
 
 ontology_mapper = ClinicalOntologyMapper()
 bayes_net = BayesianDiagnosticNetwork()
@@ -128,16 +134,17 @@ class SearchQuery(BaseModel):
 @app.get("/api/health")
 def health_probe():
     """Probe público para orquestradores (Cloud Run / k8s)."""
-    return {"status": "healthy", "service": "HealthTech API"}
+    return {"status": "healthy", "service": "Saúde Responsiva API"}
 
 
 @app.get("/api/status")
 def get_status(_api_key: Optional[str] = Depends(require_api_key)):
     """Retorna o status atual dos motores do sistema (requer API key)."""
     df_lake = dl_manager.load_latest_knowledge()
+    slm = get_slm_engine()
     return {
         "status": "online",
-        "slm_loaded": slm_engine.encoder is not None,
+        "slm_loaded": slm.encoder is not None,
         "ontology_loaded": len(ontology_mapper.ontology) > 0,
         "data_lake_size": len(df_lake),
         "config": {
@@ -158,7 +165,7 @@ def search_literature(
         raise HTTPException(status_code=400, detail="A consulta (query) não pode estar vazia.")
     
     try:
-        results = slm_engine.search_medical_knowledge(search.query, n_results=search.n_results)
+        results = get_slm_engine().search_medical_knowledge(search.query, n_results=search.n_results)
         
         parsed_docs = []
         if results['documents'] and len(results['documents'][0]) > 0:
@@ -182,11 +189,74 @@ def search_literature(
 def reindex_data_lake(_api_key: Optional[str] = Depends(require_api_key)):
     """Re-indexa o Data Lake no banco vetorial ChromaDB."""
     try:
-        slm_engine.index_datalake(dl_manager)
+        get_slm_engine().index_datalake(dl_manager)
         return {"status": "success", "message": "Data lake reindexado com sucesso."}
     except Exception as e:
         logger.error(f"Erro ao reindexar data lake: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class BMOAnalysisRequest(BaseModel):
+    signal: list[float]
+    scales: Optional[list[int]] = None
+
+
+class BMODenoiseRequest(BaseModel):
+    signal: list[float]
+    window_size: int = 8
+    alpha: float = 0.5
+
+
+class BMOHRVRequest(BaseModel):
+    rr_intervals: list[float]
+
+
+@app.post("/api/v1/signal/bmo-analysis")
+def analyze_bmo(
+    req: BMOAnalysisRequest,
+    _api_key: Optional[str] = Depends(require_api_key),
+):
+    """Análise de Espaço de Oscilação Média Limitada (BMO) e VMO para sinais fisiológicos."""
+    if not req.signal or len(req.signal) < 4:
+        raise HTTPException(status_code=400, detail="Sinal deve conter pelo menos 4 amostras.")
+    
+    analyzer = BMOAnalyzer(default_scales=req.scales)
+    profile = analyzer.multiscale_bmo_profile(np.array(req.signal), scales=req.scales)
+    return profile
+
+
+@app.post("/api/v1/signal/bmo-denoise")
+def denoise_bmo(
+    req: BMODenoiseRequest,
+    _api_key: Optional[str] = Depends(require_api_key),
+):
+    """Denoising 1D adaptativo com preservação de bordas sem efeito escada (staircasing)."""
+    if not req.signal:
+        raise HTTPException(status_code=400, detail="Sinal de entrada não pode ser vazio.")
+    
+    denoiser = BMODenoiser(window_size=req.window_size, alpha=req.alpha)
+    filtered = denoiser.denoise(np.array(req.signal))
+    return {
+        "filtered_signal": filtered.tolist(),
+        "original_len": len(req.signal),
+        "window_size": req.window_size,
+        "alpha": req.alpha,
+    }
+
+
+@app.post("/api/v1/hrv/bmo-metrics")
+def bmo_hrv_metrics(
+    req: BMOHRVRequest,
+    _api_key: Optional[str] = Depends(require_api_key),
+):
+    """Métricas de HRV no domínio BMO para análise da variabilidade R-R."""
+    if not req.rr_intervals or len(req.rr_intervals) < 4:
+        raise HTTPException(status_code=400, detail="Sequência R-R deve conter pelo menos 4 intervalos.")
+    
+    hrv = HRVAnalyzer()
+    metrics = hrv.compute_bmo_domain(np.array(req.rr_intervals))
+    return metrics
+
 
 
 # Gerenciador de conexões WebSocket ativas
@@ -208,10 +278,17 @@ class ConnectionManager:
             try:
                 await connection.send_json(message)
             except Exception:
-                # Conexão corrompida será limpa na leitura
                 pass
 
+
 manager = ConnectionManager()
+
+
+def safe_insert_bq(client, table_id, row):
+    try:
+        client.insert_rows_json(table_id, row)
+    except Exception as e:
+        logger.debug("Falha na gravação BigQuery (não bloqueante): %s", e)
 
 
 async def telemetry_stream_loop():
@@ -222,8 +299,10 @@ async def telemetry_stream_loop():
     # Instanciar filtros
     wavelet_denoiser = WaveletDenoiser(wavelet='db4', level=2)
     butter_filter = ButterworthFilter(fs=1.0)
+    bmo_denoiser = BMODenoiser(window_size=8, alpha=0.5)
     sensor_fuser = AdaptiveSensorFusion(sensor_ids=["pixel_watch", "fitbit_band"])
     phantom_engine = PhantomDataEngine(dt=sim_config.dt, use_ukf=sim_config.use_ukf)
+
     
     # buffers históricos locais para filtros
     raw_bpm_buffer = []
@@ -285,8 +364,13 @@ async def telemetry_stream_loop():
             win = np.array(raw_bpm_buffer[-8:])
             denoised = butter_filter.lowpass(win, cutoff=0.3)
             bpm_clean = denoised[-1]
+        elif sim_config.filter_type == "BMO" and len(raw_bpm_buffer) >= 4:
+            win = np.array(raw_bpm_buffer[-8:])
+            denoised = bmo_denoiser.denoise(win)
+            bpm_clean = denoised[-1]
         else:
             bpm_clean = bpm_fused
+
             
         # 5. Injetar no Motor de Dados Fantasmas
         # Ajustar tipo de filtro se houver alteração
@@ -328,15 +412,15 @@ async def telemetry_stream_loop():
                     "is_anomaly": bool(is_anomaly)
                 }]
                 loop = asyncio.get_event_loop()
-                # insert_rows_json faz requisição HTTP POST para a API do BigQuery Streaming Ingest
                 loop.run_in_executor(
                     None, 
-                    bq_client.insert_rows_json, 
+                    safe_insert_bq, 
+                    bq_client,
                     f"{gcp_project}.healthtech_datalake.wearable_biometrics", 
                     row_to_insert
                 )
             except Exception as bq_err:
-                logger.error(f"Erro ao inserir biometria no BigQuery: {bq_err}")
+                logger.error(f"Erro ao agendar gravação no BigQuery: {bq_err}")
 
         phantom_res = phantom_engine.process_reading(wearable_reading)
         states = phantom_res['states']
@@ -406,6 +490,8 @@ async def startup_event():
     """Inicializa tarefas em segundo plano no arranque do app."""
     validate_secret_salt(raise_in_production=True)
     asyncio.create_task(telemetry_stream_loop())
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, get_slm_engine)
     logger.info(
         "Serviço de streaming de telemetria inicializado (CORS=%s).",
         get_cors_origins(),
@@ -447,9 +533,10 @@ async def websocket_endpoint(
                 logger.info("Simulação pausada via comando WebSocket.")
             elif action == "set_filter":
                 filter_val = data.get("value")
-                if filter_val in ["Sem Filtro", "Wavelet", "Butterworth"]:
+                if filter_val in ["Sem Filtro", "Wavelet", "Butterworth", "BMO"]:
                     sim_config.filter_type = filter_val
                     logger.info(f"Filtro alterado para: {filter_val}")
+
             elif action == "set_kalman":
                 kalman_val = data.get("value")
                 sim_config.use_ukf = (kalman_val == "UKF")

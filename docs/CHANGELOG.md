@@ -5,7 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **F20** — Teoria e Algoritmos do Espaço BMO (Bounded Mean Oscillation) e VMO (`src/signal_processing/bmo_analysis.py`)
+  - Denoising 1D adaptativo e filtragem 2D de imagens médicas (RM, TC, Ultrassom) preservando bordas sem efeito escada (*staircasing*).
+  - Perfil multiescala BMO e índice VMO no `FractalChaosAnalyzer` e `HRVAnalyzer`.
+  - Detector preditivo de anomalias `BMOAnomalyDetector` para UTI e wearables.
+  - Endpoints REST `/api/v1/signal/bmo-analysis`, `/api/v1/signal/bmo-denoise`, `/api/v1/hrv/bmo-metrics` e WebSocket streaming.
 - **Hardening de segurança** — `src/security/auth.py` (API key `X-API-Key`, CORS restrito, validação de `SECRET_SALT`)
+
 - Auth nas APIs `health-aggregator` e `src/api_server.py` (REST + WebSocket `?api_key=`)
 - Endpoint público `/api/health` e `/health` para probes
 - Suite de testes `tests/` + `pytest.ini` + `requirements-dev.txt`

@@ -524,6 +524,24 @@ class SigmoidalMicroclimateNoiseFilter:
         }
 
 
+class BMODenoiser:
+    """
+    Filtro Denoising Adaptativo baseado em BMO (Bounded Mean Oscillation).
+    Preserva bordas e picos fisiológicos agudos sem produzir o efeito escada (staircasing).
+    """
+
+    def __init__(self, window_size: int = 8, alpha: float = 0.5) -> None:
+        from .bmo_analysis import BMOAnalyzer
+        self.bmo_analyzer = BMOAnalyzer()
+        self.window_size = window_size
+        self.alpha = alpha
+
+    def denoise(self, signal_data: np.ndarray) -> np.ndarray:
+        return self.bmo_analyzer.denoise_edge_preserving_1d(
+            signal_data, window_size=self.window_size, alpha=self.alpha
+        )
+
+
 def decompose_signal_components(
     signal_data: np.ndarray,
     fs: float,
@@ -541,9 +559,9 @@ def decompose_signal_components(
     Algoritmo:
         1. Estima tendência via filtro Butterworth passa-baixa (fc = trend_ratio × fs)
         2. Remove tendência: sinal_sem_trend = sinal - tendência
-        3. Extrai componente fisiológico via bandpass ou denoising wavelet
+        3. Extrai componente fisiológico via bandpass ou denoising wavelet/BMO
         4. Estima ruído: ruído = sinal_sem_trend - fisiológico
-        5. Calcula SNR
+        5. Calcula SNR e Perfil de Oscilação Média BMO/VMO
 
     Parâmetros:
         signal_data: Sinal de entrada como array 1D.
@@ -559,11 +577,13 @@ def decompose_signal_components(
             'physiological': np.ndarray — Componente fisiológico de interesse
             'noise': np.ndarray — Componente de ruído residual
             'snr_db': float — Razão sinal-ruído em decibéis
+            'bmo_norm': float — Norma BMO do componente fisiológico
+            'vmo_index': float — Índice VMO (Vanishing Mean Oscillation)
 
     Exemplo:
         >>> result = decompose_signal_components(ecg_raw, fs=250.0,
         ...     physiological_band=(0.5, 40.0))
-        >>> print(f"SNR: {result['snr_db']:.1f} dB")
+        >>> print(f"SNR: {result['snr_db']:.1f} dB, BMO: {result['bmo_norm']:.3f}")
     """
     sig: np.ndarray = np.asarray(signal_data, dtype=np.float64)
     n: int = len(sig)
@@ -600,29 +620,23 @@ def decompose_signal_components(
         if low_hz <= 0 or high_hz >= nyquist or low_hz >= high_hz:
             logger.warning(
                 "Banda fisiológica [%.2f, %.2f] Hz inválida para Nyquist=%.1f Hz. "
-                "Usando denoising wavelet como fallback.",
+                "Usando denoising BMO como fallback.",
                 low_hz, high_hz, nyquist,
             )
-            # Fallback para wavelet
-            if _HAS_PYWT:
-                denoiser = WaveletDenoiser(wavelet="db4", level=4, threshold_mode="soft")
-                physiological = denoiser.denoise(detrended)
-            else:
-                physiological = detrended.copy()
+            # Fallback para BMO
+            bmo = BMODenoiser()
+            physiological = bmo.denoise(detrended)
         else:
             bp_filter = ButterworthFilter(fs=fs, order=4)
             physiological = bp_filter.bandpass(detrended, lowcut=low_hz, highcut=high_hz)
     else:
-        # Sem banda especificada: usar denoising wavelet
+        # Sem banda especificada: usar denoising BMO / Wavelet
         if _HAS_PYWT:
             denoiser = WaveletDenoiser(wavelet="db4", level=4, threshold_mode="soft")
             physiological = denoiser.denoise(detrended)
         else:
-            logger.warning(
-                "pywt não disponível e banda fisiológica não especificada. "
-                "Componente fisiológico = sinal detrended."
-            )
-            physiological = detrended.copy()
+            bmo = BMODenoiser()
+            physiological = bmo.denoise(detrended)
 
     # --- 3. Estimativa de Ruído ---
     noise: np.ndarray = detrended - physiological
@@ -636,10 +650,14 @@ def decompose_signal_components(
     else:
         snr_db = 10.0 * np.log10(p_signal / p_noise)
 
+    # --- 5. Análise BMO ---
+    from .bmo_analysis import BMOAnalyzer
+    bmo_analyzer = BMOAnalyzer()
+    bmo_prof = bmo_analyzer.multiscale_bmo_profile(physiological)
+
     logger.info(
-        "Decomposição concluída: SNR=%.2f dB, "
-        "P_trend=%.4f, P_physio=%.4f, P_noise=%.6f",
-        snr_db, float(np.mean(trend ** 2)), p_signal, p_noise,
+        "Decomposição concluída: SNR=%.2f dB, BMO=%.3f, VMO=%.3f",
+        snr_db, bmo_prof["bmo_norm"], bmo_prof["vmo_index"]
     )
 
     return {
@@ -647,7 +665,10 @@ def decompose_signal_components(
         "physiological": physiological,
         "noise": noise,
         "snr_db": snr_db,
+        "bmo_norm": bmo_prof["bmo_norm"],
+        "vmo_index": bmo_prof["vmo_index"],
     }
+
 
 
 if __name__ == "__main__":

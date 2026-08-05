@@ -3,9 +3,14 @@
    ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Configurações Globais
-    const API_URL = "http://127.0.0.1:8000";
-    const WS_URL = "ws://127.0.0.1:8000/ws/telemetry";
+    // Configurações Globais (Detecção dinâmica de host para ambiente local ou Cloud Run)
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    const isHttps = protocol === "https:";
+    const urlParams = new URLSearchParams(window.location.search);
+    const apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "healthtech_live_key_2026";
+    const API_URL = `${protocol}//${host}`;
+    const WS_URL = `${isHttps ? "wss:" : "ws:"}//${host}/ws/telemetry${apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : ""}`;
     let ws = null;
     let isConnected = false;
 
@@ -441,9 +446,12 @@ document.addEventListener("DOMContentLoaded", () => {
         searchResultsBox.innerHTML = '<div class="no-results">🔍 Buscando contexto...</div>';
 
         try {
+            const headers = { "Content-Type": "application/json" };
+            if (apiKey) headers["X-API-Key"] = apiKey;
+
             const response = await fetch(`${API_URL}/api/search`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: headers,
                 body: JSON.stringify({ query: query, n_results: 2 })
             });
 

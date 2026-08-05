@@ -38,6 +38,9 @@ from .noise_separation import (
     decompose_signal_components,
 )
 
+# --- bmo_analysis ---
+from .bmo_analysis import BMOAnalyzer
+
 __all__: list[str] = [
     # Geração de sinais fisiológicos
     "OrnsteinUhlenbeckProcess",
@@ -50,4 +53,7 @@ __all__: list[str] = [
     "WaveletDenoiser",
     "ButterworthFilter",
     "decompose_signal_components",
+    # Análise BMO
+    "BMOAnalyzer",
 ]
+

@@ -14,14 +14,16 @@ Classes principais:
     - EnsembleAnomalyScorer: Orquestrador de múltiplos detectores com fusão estatística.
 """
 
-from .temporal_detector import CUSUMDetector, MahalanobisScorer, AdaptiveZScore
+from .temporal_detector import CUSUMDetector, MahalanobisScorer, AdaptiveZScore, BMOAnomalyDetector
 from .ensemble_scorer import PlattScaling, FisherCombinedTest, EnsembleAnomalyScorer
 
 __all__ = [
     "CUSUMDetector",
     "MahalanobisScorer",
     "AdaptiveZScore",
+    "BMOAnomalyDetector",
     "PlattScaling",
     "FisherCombinedTest",
     "EnsembleAnomalyScorer",
 ]
+

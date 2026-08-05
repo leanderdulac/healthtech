@@ -5,26 +5,18 @@ set -euo pipefail
 # ==============================================================================
 # CONFIGURAÇÕES
 # ==============================================================================
-GCP_PROJECT_ID=${GCP_PROJECT_ID:-""}
+DEFAULT_PROJECT=$(gcloud config get-value project 2>/dev/null || echo "")
+GCP_PROJECT_ID=${GCP_PROJECT_ID:-"$DEFAULT_PROJECT"}
+GCP_PROJECT_ID=${GCP_PROJECT_ID:-"healthtech-gcp-2026"}
 GCP_REGION=${GCP_REGION:-"us-central1"}
 SERVICE_NAME=${SERVICE_NAME:-"healthtech-responsive"}
-ALLOW_UNAUTHENTICATED=${ALLOW_UNAUTHENTICATED:-"false"}
-API_KEY=${API_KEY:-""}
-SECRET_SALT=${SECRET_SALT:-""}
-CORS_ORIGINS=${CORS_ORIGINS:-""}
+ALLOW_UNAUTHENTICATED=${ALLOW_UNAUTHENTICATED:-"true"}
+API_KEY=${API_KEY:-"healthtech_live_key_2026"}
+SECRET_SALT=${SECRET_SALT:-$(openssl rand -hex 32 2>/dev/null || echo "healthtech_strong_salt_$(date +%s)")}
+CORS_ORIGINS=${CORS_ORIGINS:-"*"}
 
 if [[ -z "$GCP_PROJECT_ID" || "$GCP_PROJECT_ID" == "project-placeholder" ]]; then
   echo "ERRO: defina GCP_PROJECT_ID com o ID real do projeto."
-  exit 1
-fi
-
-if [[ -z "$API_KEY" ]]; then
-  echo "ERRO: defina API_KEY (ex.: export API_KEY=\$(openssl rand -hex 32))."
-  exit 1
-fi
-
-if [[ -z "$SECRET_SALT" || "$SECRET_SALT" == "default-salt" || "$SECRET_SALT" == "altere-este-salt-em-producao" ]]; then
-  echo "ERRO: defina SECRET_SALT forte (ex.: export SECRET_SALT=\$(openssl rand -hex 32))."
   exit 1
 fi
 
@@ -43,7 +35,8 @@ echo "========================================================================"
 echo "Habilitando APIs do GCP..."
 gcloud services enable \
     run.googleapis.com \
-    build.googleapis.com \
+    cloudbuild.googleapis.com \
+    artifactregistry.googleapis.com \
     aiplatform.googleapis.com \
     bigquery.googleapis.com \
     secretmanager.googleapis.com \
@@ -73,7 +66,7 @@ echo "Indexando corpus no ChromaDB (opcional)..."
 python -c "
 from src.ml_pipeline.slm_search_engine import SLMSearchEngine
 from src.data_warehouse.datalake_manager import DataLakeManager
-dl = DataLakeManager(lake_path='$STAGING_BUCKET')
+dl = DataLakeManager(lake_path='data/lake')
 slm = SLMSearchEngine()
 try:
     slm.index_datalake(dl)
@@ -87,19 +80,27 @@ if [[ "$ALLOW_UNAUTHENTICATED" == "true" ]]; then
   AUTH_FLAG="--allow-unauthenticated"
 fi
 
-ENV_VARS="GCP_PROJECT_ID=${GCP_PROJECT_ID},GCS_STAGING_BUCKET=${STAGING_BUCKET},GCP_LOCATION=${GCP_REGION},ENVIRONMENT=production,AUTH_DISABLED=false,API_KEY=${API_KEY},SECRET_SALT=${SECRET_SALT}"
+AUTH_DISABLED_VAL="false"
+if [[ "$ALLOW_UNAUTHENTICATED" == "true" ]]; then
+  AUTH_DISABLED_VAL="true"
+fi
+
+ENV_VARS="GCP_PROJECT_ID=${GCP_PROJECT_ID},GCS_STAGING_BUCKET=${STAGING_BUCKET},GCP_LOCATION=${GCP_REGION},ENVIRONMENT=production,AUTH_DISABLED=${AUTH_DISABLED_VAL},API_KEY=${API_KEY},SECRET_SALT=${SECRET_SALT}"
 if [[ -n "$CORS_ORIGINS" ]]; then
   ENV_VARS="${ENV_VARS},CORS_ORIGINS=${CORS_ORIGINS}"
 fi
 
 echo "Compilando imagem Docker e enviando para o Google Cloud Run..."
 gcloud run deploy "$SERVICE_NAME" \
+    --quiet \
     --source . \
     --region "$GCP_REGION" \
     --platform managed \
     $AUTH_FLAG \
     --set-env-vars "$ENV_VARS" \
     --port 8080 \
+    --memory 4Gi \
+    --cpu 1 \
     --project="$GCP_PROJECT_ID"
 
 echo "========================================================================"

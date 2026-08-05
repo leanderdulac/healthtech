@@ -91,9 +91,15 @@ def run_simulation():
         signal_denoised = denoiser.denoise(signal_reconciled)
         snr_db = denoiser.estimate_snr(signal_reconciled, signal_denoised)
         print(f"  -> Denoising Wavelet (DWT) aplicado. SNR Estimado: {snr_db:.2f} dB")
+        
+        from src.signal_processing.bmo_analysis import BMOAnalyzer
+        bmo = BMOAnalyzer()
+        bmo_prof = bmo.multiscale_bmo_profile(signal_reconciled)
+        print(f"  -> Análise BMO (Oscilação Média Limitada): Norma BMO={bmo_prof['bmo_norm']:.3f}, Índice VMO={bmo_prof['vmo_index']:.3f}")
     else:
         signal_denoised = signal_reconciled
         print("  -> Denoising Wavelet ignorado (dados insuficientes)")
+
 
     # 2. Segurança e Anonimização
     print("\n[2] SEGURANÇA E PRIVACIDADE (FHIR Anonymization)...")

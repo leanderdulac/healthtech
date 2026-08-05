@@ -507,8 +507,58 @@ class AdaptiveZScore:
 
 
 # ---------------------------------------------------------------------------
+# BMOAnomalyDetector
+# ---------------------------------------------------------------------------
+
+
+class BMOAnomalyDetector:
+    """
+    Detector de Anomalias Preditivas em Tempo Real baseado em BMO e VMO.
+
+    Monitora variações de Oscilação Média Limitada (BMO) e Vanishing Mean Oscillation (VMO)
+    para diferenciar flutuações fisiológicas benignas de variações patológicas críticas.
+    """
+
+    def __init__(
+        self,
+        short_window: int = 8,
+        long_window: int = 64,
+        bmo_threshold_multiplier: float = 3.0,
+    ) -> None:
+        from src.signal_processing.bmo_analysis import BMOAnalyzer
+        self.bmo_analyzer = BMOAnalyzer(default_scales=[short_window, long_window])
+        self.short_window = short_window
+        self.long_window = long_window
+        self.multiplier = bmo_threshold_multiplier
+
+    def detect_anomalies(self, series: np.ndarray) -> Dict[str, Any]:
+        x = np.asarray(series, dtype=np.float64)
+        if len(x) < self.short_window:
+            return {"anomalies_detected": False, "anomaly_count": 0, "anomaly_indices": [], "bmo_norm": 0.0, "vmo_index": 0.0}
+
+        profile = self.bmo_analyzer.multiscale_bmo_profile(x, scales=[self.short_window, self.long_window])
+        mo_short = self.bmo_analyzer.compute_local_mean_oscillation(x, self.short_window)
+
+        baseline_mean = float(np.mean(mo_short))
+        baseline_std = float(np.std(mo_short))
+        threshold = baseline_mean + self.multiplier * (baseline_std + 1e-8)
+
+        anomaly_indices = np.where(mo_short > threshold)[0].tolist()
+
+        return {
+            "anomalies_detected": len(anomaly_indices) > 0,
+            "anomaly_count": len(anomaly_indices),
+            "anomaly_indices": anomaly_indices,
+            "bmo_norm": profile["bmo_norm"],
+            "vmo_index": profile["vmo_index"],
+            "threshold": threshold,
+        }
+
+
+# ---------------------------------------------------------------------------
 # Demo
 # ---------------------------------------------------------------------------
+
 
 if __name__ == "__main__":
     logging.basicConfig(

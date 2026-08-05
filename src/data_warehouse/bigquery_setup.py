@@ -50,7 +50,12 @@ def provision_bigquery_datalake(project_id: str, location: str = "US"):
       2. fhir_observations — view-friendly para sinais vitais (derivada do JSON)
       3. wearable_biometrics — compatibilidade retroativa (legado)
     """
-    client = bigquery.Client(project=project_id, location=location)
+    try:
+        client = bigquery.Client(project=project_id, location=location)
+    except Exception as e:
+        logger.warning("Não foi possível instanciar cliente do BigQuery localmente: %s", e)
+        return
+
     dataset_id = f"{project_id}.healthtech_datalake"
 
     logger.info("Provisionando Datalake FHIR no projeto: %s", project_id)

@@ -75,12 +75,12 @@ class DataLakeManager:
     def load_latest_knowledge(self):
         """Carrega todos os dados da camada Trusted (GCS ou local) para alimentar modelos de IA."""
         logger.info(f"Carregando literatura médica do Data Lake ({'GCS' if self.is_gcs else 'Local'})...")
-        try:
-            df = pd.read_parquet(self.trusted_zone, engine='pyarrow')
-            return df
-        except Exception as e:
-            logger.warning(f"Data Lake ({self.trusted_zone}) pode estar vazio ou inacessível. {e}")
-            if self.is_gcs:
+        if self.is_gcs:
+            try:
+                df = pd.read_parquet(self.trusted_zone, engine='pyarrow')
+                return df
+            except Exception as e:
+                logger.warning(f"Data Lake GCS ({self.trusted_zone}) inacessível ou vazio: {e}")
                 logger.info("Tentando carregar dados do fallback local (data/lake)...")
                 try:
                     local_trusted = os.path.join('data/lake', 'trusted', 'medical_literature')
@@ -88,6 +88,13 @@ class DataLakeManager:
                         return pd.read_parquet(local_trusted, engine='pyarrow')
                 except Exception as local_err:
                     logger.warning(f"Falha ao carregar do fallback local: {local_err}")
+                return pd.DataFrame()
+        else:
+            try:
+                if os.path.exists(self.trusted_zone):
+                    return pd.read_parquet(self.trusted_zone, engine='pyarrow')
+            except Exception as local_err:
+                logger.warning(f"Falha ao carregar do Data Lake local: {local_err}")
             return pd.DataFrame()
 
 if __name__ == "__main__":
