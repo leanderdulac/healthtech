@@ -25,13 +25,25 @@ window.switchTab = function(targetTab) {
 
 document.addEventListener("DOMContentLoaded", () => {
     // Configurações Globais (Detecção dinâmica de host para ambiente local ou Cloud Run)
+    const CLOUD_RUN_URL = "https://healthtech-responsive-5794833455.us-central1.run.app";
+    const CLOUD_RUN_HOST = "healthtech-responsive-5794833455.us-central1.run.app";
+
     const protocol = window.location.protocol;
     const host = window.location.host;
     const isHttps = protocol === "https:";
     const urlParams = new URLSearchParams(window.location.search);
     const apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "healthtech_live_key_2026";
-    const API_URL = `${protocol}//${host}`;
-    const WS_URL = `${isHttps ? "wss:" : "ws:"}//${host}/ws/telemetry${apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : ""}`;
+    
+    let API_URL = `${protocol}//${host}`;
+    let WS_HOST = host;
+
+    // Fallback automático para o Cloud Run se aberto como arquivo local (file://) ou sem host válido
+    if (protocol === "file:" || !host || host === "" || host.includes("null")) {
+        API_URL = CLOUD_RUN_URL;
+        WS_HOST = CLOUD_RUN_HOST;
+    }
+
+    const WS_URL = `${WS_HOST.includes(".run.app") || isHttps ? "wss:" : "ws:"}//${WS_HOST}/ws/telemetry${apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : ""}`;
     let ws = null;
     let isConnected = false;
 
