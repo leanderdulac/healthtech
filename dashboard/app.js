@@ -2,6 +2,27 @@
    HealthTech Telemetry Dashboard JS — Chart.js & WebSocket Integration
    ========================================================================== */
 
+// Função Global de Alternância de Abas
+window.switchTab = function(targetTab) {
+    const navButtons = document.querySelectorAll(".nav-btn");
+    const tabContents = document.querySelectorAll(".tab-content");
+    
+    navButtons.forEach(b => b.classList.remove("active"));
+    tabContents.forEach(c => {
+        c.classList.remove("active");
+        c.style.display = "none";
+    });
+
+    const activeBtn = document.querySelector(`.nav-btn[data-tab="${targetTab}"]`);
+    if (activeBtn) activeBtn.classList.add("active");
+
+    const activeContent = document.getElementById(`view-${targetTab}`);
+    if (activeContent) {
+        activeContent.classList.add("active");
+        activeContent.style.display = "block";
+    }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
     // Configurações Globais (Detecção dinâmica de host para ambiente local ou Cloud Run)
     const protocol = window.location.protocol;

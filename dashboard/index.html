@@ -24,13 +24,13 @@
 
             <!-- NAVEGAÇÃO DE ABAS DA APLICAÇÃO -->
             <nav class="header-nav">
-                <button class="nav-btn active" data-tab="dashboard">
+                <button type="button" class="nav-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
                     <span class="material-icons-round">dashboard</span> Painel Principal
                 </button>
-                <button class="nav-btn" data-tab="api-access">
+                <button type="button" class="nav-btn" data-tab="api-access" onclick="switchTab('api-access')">
                     <span class="material-icons-round">key</span> Acesso à API
                 </button>
-                <button class="nav-btn" data-tab="api-docs">
+                <button type="button" class="nav-btn" data-tab="api-docs" onclick="switchTab('api-docs')">
                     <span class="material-icons-round">menu_book</span> Documentação da API
                 </button>
             </nav>

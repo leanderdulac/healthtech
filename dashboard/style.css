@@ -513,59 +513,80 @@ body {
 }
 
 /* ==========================================================================
-   NAVEGAÇÃO POR ABAS DO DASHBOARD
+   NAVEGAÇÃO POR ABAS DO DASHBOARD (ESTILO GLASSMORPHISM PREMIUM)
    ========================================================================== */
 .header-nav {
     display: flex;
-    gap: 8px;
-    background: rgba(15, 23, 42, 0.6);
-    padding: 4px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.nav-btn {
-    display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: transparent;
-    border: none;
-    color: #94a3b8;
-    font-family: inherit;
-    font-size: 0.9rem;
-    font-weight: 500;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.75);
+    padding: 5px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-.nav-btn span {
-    font-size: 1.1rem;
+.header-nav .nav-btn,
+button.nav-btn {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    padding: 8px 16px !important;
+    background: rgba(30, 41, 59, 0.5) !important;
+    background-color: rgba(30, 41, 59, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #94a3b8 !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    outline: none !important;
+    box-shadow: none !important;
+    user-select: none !important;
+    margin: 0 !important;
 }
 
-.nav-btn:hover {
-    color: #e2e8f0;
-    background: rgba(255, 255, 255, 0.05);
+.header-nav .nav-btn span,
+button.nav-btn span {
+    font-size: 1.15rem !important;
+    color: inherit !important;
 }
 
-.nav-btn.active {
-    color: #38bdf8;
-    background: rgba(14, 165, 233, 0.15);
-    border: 1px solid rgba(56, 189, 248, 0.3);
-    font-weight: 600;
-    box-shadow: 0 0 12px rgba(14, 165, 233, 0.2);
+.header-nav .nav-btn:hover,
+button.nav-btn:hover {
+    color: #f8fafc !important;
+    background: rgba(51, 65, 85, 0.7) !important;
+    background-color: rgba(51, 65, 85, 0.7) !important;
+    border-color: rgba(56, 189, 248, 0.35) !important;
+    transform: translateY(-1px);
+}
+
+.header-nav .nav-btn.active,
+button.nav-btn.active {
+    color: #38bdf8 !important;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(2, 132, 199, 0.35)) !important;
+    background-color: rgba(14, 165, 233, 0.25) !important;
+    border: 1px solid rgba(56, 189, 248, 0.5) !important;
+    font-weight: 700 !important;
+    box-shadow: 0 0 15px rgba(14, 165, 233, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
 }
 
 /* Controle de Visibilidade das Views (Tab Content) */
 .tab-content {
-    display: none;
+    display: none !important;
 }
 
 .tab-content.active {
-    display: block;
+    display: block !important;
     animation: fadeIn 0.25s ease-in-out;
 }
+
 
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(6px); }
