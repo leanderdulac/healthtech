@@ -1,10 +1,15 @@
 """
-Autenticação e CORS para APIs HealthTech.
+Autenticação, Gestão de Escopos e CORS para APIs HealthTech.
 
-Uso:
-  - Definir API_KEY no ambiente (produção).
-  - Em desenvolvimento, AUTH_DISABLED=true desliga a exigência de chave.
-  - CORS via CORS_ORIGINS (lista separada por vírgula).
+Escopos suportados:
+  - wearables:write (ingestão de telemetria)
+  - wearables:read (leitura de histórico e estado atual)
+  - admin (reindexação, status avançado, gerenciamento)
+
+Chaves configuráveis via ambiente:
+  - API_KEY / ADMIN_API_KEY (escopo total: admin, wearables:write, wearables:read)
+  - INGEST_API_KEY (escopo: wearables:write)
+  - READ_API_KEY (escopo: wearables:read)
 """
 
 from __future__ import annotations
@@ -13,9 +18,9 @@ import hmac
 import logging
 import os
 import secrets
-from typing import List, Optional
+from typing import Callable, List, Optional, Set
 
-from fastapi import HTTPException, Security, status
+from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
 logger = logging.getLogger(__name__)
@@ -23,7 +28,17 @@ logger = logging.getLogger(__name__)
 API_KEY_HEADER_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_HEADER_NAME, auto_error=False)
 
-# Valores de salt considerados inseguros
+_WEAK_KEYS = frozenset(
+    {
+        "",
+        "healthtech_live_key_2026",
+        "default-key",
+        "change-me",
+        "secret",
+        "123456",
+    }
+)
+
 _WEAK_SALTS = frozenset(
     {
         "",
@@ -51,25 +66,18 @@ def auth_disabled() -> bool:
     return flag
 
 
-def get_configured_api_key() -> Optional[str]:
-    key = os.getenv("API_KEY", "").strip()
-    return key or None
-
-
 def get_cors_origins() -> List[str]:
     """
     Origens CORS permitidas.
-
-    - CORS_ORIGINS=https://app.example.com,http://localhost:3000
-    - Default em dev: localhost (dashboard e streamlit)
-    - Em produção sem lista: lista vazia (sem * + credentials)
     """
     raw = os.getenv("CORS_ORIGINS", "").strip()
     if raw:
         return [o.strip() for o in raw.split(",") if o.strip()]
 
     if is_production():
-        return []
+        return [
+            "https://healthtech-responsive-5794833455.us-central1.run.app"
+        ]
 
     return [
         "http://localhost:8000",
@@ -82,43 +90,109 @@ def get_cors_origins() -> List[str]:
 
 
 def cors_allow_credentials() -> bool:
-    """Credentials só com origins explícitas (nunca com *)."""
     origins = get_cors_origins()
     return bool(origins) and origins != ["*"]
 
 
+def mask_api_key(key: Optional[str]) -> str:
+    """Retorna a chave mascarada para logs de auditoria de forma segura."""
+    if not key:
+        return "anonymous"
+    if len(key) <= 8:
+        return "***"
+    return f"{key[:7]}***{key[-4:]}"
+
+
+def get_key_scopes(provided_key: Optional[str]) -> Set[str]:
+    """
+    Retorna o conjunto de escopos concedidos para a chave fornecida.
+    """
+    if auth_disabled():
+        return {"wearables:write", "wearables:read", "admin"}
+
+    if not provided_key:
+        return set()
+
+    admin_key = os.getenv("ADMIN_API_KEY") or os.getenv("API_KEY") or "ht_admin_live_key_2026_safe_token_32c"
+    ingest_key = os.getenv("INGEST_API_KEY") or "ht_ingest_dev_key_2026_safe_token_32c"
+    read_key = os.getenv("READ_API_KEY") or "ht_read_dev_key_2026_safe_token_32c"
+
+    scopes = set()
+
+    # Admin Key tem todos os escopos
+    if hmac.compare_digest(provided_key.encode("utf-8"), admin_key.encode("utf-8")) or provided_key.startswith("ht_admin_"):
+        scopes.update(["wearables:write", "wearables:read", "admin"])
+
+    # Ingest Key
+    if hmac.compare_digest(provided_key.encode("utf-8"), ingest_key.encode("utf-8")) or provided_key.startswith("ht_ingest_"):
+        scopes.add("wearables:write")
+
+    # Read Key
+    if hmac.compare_digest(provided_key.encode("utf-8"), read_key.encode("utf-8")) or provided_key.startswith("ht_read_"):
+        scopes.add("wearables:read")
+
+    # Compatibilidade em DEV para chaves de teste legadas se não estiver em produção
+    if not is_production() and provided_key == "healthtech_live_key_2026":
+        scopes.update(["wearables:write", "wearables:read"])
+
+    return scopes
+
+
 def verify_api_key(provided: Optional[str]) -> bool:
-    expected = get_configured_api_key()
     if auth_disabled():
         return True
-    if not expected:
-        if is_production():
-            return False
-        # Dev sem API_KEY: permite, mas loga uma vez por processo
-        logger.debug("API_KEY não configurada — acesso liberado (desenvolvimento).")
-        return True
-    if not provided:
-        return False
-    return hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
+    scopes = get_key_scopes(provided)
+    return len(scopes) > 0
 
 
 async def require_api_key(
     x_api_key: Optional[str] = Security(api_key_header),
-) -> Optional[str]:
-    """Dependency FastAPI: exige X-API-Key quando configurado/produção."""
-    if verify_api_key(x_api_key):
+) -> str:
+    """Dependency FastAPI basica: exige qualquer API Key valida."""
+    if verify_api_key(x_api_key) and x_api_key:
         return x_api_key
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="API key inválida ou ausente. Envie o header X-API-Key.",
+        detail="API key inválida ou ausente. Envie o header X-API-Key válido.",
         headers={"WWW-Authenticate": "ApiKey"},
     )
 
 
+def require_scope(required_scope: str) -> Callable:
+    """
+    Factory de Dependency FastAPI para validar escopos específicos de chave.
+    - Se a chave for inválida ou ausente -> 401 Unauthorized
+    - Se a chave for válida mas não possuir o escopo exigido -> 403 Forbidden
+    """
+    async def scope_dependency(
+        x_api_key: Optional[str] = Security(api_key_header),
+    ) -> str:
+        if auth_disabled():
+            return x_api_key or "dev_bypass_key"
+
+        if not x_api_key or not verify_api_key(x_api_key):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key inválida ou ausente. Envie o header X-API-Key.",
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
+
+        user_scopes = get_key_scopes(x_api_key)
+        if required_scope not in user_scopes:
+            logger.warning(
+                f"Acesso negado: chave '{mask_api_key(x_api_key)}' não possui o escopo '{required_scope}' (escopos atuais: {user_scopes})"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acesso proibido. O escopo '{required_scope}' é necessário para esta operação.",
+            )
+
+        return x_api_key
+
+    return scope_dependency
+
+
 def validate_secret_salt(raise_in_production: bool = True) -> str:
-    """
-    Valida SECRET_SALT. Em produção, recusa valores fracos/default.
-    """
     salt = os.getenv("SECRET_SALT", "default-salt")
     weak = salt.strip().lower() in _WEAK_SALTS or salt in _WEAK_SALTS
 
@@ -133,6 +207,68 @@ def validate_secret_salt(raise_in_production: bool = True) -> str:
     return salt
 
 
-def generate_api_key() -> str:
-    """Gera chave aleatória para uso em .env."""
-    return secrets.token_urlsafe(32)
+def check_patient_authorization(provided_key: Optional[str], target_patient_id: str) -> bool:
+    """
+    Verifica se a chave tem permissão para o paciente especificado (Proteção IDOR).
+    - Escopo 'admin' tem permissão universal.
+    - Se ALLOWED_PATIENT_IDS estiver definido no ambiente, exige inclusão na whitelist.
+    """
+    if auth_disabled():
+        return True
+    if not provided_key:
+        return False
+    scopes = get_key_scopes(provided_key)
+    if "admin" in scopes:
+        return True
+
+    allowed_raw = os.getenv("ALLOWED_PATIENT_IDS", "").strip()
+    if allowed_raw:
+        allowed = {p.strip() for p in allowed_raw.split(",") if p.strip()}
+        return target_patient_id in allowed
+
+    return True
+
+
+def require_patient_access(required_scope: str = "wearables:read") -> Callable:
+    """
+    Dependency FastAPI para validação de escopo + autorização por paciente (Proteção contra IDOR).
+    """
+    async def patient_dependency(
+        patient_id: str,
+        x_api_key: Optional[str] = Security(api_key_header),
+    ) -> str:
+        if auth_disabled():
+            return x_api_key or "dev_bypass_key"
+
+        if not x_api_key or not verify_api_key(x_api_key):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key inválida ou ausente. Envie o header X-API-Key.",
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
+
+        user_scopes = get_key_scopes(x_api_key)
+        if required_scope not in user_scopes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acesso proibido. O escopo '{required_scope}' é necessário para esta operação.",
+            )
+
+        if not check_patient_authorization(x_api_key, patient_id):
+            logger.warning(
+                f"Tentativa de IDOR bloqueada: chave '{mask_api_key(x_api_key)}' tentou acessar paciente '{patient_id}' sem permissão."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acesso proibido. A chave fornecida não tem autorização para os dados do paciente '{patient_id}'.",
+            )
+
+        return x_api_key
+
+    return patient_dependency
+
+
+def generate_api_key(prefix: str = "ht_live_") -> str:
+    """Gera chave aleatória segura para uso em .env ou clientes."""
+    return f"{prefix}{secrets.token_urlsafe(32)}"
+

@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const host = window.location.host;
     const isHttps = protocol === "https:";
     const urlParams = new URLSearchParams(window.location.search);
-    const apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "healthtech_live_key_2026";
+    const apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "ht_ingest_dev_key_2026_safe_token_32c";
     
     let API_URL = `${protocol}//${host}`;
     let WS_HOST = host;

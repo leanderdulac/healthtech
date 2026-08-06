@@ -11,9 +11,11 @@ GCP_PROJECT_ID=${GCP_PROJECT_ID:-"healthtech-gcp-2026"}
 GCP_REGION=${GCP_REGION:-"us-central1"}
 SERVICE_NAME=${SERVICE_NAME:-"healthtech-responsive"}
 ALLOW_UNAUTHENTICATED=${ALLOW_UNAUTHENTICATED:-"true"}
-API_KEY=${API_KEY:-"healthtech_live_key_2026"}
+API_KEY=${API_KEY:-"ht_admin_live_key_2026_safe_token_32c"}
+INGEST_API_KEY=${INGEST_API_KEY:-"ht_ingest_live_key_2026_safe_token_32c"}
+READ_API_KEY=${READ_API_KEY:-"ht_read_live_key_2026_safe_token_32c"}
 SECRET_SALT=${SECRET_SALT:-$(openssl rand -hex 32 2>/dev/null || echo "healthtech_strong_salt_$(date +%s)")}
-CORS_ORIGINS=${CORS_ORIGINS:-"*"}
+CORS_ORIGINS=${CORS_ORIGINS:-"https://healthtech-responsive-5794833455.us-central1.run.app,http://localhost:8000"}
 
 if [[ -z "$GCP_PROJECT_ID" || "$GCP_PROJECT_ID" == "project-placeholder" ]]; then
   echo "ERRO: defina GCP_PROJECT_ID com o ID real do projeto."
@@ -74,21 +76,10 @@ except Exception as e:
     print('Indexação pulada/falhou (não bloqueante):', e)
 " || true
 
-AUTH_FLAG="--no-allow-unauthenticated"
-if [[ "$ALLOW_UNAUTHENTICATED" == "true" ]]; then
-  echo "AVISO: deploy público (--allow-unauthenticated). Prefira Identity / API key."
-  AUTH_FLAG="--allow-unauthenticated"
-fi
-
+AUTH_FLAG="--allow-unauthenticated"
 AUTH_DISABLED_VAL="false"
-if [[ "$ALLOW_UNAUTHENTICATED" == "true" ]]; then
-  AUTH_DISABLED_VAL="true"
-fi
 
-ENV_VARS="GCP_PROJECT_ID=${GCP_PROJECT_ID},GCS_STAGING_BUCKET=${STAGING_BUCKET},GCP_LOCATION=${GCP_REGION},ENVIRONMENT=production,AUTH_DISABLED=${AUTH_DISABLED_VAL},API_KEY=${API_KEY},SECRET_SALT=${SECRET_SALT}"
-if [[ -n "$CORS_ORIGINS" ]]; then
-  ENV_VARS="${ENV_VARS},CORS_ORIGINS=${CORS_ORIGINS}"
-fi
+ENV_VARS="^@^GCP_PROJECT_ID=${GCP_PROJECT_ID}@GCS_STAGING_BUCKET=${STAGING_BUCKET}@GCP_LOCATION=${GCP_REGION}@ENVIRONMENT=production@AUTH_DISABLED=${AUTH_DISABLED_VAL}@API_KEY=${API_KEY}@ADMIN_API_KEY=${API_KEY}@INGEST_API_KEY=${INGEST_API_KEY}@READ_API_KEY=${READ_API_KEY}@SECRET_SALT=${SECRET_SALT}@CORS_ORIGINS=${CORS_ORIGINS}"
 
 echo "Compilando imagem Docker e enviando para o Google Cloud Run..."
 gcloud run deploy "$SERVICE_NAME" \

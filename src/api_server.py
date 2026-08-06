@@ -28,13 +28,24 @@ from pydantic import BaseModel
 # Garantir imports corretos
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from pydantic import BaseModel, Field, field_validator
+from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.requests import Request
+
 from src.security.auth import (
     cors_allow_credentials,
     get_cors_origins,
+    is_production,
+    mask_api_key,
     require_api_key,
+    require_patient_access,
+    require_scope,
     validate_secret_salt,
     verify_api_key,
 )
+from src.security.security_headers import SecurityHeadersMiddleware
+from src.security.rate_limiter import RateLimitingMiddleware
+from src.security.audit_logger import AuditLoggingMiddleware
 from src.data_warehouse.datalake_manager import DataLakeManager
 from src.ml_pipeline.slm_search_engine import SLMSearchEngine
 from src.signal_processing import WaveletDenoiser, ButterworthFilter, AdaptiveSensorFusion, BMOAnalyzer
@@ -49,18 +60,39 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Saúde Responsiva — Plataforma Biomédica API",
     description="Servidor de telemetria biométrica, processamento de sinais e dados fantasmas em tempo real.",
-    version="2.1.0"
+    version="2.1.0",
+    docs_url=None if is_production() else "/docs",
+    redoc_url=None if is_production() else "/redoc",
 )
+
+# Registra Middlewares em ordem de execução
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitingMiddleware)
+app.add_middleware(AuditLoggingMiddleware)
 
 # CORS restrito (nunca * com credentials). Configure CORS_ORIGINS em produção.
 _cors_origins = get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins or ["http://localhost:8080"],
+    allow_origins=_cors_origins or ["https://healthtech-responsive-5794833455.us-central1.run.app"],
     allow_credentials=cors_allow_credentials(),
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*", "X-API-Key"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    req_id = getattr(request.state, "request_id", "unknown")
+    logger.error(f"Exceção não tratada [Request-ID: {req_id}]: {exc}", exc_info=not is_production())
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Ocorreu um erro interno no processamento da solicitação.",
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "request_id": req_id,
+        },
+    )
 
 # Montar diretório de frontend estático
 app.mount("/dashboard", StaticFiles(directory="dashboard"), name="dashboard")
@@ -91,6 +123,7 @@ def get_slm_engine() -> SLMSearchEngine:
 ontology_mapper = ClinicalOntologyMapper()
 bayes_net = BayesianDiagnosticNetwork()
 report_generator = OntologyEnrichedReport(ontology_mapper, bayes_net)
+dl_manager = DataLakeManager()
 
 # Inicializar clientes do GCP (BigQuery e Vertex Endpoint)
 bq_client = None
@@ -140,8 +173,8 @@ def health_probe():
 
 
 @app.get("/api/status")
-def get_status(_api_key: Optional[str] = Depends(require_api_key)):
-    """Retorna o status atual dos motores do sistema (requer API key)."""
+def get_status(_api_key: str = Depends(require_scope("admin"))):
+    """Retorna o status atual dos motores do sistema (requer escopo 'admin')."""
     df_lake = dl_manager.load_latest_knowledge()
     slm = get_slm_engine()
     return {
@@ -160,7 +193,7 @@ def get_status(_api_key: Optional[str] = Depends(require_api_key)):
 @app.post("/api/search")
 def search_literature(
     search: SearchQuery,
-    _api_key: Optional[str] = Depends(require_api_key),
+    _api_key: str = Depends(require_scope("wearables:read")),
 ):
     """Busca literatura nas teses da USP via SLM (RAG)."""
     if not search.query:
@@ -184,18 +217,19 @@ def search_literature(
         return {"results": parsed_docs}
     except Exception as e:
         logger.error(f"Erro na busca do SLM: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Erro ao realizar busca semântica na literatura médica.")
 
 
+@app.post("/api/v1/admin/reindex")
 @app.post("/api/reindex")
-def reindex_data_lake(_api_key: Optional[str] = Depends(require_api_key)):
-    """Re-indexa o Data Lake no banco vetorial ChromaDB."""
+def reindex_data_lake(_api_key: str = Depends(require_scope("admin"))):
+    """Re-indexa o Data Lake no banco vetorial ChromaDB (requer escopo 'admin')."""
     try:
         get_slm_engine().index_datalake(dl_manager)
         return {"status": "success", "message": "Data lake reindexado com sucesso."}
     except Exception as e:
         logger.error(f"Erro ao reindexar data lake: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Erro interno ao reindexar Data Lake.")
 
 
 class BMOAnalysisRequest(BaseModel):
@@ -216,7 +250,7 @@ class BMOHRVRequest(BaseModel):
 @app.post("/api/v1/signal/bmo-analysis")
 def analyze_bmo(
     req: BMOAnalysisRequest,
-    _api_key: Optional[str] = Depends(require_api_key),
+    _api_key: str = Depends(require_scope("wearables:read")),
 ):
     """Análise de Espaço de Oscilação Média Limitada (BMO) e VMO para sinais fisiológicos."""
     if not req.signal or len(req.signal) < 4:
@@ -230,7 +264,7 @@ def analyze_bmo(
 @app.post("/api/v1/signal/bmo-denoise")
 def denoise_bmo(
     req: BMODenoiseRequest,
-    _api_key: Optional[str] = Depends(require_api_key),
+    _api_key: str = Depends(require_scope("wearables:write")),
 ):
     """Denoising 1D adaptativo com preservação de bordas sem efeito escada (staircasing)."""
     if not req.signal:
@@ -249,7 +283,7 @@ def denoise_bmo(
 @app.post("/api/v1/hrv/bmo-metrics")
 def bmo_hrv_metrics(
     req: BMOHRVRequest,
-    _api_key: Optional[str] = Depends(require_api_key),
+    _api_key: str = Depends(require_scope("wearables:read")),
 ):
     """Métricas de HRV no domínio BMO para análise da variabilidade R-R."""
     if not req.rr_intervals or len(req.rr_intervals) < 4:
@@ -269,20 +303,27 @@ patient_history: Dict[str, list[dict]] = {}
 
 
 class WearableTelemetryRequest(BaseModel):
-    patient_id: str
-    device_id: Optional[str] = "wrist_wearable"
-    timestamp: Optional[str] = None
-    heart_rate: float
-    hrv_rmssd: Optional[float] = 40.0
-    skin_temp: Optional[float] = 33.0
-    spo2: Optional[float] = 98.0
-    activity_level: Optional[float] = 0.0
+    patient_id: str = Field(..., min_length=3, max_length=64, pattern=r"^[A-Za-z0-9\-_]+$")
+    device_id: Optional[str] = Field("wrist_wearable", max_length=64)
+    timestamp: Optional[str] = Field(None, max_length=64)
+    heart_rate: float = Field(..., ge=20.0, le=250.0)
+    hrv_rmssd: Optional[float] = Field(40.0, ge=0.0, le=300.0)
+    skin_temp: Optional[float] = Field(33.0, ge=25.0, le=45.0)
+    spo2: Optional[float] = Field(98.0, ge=50.0, le=100.0)
+    activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
     ppg_signal: Optional[list[float]] = None
-    filter_type: Optional[str] = "BMO"
+    filter_type: Optional[str] = Field("BMO", max_length=32)
+
+    @field_validator("filter_type")
+    @classmethod
+    def validate_filter_type(cls, v: Optional[str]) -> Optional[str]:
+        if v and v not in {"BMO", "Wavelet", "Butterworth", "Raw", "Adaptive"}:
+            raise ValueError("filter_type inválido. Valores aceitos: BMO, Wavelet, Butterworth, Raw, Adaptive.")
+        return v
 
 
 class WearableBatchIngestRequest(BaseModel):
-    patient_id: str
+    patient_id: str = Field(..., min_length=3, max_length=64, pattern=r"^[A-Za-z0-9\-_]+$")
     readings: list[WearableTelemetryRequest]
 
 
@@ -295,11 +336,11 @@ def get_patient_engine(patient_id: str, use_ukf: bool = False) -> PhantomDataEng
 @app.post("/api/v1/wearables/ingest")
 def ingest_wearable_reading(
     req: WearableTelemetryRequest,
-    _api_key: Optional[str] = Depends(require_api_key),
+    _api_key: str = Depends(require_scope("wearables:write")),
 ):
     """
     Endpoint principal para recepção de telemetria enviada por wearables no pulso dos pacientes
-    (ex: Smartwatches, Smartbands, sensores PPG de pulso).
+    (ex: Smartwatches, Smartbands, sensores PPG de pulso). Requer escopo 'wearables:write'.
     
     Aplica denoising (BMO/Wavelet), inferência de dados fantasmas (Pressão Arterial, Glicose, SpO2, Tônus Vagal),
     detecção de anomalias em tempo real e geração de código diagnóstico de ontologia médica (CID-10/SNOMED CT).
@@ -437,10 +478,10 @@ def ingest_wearable_reading(
 @app.post("/api/v1/wearables/batch-ingest")
 def batch_ingest_wearables(
     batch: WearableBatchIngestRequest,
-    _api_key: Optional[str] = Depends(require_api_key),
+    _api_key: str = Depends(require_scope("wearables:write")),
 ):
     """
-    Ingestão em lote para sincronização periódica de leituras acumuladas por wearables no pulso.
+    Ingestão em lote para sincronização periódica de leituras acumuladas por wearables no pulso. Requer escopo 'wearables:write'.
     """
     results = []
     for reading in batch.readings:
@@ -458,10 +499,10 @@ def batch_ingest_wearables(
 @app.get("/api/v1/wearables/patient/{patient_id}/latest")
 def get_latest_patient_telemetry(
     patient_id: str,
-    _api_key: Optional[str] = Depends(require_api_key),
+    _api_key: str = Depends(require_patient_access("wearables:read")),
 ):
     """
-    Retorna o último estado fisiológico e dados fantasmas inferidos para o paciente especificado.
+    Retorna o último estado fisiológico e dados fantasmas inferidos para o paciente especificado. Requer escopo 'wearables:read' e autorização sobre o paciente.
     """
     history = patient_history.get(patient_id)
     if not history:
@@ -473,15 +514,37 @@ def get_latest_patient_telemetry(
 def get_patient_telemetry_history(
     patient_id: str,
     limit: int = Query(default=20, ge=1, le=100),
-    _api_key: Optional[str] = Depends(require_api_key),
+    _api_key: str = Depends(require_patient_access("wearables:read")),
 ):
     """
-    Retorna o histórico recente de leituras do paciente.
+    Retorna o histórico recente de leituras do paciente (Proteção contra IDOR).
     """
     history = patient_history.get(patient_id)
     if not history:
         raise HTTPException(status_code=404, detail=f"Nenhum histórico encontrado para o paciente '{patient_id}'.")
     return {"patient_id": patient_id, "total_records": len(history), "records": history[-limit:]}
+
+
+@app.delete("/api/v1/patient/{patient_id}/anonymize")
+def anonymize_patient_telemetry(
+    patient_id: str,
+    _api_key: str = Depends(require_scope("admin")),
+):
+    """
+    Endpoint de conformidade LGPD: Purga e anonimiza todo o histórico de telemetria do paciente.
+    Requer escopo 'admin'.
+    """
+    removed_history = patient_history.pop(patient_id, None)
+    removed_engine = patient_engines.pop(patient_id, None)
+    
+    if removed_history is None and removed_engine is None:
+        raise HTTPException(status_code=404, detail=f"Nenhum dado ativo registrado para o paciente '{patient_id}'.")
+    
+    return {
+        "status": "success",
+        "message": f"Dados do paciente '{patient_id}' purgados com sucesso para conformidade LGPD.",
+        "patient_id": patient_id
+    }
 
 
 

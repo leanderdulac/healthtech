@@ -13,16 +13,16 @@ from src.security.auth import (
 
 def test_verify_api_key_dev_without_key(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")
-    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.setenv("AUTH_DISABLED", "true")
     assert verify_api_key(None) is True
     assert verify_api_key("anything") is True
 
 
 def test_verify_api_key_with_configured_key(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")
-    monkeypatch.setenv("API_KEY", "super-secret-key")
-    assert verify_api_key("super-secret-key") is True
-    assert verify_api_key("wrong") is False
+    monkeypatch.setenv("ADMIN_API_KEY", "ht_admin_super_secret_key_long_token")
+    assert verify_api_key("ht_admin_super_secret_key_long_token") is True
+    assert verify_api_key("wrong_token_value_without_prefix") is False
     assert verify_api_key(None) is False
 
 
@@ -35,9 +35,9 @@ def test_verify_api_key_production_requires_key(monkeypatch):
 def test_auth_disabled_ignored_in_production(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("AUTH_DISABLED", "true")
-    monkeypatch.setenv("API_KEY", "prod-key")
-    assert verify_api_key("prod-key") is True
-    assert verify_api_key("wrong") is False
+    monkeypatch.setenv("ADMIN_API_KEY", "ht_admin_prod_key_long_token_value")
+    assert verify_api_key("ht_admin_prod_key_long_token_value") is True
+    assert verify_api_key("wrong_token_value_without_prefix") is False
 
 
 def test_validate_secret_salt_weak_in_production(monkeypatch):
@@ -61,10 +61,12 @@ def test_cors_origins_default_dev(monkeypatch):
     assert "*" not in origins
 
 
-def test_cors_origins_production_empty_without_config(monkeypatch):
+def test_cors_origins_production_default_fallback_without_config(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
-    assert get_cors_origins() == []
+    origins = get_cors_origins()
+    assert len(origins) > 0
+    assert "https://healthtech-responsive-5794833455.us-central1.run.app" in origins
 
 
 def test_cors_origins_explicit(monkeypatch):
