@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **HBand / Veepoo companion** — contrato OpenAPI `docs/openapi/hband-wearable.yaml`
+- `HBandNormalizer` + `HBandCompanionAdapter` (`src/ingestion/real/hband_*`)
+- Métricas Bronze: `blood_pressure_sys/dia`, `calories`, `distance_km`
+- Checklist companion Android: `docs/HBAND_COMPANION_CHECKLIST.md`
+- Testes: `tests/test_hband_normalizer.py`; registry ingestão fonte `hband`
 - **F20** — Teoria e Algoritmos do Espaço BMO (Bounded Mean Oscillation) e VMO (`src/signal_processing/bmo_analysis.py`)
   - Denoising 1D adaptativo e filtragem 2D de imagens médicas (RM, TC, Ultrassom) preservando bordas sem efeito escada (*staircasing*).
   - Perfil multiescala BMO e índice VMO no `FractalChaosAnalyzer` e `HRVAnalyzer`.

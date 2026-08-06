@@ -14,6 +14,7 @@ from src.ingestion.real.apple_health import AppleHealthAdapter
 from src.ingestion.real.base import AdapterResult, TelemetryAdapter
 from src.ingestion.real.ble_adapter import BLEHeartRateAdapter
 from src.ingestion.real.google_fit import GoogleFitAdapter
+from src.ingestion.real.hband_adapter import HBandCompanionAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ ADAPTER_REGISTRY: Dict[str, Type[TelemetryAdapter]] = {
     "apple_health": AppleHealthAdapter,
     "google_fit": GoogleFitAdapter,
     "ble": BLEHeartRateAdapter,
+    "hband": HBandCompanionAdapter,
 }
 
 

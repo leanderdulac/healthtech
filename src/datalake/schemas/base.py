@@ -26,6 +26,11 @@ class MetricType(str, Enum):
     STRESS_INDEX = "stress_index"
     SKIN_TEMP = "skin_temp"
     RESPIRATORY_RATE = "respiratory_rate"
+    # HBand / Veepoo OriginData3 (PA estimada por pulseira — não gold-standard)
+    BLOOD_PRESSURE_SYS = "blood_pressure_sys"
+    BLOOD_PRESSURE_DIA = "blood_pressure_dia"
+    CALORIES = "calories"
+    DISTANCE_KM = "distance_km"
 
 
 class TelemetrySource(str, Enum):

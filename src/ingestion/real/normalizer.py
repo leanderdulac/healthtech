@@ -21,6 +21,10 @@ METRIC_UNITS = {
     MetricType.STRESS_INDEX: "index",
     MetricType.SKIN_TEMP: "celsius",
     MetricType.RESPIRATORY_RATE: "breaths/min",
+    MetricType.BLOOD_PRESSURE_SYS: "mmHg",
+    MetricType.BLOOD_PRESSURE_DIA: "mmHg",
+    MetricType.CALORIES: "kcal",
+    MetricType.DISTANCE_KM: "km",
 }
 
 

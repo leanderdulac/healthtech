@@ -1,0 +1,465 @@
+openapi: 3.0.3
+info:
+  title: Healthtech × HBand/Veepoo Companion Contract
+  description: |
+    Contrato de integração entre o **app companion Android** (HBandSDK / Veepoo
+    `VPOperateManager`) e a API Healthtech (ingestão + Bronze).
+
+    O SDK **não roda no servidor**. O telefone:
+    1. Conecta BLE (scan → connect → confirmDevicePwd → syncPersonInfo)
+    2. Coleta realtime / OriginData3 / sleep / PPG
+    3. Envia JSON autenticado com `X-API-Key` (escopo `wearables:write`)
+
+    Referência SDK: https://github.com/HBandSDK/Android_Ble_SDK
+  version: 1.0.0
+  contact:
+    name: Healthtech Platform
+
+servers:
+  - url: https://healthtech-responsive-xb6tlskpoq-uc.a.run.app
+    description: Cloud Run full (APP_MODE=full)
+  - url: https://healthtech-secure-api-xb6tlskpoq-uc.a.run.app
+    description: Cloud Run secure (APP_MODE=secure)
+  - url: http://localhost:8080
+    description: Local
+
+tags:
+  - name: companion-ingest
+    description: Endpoints usados pelo app HBand
+  - name: envelopes
+    description: Formatos de mensagem do companion (documentação de schema)
+
+paths:
+  /api/v1/wearables/ingest:
+    post:
+      tags: [companion-ingest]
+      summary: Ingestão de uma leitura (realtime HBand)
+      description: |
+        Mapeamento típico a partir de `startDetectHeart`, `startDetectSpo2h`,
+        `startDetectTempture`, `startDetectBP` ou chunk PPG (`ppg_signal`).
+      operationId: hbandRealtimeIngest
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HBandRealtimeIngestApi'
+            examples:
+              heartOnly:
+                summary: HR após startDetectHeart
+                value:
+                  patient_id: PAT-HBAND-001
+                  device_id: "HBAND-AA:BB:CC:DD:EE:FF"
+                  heart_rate: 78.0
+                  hrv_rmssd: 42.0
+                  filter_type: BMO
+                  timestamp: "2026-08-06T12:00:00Z"
+              multiVital:
+                summary: HR + SpO2 + temp + PPG
+                value:
+                  patient_id: PAT-HBAND-001
+                  device_id: "HBAND-AA:BB:CC:DD:EE:FF"
+                  heart_rate: 82.0
+                  spo2: 97.0
+                  skin_temp: 33.4
+                  hrv_rmssd: 38.0
+                  activity_level: 15.0
+                  ppg_signal: [120, 125, 130, 128, 122, 118, 121, 127]
+                  filter_type: BMO
+      responses:
+        "200":
+          description: Frame processado (phantom / anomalia / códigos clínicos no modo full)
+        "401":
+          description: API key ausente ou inválida
+        "403":
+          description: Escopo insuficiente (requer wearables:write)
+        "422":
+          description: Validação Pydantic falhou
+
+  /api/v1/wearables/batch-ingest:
+    post:
+      tags: [companion-ingest]
+      summary: Ingestão em lote (sync OriginData3 offline)
+      description: |
+        O companion deve expandir cada `HBandOriginSample` em um item de
+        `readings` ou enviar múltiplos POSTs. Preferível normalizar no app
+        para o schema WearableTelemetryRequest.
+      operationId: hbandBatchIngest
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WearableBatchIngest'
+            examples:
+              originDay:
+                value:
+                  patient_id: PAT-HBAND-001
+                  readings:
+                    - patient_id: PAT-HBAND-001
+                      device_id: "HBAND-AA:BB:CC:DD:EE:FF"
+                      heart_rate: 72.0
+                      spo2: 98.0
+                      skin_temp: 33.1
+                      hrv_rmssd: 45.0
+                      timestamp: "2026-08-06T08:00:00Z"
+                    - patient_id: PAT-HBAND-001
+                      device_id: "HBAND-AA:BB:CC:DD:EE:FF"
+                      heart_rate: 75.0
+                      spo2: 97.0
+                      timestamp: "2026-08-06T08:05:00Z"
+      responses:
+        "200":
+          description: Lote processado
+
+  /api/v1/signal/bmo-analysis:
+    post:
+      tags: [companion-ingest]
+      summary: Análise BMO de PPG raw (sem ingestão de paciente)
+      description: Use com amostras de `onGreenLightDataReport` (~25 Hz).
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signal]
+              properties:
+                signal:
+                  type: array
+                  items:
+                    type: number
+                  minItems: 4
+                scales:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        "200":
+          description: Perfil multi-escala BMO/VMO
+
+  /api/health:
+    get:
+      tags: [companion-ingest]
+      summary: Probe público
+      security: []
+      responses:
+        "200":
+          description: healthy
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Chave com escopo wearables:write (INGEST_API_KEY)
+
+  schemas:
+    HBandDeviceInfo:
+      type: object
+      required: [device_id]
+      properties:
+        device_id:
+          type: string
+          minLength: 3
+          maxLength: 128
+          example: "HBAND-AA:BB:CC:DD:EE:FF"
+        vendor:
+          type: string
+          default: hband
+        model:
+          type: string
+          nullable: true
+        firmware_version:
+          type: string
+          nullable: true
+        mac_address:
+          type: string
+          nullable: true
+        origin_protocol_version:
+          type: integer
+          minimum: 0
+          maximum: 10
+          description: "0/1/2 = OriginData; 3/5 = OriginData3"
+        watchday:
+          type: integer
+          minimum: 1
+          maximum: 14
+          description: Capacidade de histórico no device (dias)
+
+    HBandRealtimeIngestApi:
+      type: object
+      required: [patient_id, heart_rate]
+      description: |
+        Subconjunto do schema WearableTelemetryRequest da API.
+        Campos HBand extras (BP, respiratory) devem ir em raw ou Bronze via normalizer.
+      properties:
+        patient_id:
+          type: string
+          pattern: '^[A-Za-z0-9\-_]+$'
+        device_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        heart_rate:
+          type: number
+          minimum: 20
+          maximum: 250
+        spo2:
+          type: number
+          minimum: 50
+          maximum: 100
+        skin_temp:
+          type: number
+          minimum: 25
+          maximum: 45
+        hrv_rmssd:
+          type: number
+          minimum: 0
+          maximum: 300
+        activity_level:
+          type: number
+          minimum: 0
+          maximum: 100
+        ppg_signal:
+          type: array
+          items:
+            type: number
+        filter_type:
+          type: string
+          enum: [BMO, Wavelet, Butterworth, Raw, Adaptive]
+          default: BMO
+
+    WearableBatchIngest:
+      type: object
+      required: [patient_id, readings]
+      properties:
+        patient_id:
+          type: string
+        readings:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/HBandRealtimeIngestApi'
+
+    # --- Envelopes documentais (processados por HBandNormalizer no backend) ---
+
+    HBandEnvelope:
+      type: object
+      required: [message_type, payload]
+      properties:
+        message_type:
+          $ref: '#/components/schemas/HBandMessageType'
+        schema_version:
+          type: string
+          default: "1.0.0"
+        payload:
+          type: object
+          description: Corpo tipado conforme message_type
+
+    HBandMessageType:
+      type: string
+      enum:
+        - realtime_ingest
+        - origin_batch
+        - sleep_batch
+        - sport_snapshot
+        - ppg_stream
+        - ppg_raw_history
+        - device_capabilities
+
+    HBandOriginSample:
+      type: object
+      required: [timestamp]
+      description: Mapeia com.veepoo.protocol OriginData / OriginData3
+      properties:
+        timestamp:
+          type: string
+          description: ISO-8601 ou yyyy-MM-dd HH:mm:ss
+        package_number:
+          type: integer
+          minimum: 1
+          maximum: 288
+        rate_value:
+          type: number
+          description: Heart rate bpm
+        spo2_value:
+          type: number
+        hrv:
+          type: number
+        step_value:
+          type: number
+        sport_value:
+          type: number
+          description: Intensidade 0–65535
+        high_value:
+          type: number
+          description: PA sistólica mmHg
+        low_value:
+          type: number
+          description: PA diastólica mmHg
+        respiration_rate:
+          type: number
+        base_temperature:
+          type: number
+        temperature:
+          type: number
+        ppg_data:
+          type: array
+          items:
+            type: number
+        ecg_data:
+          type: array
+          items:
+            type: number
+
+    HBandOriginBatch:
+      type: object
+      required: [patient_id, device, samples]
+      properties:
+        patient_id:
+          type: string
+        device:
+          $ref: '#/components/schemas/HBandDeviceInfo'
+        day_offset:
+          type: integer
+          minimum: 0
+          maximum: 14
+        samples:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/HBandOriginSample'
+
+    HBandSleepRecord:
+      type: object
+      required: [date]
+      properties:
+        date:
+          type: string
+          example: "2026-08-05"
+        sleep_quality:
+          type: integer
+        wake_count:
+          type: integer
+        deep_sleep_time_min:
+          type: integer
+        light_sleep_time_min:
+          type: integer
+        all_sleep_time_min:
+          type: integer
+        sleep_line:
+          type: string
+          description: "0/1/2 (5min) ou 0-4 precisão"
+        sleep_down:
+          type: string
+        sleep_up:
+          type: string
+        precision_sleep:
+          type: boolean
+          default: false
+
+    HBandSleepBatch:
+      type: object
+      required: [patient_id, device, records]
+      properties:
+        patient_id:
+          type: string
+        device:
+          $ref: '#/components/schemas/HBandDeviceInfo'
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/HBandSleepRecord'
+
+    HBandSportSnapshot:
+      type: object
+      required: [patient_id, device]
+      properties:
+        patient_id:
+          type: string
+        device:
+          $ref: '#/components/schemas/HBandDeviceInfo'
+        timestamp:
+          type: string
+        step:
+          type: integer
+        distance_km:
+          type: number
+        kcal:
+          type: number
+        calc_type:
+          type: integer
+
+    HBandPPGStreamChunk:
+      type: object
+      required: [patient_id, device, green_light]
+      properties:
+        patient_id:
+          type: string
+        device:
+          $ref: '#/components/schemas/HBandDeviceInfo'
+        timestamp:
+          type: string
+        green_light:
+          type: array
+          items:
+            type: number
+          minItems: 1
+        sample_rate_hz:
+          type: number
+          default: 25
+        acceleration:
+          type: array
+          items:
+            type: object
+            properties:
+              x: { type: number }
+              y: { type: number }
+              z: { type: number }
+        mode:
+          type: string
+          enum: [MODE1, MODE2, realtime]
+
+    # Mapeamento SDK → campos (documentação)
+    SdkFieldMap:
+      type: object
+      description: Referência de mapeamento (não enviado na API)
+      properties:
+        rateValue:
+          type: string
+          example: heart_rate / MetricType.HEART_RATE
+        spo2Value:
+          type: string
+          example: spo2 / MetricType.SPO2
+        hrv:
+          type: string
+          example: hrv_rmssd / MetricType.HRV
+        stepValue:
+          type: string
+          example: MetricType.STEPS
+        highValue:
+          type: string
+          example: MetricType.BLOOD_PRESSURE_SYS
+        lowValue:
+          type: string
+          example: MetricType.BLOOD_PRESSURE_DIA
+        baseTemperature:
+          type: string
+          example: skin_temp / MetricType.SKIN_TEMP
+        greenLightDataList:
+          type: string
+          example: ppg_signal
+        SleepData.sleepLine:
+          type: string
+          example: MetricType.SLEEP_STAGE
