@@ -25,8 +25,13 @@ ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
 ENV ENVIRONMENT=production
 ENV AUTH_DISABLED=false
+# full = monólito (dashboard/WS/Vertex) | secure = API enxuta
+ARG APP_MODE=full
+ENV APP_MODE=${APP_MODE}
+ENV PYTHONPATH=/app:/app/saude_responsiva_secure
 
 COPY --chown=appuser:appuser src/ /app/src/
+COPY --chown=appuser:appuser saude_responsiva_secure/ /app/saude_responsiva_secure/
 COPY --chown=appuser:appuser dashboard/ /app/dashboard/
 COPY --chown=appuser:appuser data/ /app/data/
 COPY --chown=appuser:appuser requirements.txt /app/
@@ -41,5 +46,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health')" || exit 1
 
-# Uvicorn explícito (mais estável que python -m script em containers)
-CMD ["python", "-m", "uvicorn", "src.api_server:app", "--host", "0.0.0.0", "--port", "8080"]
+# Factory secure (APP_MODE controla full vs secure)
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

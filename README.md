@@ -41,6 +41,25 @@ cp .env.example .env   # configure GCP, SECRET_SALT e API_KEY
 
 Endpoints `/health` e `/api/health` são públicos (probes). Demais rotas exigem API key quando configurada.
 
+### API secure vs monólito full
+
+| `APP_MODE` | Entry point | Conteúdo |
+|------------|-------------|----------|
+| `full` (padrão no monólito) | `uvicorn src.api_server:app` ou `APP_MODE=full uvicorn app.main:app` | Dashboard, WebSocket, phantom/Kalman, Vertex, RAG |
+| `secure` | `cd saude_responsiva_secure && uvicorn app.main:app` | API enxuta: scopes, rate limit, LGPD, anti-IDOR |
+
+Pacote dedicado: [`saude_responsiva_secure/`](saude_responsiva_secure/README.md) (factory, Docker e testes de hardening).
+
+Deploy Cloud Run:
+
+```bash
+# Monólito completo (4Gi, dashboard + pipelines)
+APP_MODE=full ./deploy_to_gcp.sh
+
+# API secure enxuta (1Gi, sem dashboard/Vertex no container)
+APP_MODE=secure ./deploy_to_gcp.sh
+```
+
 ## Execução
 
 | Comando | Descrição |
@@ -61,9 +80,11 @@ Endpoints `/health` e `/api/health` são públicos (probes). Demais rotas exigem
 | `python run_vertex_deploy.py` | Deploy dos 3 TCNs no Vertex AI |
 | `python run_production_pipeline.py` | Pipeline de produção F17 completo |
 | `cd health-aggregator && uvicorn main:app --port 8000` | API REST de agregação multimodal |
-| `uvicorn src.api_server:app --port 8080` | API + dashboard + WebSocket telemetria |
+| `uvicorn src.api_server:app --port 8080` | API full (factory secure + monólito) |
+| `cd saude_responsiva_secure && PYTHONPATH=. uvicorn app.main:app --port 8080` | API secure enxuta |
 | `streamlit run dashboard/app.py` | Dashboard Streamlit MLOps |
 | `pytest` | Suite de testes unitários |
+| `cd saude_responsiva_secure && PYTHONPATH=. pytest test_security.py` | Hardening da API secure |
 
 ## Estrutura do projeto
 
@@ -73,13 +94,19 @@ healthtech-main/
 ├── run_*.py                    # Entry points por feature
 ├── requirements.txt
 ├── requirements-dev.txt
-├── Dockerfile                  # Cloud Run (non-root + healthcheck)
-├── deploy_to_gcp.sh
+├── Dockerfile                  # Cloud Run full (APP_MODE=full|secure)
+├── deploy_to_gcp.sh            # Deploy full ou secure (APP_MODE=...)
 ├── tests/                      # Pytest (auth, FHIR, quality, hemodynamics)
 ├── dashboard/                  # UI glassmórfica + Streamlit
 ├── health-aggregator/          # API REST agregação multimodal
+├── saude_responsiva_secure/    # Factory secure + Docker enxuto
+│   ├── app/main.py             # create_app() — secure | full
+│   ├── app/security/           # Auth scopes, rate limit, headers
+│   ├── app/api/                # wearables, signal, admin, LGPD
+│   └── test_security.py
 ├── src/
-│   ├── api_server.py           # FastAPI + WebSocket dashboard
+│   ├── api_server.py           # Entry full → factory (APP_MODE=full)
+│   ├── api_monolith_runtime.py # Rotas monólito (dashboard + WS)
 │   ├── datalake/               # Lakehouse Medallion
 │   ├── fhir/                   # HL7 FHIR R4
 │   ├── integrations/           # BigQuery + Vertex AI
