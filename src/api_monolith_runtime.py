@@ -142,16 +142,19 @@ if gcp_project:
     except Exception as e:
         logger.error(f"Erro ao instanciar cliente do BigQuery: {e}")
         
-    if vertex_endpoint:
+    if vertex_endpoint and "placeholder" not in str(vertex_endpoint):
         logger.info(f"Conectando ao Vertex AI Endpoint '{vertex_endpoint}'...")
         try:
+            from src.ml_pipeline.online_inference import VertexOnlineDetector
+
             vertex_detector = VertexOnlineDetector(
-                project=gcp_project, 
-                location=gcp_location, 
-                endpoint_id=vertex_endpoint
+                project=gcp_project,
+                location=gcp_location,
+                endpoint_id=vertex_endpoint,
             )
         except Exception as e:
             logger.error(f"Erro ao instanciar detector online do Vertex: {e}")
+            vertex_detector = None
 
 # Configurações globais de simulação modificáveis via WebSocket
 class SimConfig:
