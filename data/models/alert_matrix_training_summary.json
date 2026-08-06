@@ -1,0 +1,15 @@
+{
+  "n_rules": 51,
+  "n_samples": 9600,
+  "metrics": {
+    "severity_f1_macro": 0.9958494249298017,
+    "false_positive_precision": 0.8439716312056738,
+    "false_positive_recall": 0.9979035639412998,
+    "false_positive_f1": 0.914505283381364,
+    "true_alert_precision": 1.0,
+    "true_alert_recall": 0.9970588235294118,
+    "true_alert_f1": 0.9985272459499264
+  },
+  "model_path": "data/models/alert_matrix_classifier.pkl",
+  "dataset": "data/clinical_intelligence/alert_matrix_training.csv"
+}

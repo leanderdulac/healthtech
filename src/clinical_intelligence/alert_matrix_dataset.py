@@ -1,0 +1,537 @@
+"""
+Geração de dataset sintético a partir da matriz de alertas.
+
+Classes:
+  - true_alert + severity {leve, moderado, critico}
+  - false_positive: anomalia isolada / limítrofe SEM match de regra
+  - normal: vitais estáveis
+
+O classificador aprende a separar FPs (não alertar) de verdadeiros positivos
+com a severidade correta.
+"""
+
+from __future__ import annotations
+
+import random
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+
+from src.clinical_intelligence.alert_matrix_rules import (
+    ALERT_RULES,
+    AlertMatrixEngine,
+    VitalSnapshot,
+)
+
+FEATURE_COLUMNS = [
+    "pas",
+    "pad",
+    "hr",
+    "spo2",
+    "temp_c",
+    "glucose_mgdl",
+    "steps_drop_pct",
+    "sleep_worsen_pct",
+    "hr_baseline_rise",
+    "spo2_drop_points",
+    "consciousness_altered",
+    "map_approx",
+    "pulse_pressure",
+]
+
+SEVERITY_LABELS = ["none", "leve", "moderado", "critico"]
+# is_false_positive: 1 = FP (não deve alertar), 0 = normal ou true alert
+
+
+def _rng(seed: Optional[int] = None) -> random.Random:
+    return random.Random(seed)
+
+
+def _uniform(r: random.Random, lo: float, hi: float) -> float:
+    return r.uniform(lo, hi)
+
+
+def _sample_for_rule(rule_id: str, r: random.Random) -> VitalSnapshot:
+    """Amostra vitais no interior das faixas da regra (com jitter seguro)."""
+    # Defaults normais; sobrescritos conforme regra
+    v = VitalSnapshot(
+        pas=120.0,
+        pad=80.0,
+        hr=72.0,
+        spo2=98.0,
+        temp_c=36.6,
+        glucose_mgdl=100.0,
+        steps_drop_pct=0.0,
+        sleep_worsen_pct=0.0,
+        hr_baseline_rise=0.0,
+        spo2_drop_points=0.0,
+        consciousness_altered=False,
+    )
+
+    samplers = {
+        "pa_elev_1": lambda: VitalSnapshot(
+            pas=_uniform(r, 140, 159),
+            pad=_uniform(r, 90, 99),
+            hr=_uniform(r, 91, 110),
+            spo2=_uniform(r, 96, 99),
+            temp_c=_uniform(r, 36.2, 37.2),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "pa_elev_2": lambda: VitalSnapshot(
+            pas=_uniform(r, 160, 179),
+            pad=_uniform(r, 100, 109),
+            hr=_uniform(r, 111, 130),
+            spo2=_uniform(r, 95, 99),
+            temp_c=_uniform(r, 36.2, 37.2),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "pa_elev_3": lambda: VitalSnapshot(
+            pas=_uniform(r, 180, 210),
+            pad=_uniform(r, 110, 130),
+            hr=_uniform(r, 111, 150),
+            spo2=_uniform(r, 94, 99),
+            temp_c=_uniform(r, 36.2, 37.5),
+            glucose_mgdl=_uniform(r, 90, 180),
+        ),
+        "pa_elev_4": lambda: VitalSnapshot(
+            pas=_uniform(r, 180, 210),
+            pad=_uniform(r, 110, 130),
+            hr=_uniform(r, 80, 110),
+            spo2=_uniform(r, 85, 93),
+            temp_c=_uniform(r, 36.2, 37.5),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "pa_elev_5": lambda: VitalSnapshot(
+            pas=_uniform(r, 180, 210),
+            pad=_uniform(r, 110, 130),
+            hr=_uniform(r, 80, 120),
+            spo2=_uniform(r, 95, 99),
+            temp_c=_uniform(r, 38.1, 40.0),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "pa_elev_6": lambda: VitalSnapshot(
+            pas=_uniform(r, 180, 210),
+            pad=_uniform(r, 110, 130),
+            hr=_uniform(r, 80, 120),
+            spo2=_uniform(r, 95, 99),
+            temp_c=_uniform(r, 36.2, 37.5),
+            glucose_mgdl=_uniform(r, 250, 400),
+        ),
+        "pa_baixa_1": lambda: VitalSnapshot(
+            pas=_uniform(r, 101, 110),
+            pad=_uniform(r, 60, 75),
+            hr=_uniform(r, 91, 110),
+            spo2=_uniform(r, 96, 99),
+            temp_c=_uniform(r, 36.2, 37.2),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "pa_baixa_2": lambda: VitalSnapshot(
+            pas=_uniform(r, 91, 100),
+            pad=_uniform(r, 55, 70),
+            hr=_uniform(r, 111, 130),
+            spo2=_uniform(r, 95, 99),
+            temp_c=_uniform(r, 36.2, 37.2),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "pa_baixa_3": lambda: VitalSnapshot(
+            pas=_uniform(r, 91, 100),
+            pad=_uniform(r, 55, 70),
+            hr=_uniform(r, 111, 150),
+            spo2=_uniform(r, 95, 99),
+            temp_c=_uniform(r, 38.1, 39.5),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "pa_baixa_4": lambda: VitalSnapshot(
+            pas=_uniform(r, 91, 100),
+            pad=_uniform(r, 55, 70),
+            hr=_uniform(r, 111, 150),
+            spo2=_uniform(r, 85, 93),
+            temp_c=_uniform(r, 36.2, 37.5),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "pa_baixa_5": lambda: VitalSnapshot(
+            pas=_uniform(r, 70, 90),
+            pad=_uniform(r, 40, 60),
+            hr=_uniform(r, 111, 160),
+            spo2=_uniform(r, 94, 99),
+            temp_c=_uniform(r, 36.2, 37.5),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "pa_baixa_6": lambda: VitalSnapshot(
+            pas=_uniform(r, 70, 90),
+            pad=_uniform(r, 40, 60),
+            hr=_uniform(r, 70, 100),
+            spo2=_uniform(r, 80, 91),
+            temp_c=_uniform(r, 36.2, 37.5),
+            glucose_mgdl=_uniform(r, 90, 140),
+        ),
+        "spo2_1": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 70, 90), spo2=_uniform(r, 95, 96), temp_c=36.6, glucose_mgdl=100
+        ),
+        "spo2_2": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 70, 90), spo2=_uniform(r, 93, 94), temp_c=36.6, glucose_mgdl=100
+        ),
+        "spo2_3": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 111, 130), spo2=_uniform(r, 93, 94), temp_c=36.6, glucose_mgdl=100
+        ),
+        "spo2_4": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 111, 140), spo2=_uniform(r, 92, 93), temp_c=_uniform(r, 38.1, 39.5), glucose_mgdl=100
+        ),
+        "spo2_5": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 70, 100), spo2=_uniform(r, 80, 91), temp_c=36.6, glucose_mgdl=100
+        ),
+        "spo2_6": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 111, 150), spo2=_uniform(r, 80, 91), temp_c=36.6, glucose_mgdl=100
+        ),
+        "spo2_7": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 70, 100), spo2=_uniform(r, 80, 91), temp_c=_uniform(r, 38.1, 40), glucose_mgdl=100
+        ),
+        "temp_1": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 91, 110), spo2=98, temp_c=_uniform(r, 38.1, 39.0), glucose_mgdl=100
+        ),
+        "temp_2": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 111, 130), spo2=98, temp_c=_uniform(r, 38.1, 39.0), glucose_mgdl=100
+        ),
+        "temp_3": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 111, 140), spo2=_uniform(r, 88, 93), temp_c=_uniform(r, 38.1, 39.0), glucose_mgdl=100
+        ),
+        "temp_4": lambda: VitalSnapshot(
+            pas=_uniform(r, 80, 100), pad=60, hr=_uniform(r, 111, 140), spo2=97, temp_c=_uniform(r, 38.1, 39.0), glucose_mgdl=100
+        ),
+        "temp_5": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 111, 150), spo2=97, temp_c=_uniform(r, 39.1, 41.0), glucose_mgdl=100
+        ),
+        "temp_6": lambda: VitalSnapshot(
+            pas=_uniform(r, 80, 100), pad=60, hr=_uniform(r, 111, 150), spo2=_uniform(r, 88, 93), temp_c=_uniform(r, 39.1, 41.0), glucose_mgdl=100
+        ),
+        "temp_7": lambda: VitalSnapshot(
+            pas=_uniform(r, 80, 100), pad=55, hr=_uniform(r, 35, 50), spo2=97, temp_c=_uniform(r, 32.0, 35.0), glucose_mgdl=100
+        ),
+        "hypo_1": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=80, spo2=98, temp_c=36.6, glucose_mgdl=_uniform(r, 54, 69)
+        ),
+        "hypo_2": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 111, 140), spo2=98, temp_c=36.6, glucose_mgdl=_uniform(r, 54, 69)
+        ),
+        "hypo_3": lambda: VitalSnapshot(
+            pas=_uniform(r, 80, 100), pad=60, hr=90, spo2=98, temp_c=36.6, glucose_mgdl=_uniform(r, 54, 69)
+        ),
+        "hypo_4": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=85, spo2=98, temp_c=36.6, glucose_mgdl=_uniform(r, 30, 53.5)
+        ),
+        "hypo_5": lambda: VitalSnapshot(
+            pas=_uniform(r, 85, 100),
+            pad=60,
+            hr=_uniform(r, 111, 140),
+            spo2=98,
+            temp_c=36.6,
+            glucose_mgdl=_uniform(r, 30, 53.5),
+            consciousness_altered=r.random() < 0.5,
+        ),
+        "hyper_1": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=80, spo2=98, temp_c=36.6, glucose_mgdl=_uniform(r, 181, 249)
+        ),
+        "hyper_2": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=80, spo2=98, temp_c=36.6, glucose_mgdl=_uniform(r, 250, 399)
+        ),
+        "hyper_3": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=85, spo2=98, temp_c=_uniform(r, 38.1, 39.5), glucose_mgdl=_uniform(r, 250, 399)
+        ),
+        "hyper_4": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 111, 140), spo2=97, temp_c=_uniform(r, 38.1, 39.5), glucose_mgdl=_uniform(r, 250, 399)
+        ),
+        "hyper_5": lambda: VitalSnapshot(
+            pas=_uniform(r, 80, 100), pad=60, hr=_uniform(r, 111, 140), spo2=97, temp_c=36.8, glucose_mgdl=_uniform(r, 250, 399)
+        ),
+        "hyper_6": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=90, spo2=97, temp_c=36.8, glucose_mgdl=_uniform(r, 400, 599)
+        ),
+        "hyper_7": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=95, spo2=96, temp_c=36.8, glucose_mgdl=_uniform(r, 600, 900)
+        ),
+        "fc_1": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 41, 50), spo2=98, temp_c=36.6, glucose_mgdl=100
+        ),
+        "fc_2": lambda: VitalSnapshot(
+            pas=_uniform(r, 80, 100), pad=60, hr=_uniform(r, 41, 50), spo2=98, temp_c=36.6, glucose_mgdl=100
+        ),
+        "fc_3": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 41, 50), spo2=_uniform(r, 85, 93), temp_c=36.6, glucose_mgdl=100
+        ),
+        "fc_4": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 28, 40), spo2=98, temp_c=36.6, glucose_mgdl=100
+        ),
+        "fc_5": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 111, 130), spo2=98, temp_c=36.6, glucose_mgdl=100
+        ),
+        "fc_6": lambda: VitalSnapshot(
+            pas=120, pad=80, hr=_uniform(r, 131, 180), spo2=98, temp_c=36.6, glucose_mgdl=100
+        ),
+        "fc_7": lambda: VitalSnapshot(
+            pas=_uniform(r, 140, 170),
+            pad=_uniform(r, 90, 105),
+            hr=_uniform(r, 131, 180),
+            spo2=_uniform(r, 90, 96),
+            temp_c=_uniform(r, 38.0, 39.5),
+            glucose_mgdl=100,
+        ),
+        "func_1": lambda: VitalSnapshot(
+            pas=120,
+            pad=80,
+            hr=75,
+            spo2=98,
+            temp_c=36.6,
+            glucose_mgdl=100,
+            steps_drop_pct=_uniform(r, 40, 70),
+            sleep_worsen_pct=_uniform(r, 30, 60),
+        ),
+        "func_2": lambda: VitalSnapshot(
+            pas=120,
+            pad=80,
+            hr=85,
+            spo2=98,
+            temp_c=36.6,
+            glucose_mgdl=100,
+            steps_drop_pct=_uniform(r, 40, 70),
+            sleep_worsen_pct=_uniform(r, 30, 60),
+            hr_baseline_rise=_uniform(r, 15, 30),
+        ),
+        "func_3": lambda: VitalSnapshot(
+            pas=120,
+            pad=80,
+            hr=80,
+            spo2=96,
+            temp_c=36.6,
+            glucose_mgdl=100,
+            steps_drop_pct=_uniform(r, 50, 80),
+            spo2_drop_points=_uniform(r, 3, 8),
+        ),
+        "func_4": lambda: VitalSnapshot(
+            pas=_uniform(r, 85, 100),
+            pad=60,
+            hr=_uniform(r, 111, 140),
+            spo2=_uniform(r, 88, 93),
+            temp_c=_uniform(r, 38.1, 39.5),
+            glucose_mgdl=100,
+            steps_drop_pct=_uniform(r, 40, 70),
+            sleep_worsen_pct=_uniform(r, 30, 50),
+        ),
+        "func_5": lambda: VitalSnapshot(
+            pas=_uniform(r, 140, 159),
+            pad=_uniform(r, 90, 99),
+            hr=_uniform(r, 91, 110),
+            spo2=98,
+            temp_c=36.6,
+            glucose_mgdl=100,
+            sleep_worsen_pct=_uniform(r, 30, 60),
+        ),
+        "func_6": lambda: VitalSnapshot(
+            pas=_uniform(r, 160, 179),
+            pad=_uniform(r, 100, 109),
+            hr=_uniform(r, 111, 130),
+            spo2=97,
+            temp_c=36.6,
+            glucose_mgdl=100,
+            sleep_worsen_pct=_uniform(r, 30, 60),
+        ),
+    }
+
+    if rule_id in samplers:
+        return samplers[rule_id]()
+    return v
+
+
+def _fill_baseline_context(v: VitalSnapshot, r: random.Random) -> VitalSnapshot:
+    """
+    Preenche campos contextuais ausentes com valores estáveis realistas.
+
+    Evita que zeros exatos em steps/sono (comuns em samples de regras PA/SpO2)
+    se tornem proxy espúrio de true_alert no classificador.
+    """
+    if v.steps_drop_pct is None:
+        v.steps_drop_pct = _uniform(r, 0, 12)
+    if v.sleep_worsen_pct is None:
+        v.sleep_worsen_pct = _uniform(r, 0, 12)
+    if v.hr_baseline_rise is None:
+        v.hr_baseline_rise = _uniform(r, 0, 6)
+    if v.spo2_drop_points is None:
+        v.spo2_drop_points = _uniform(r, 0, 1.2)
+    if v.pas is None:
+        v.pas = _uniform(r, 110, 125)
+    if v.pad is None:
+        v.pad = _uniform(r, 70, 82)
+    if v.hr is None:
+        v.hr = _uniform(r, 65, 85)
+    if v.spo2 is None:
+        v.spo2 = _uniform(r, 97, 99)
+    if v.temp_c is None:
+        v.temp_c = _uniform(r, 36.3, 37.0)
+    if v.glucose_mgdl is None:
+        v.glucose_mgdl = _uniform(r, 85, 120)
+    return v
+
+
+def _sample_normal(r: random.Random) -> VitalSnapshot:
+    return VitalSnapshot(
+        pas=_uniform(r, 105, 129),
+        pad=_uniform(r, 65, 84),
+        hr=_uniform(r, 60, 90),
+        spo2=_uniform(r, 97, 100),
+        temp_c=_uniform(r, 36.2, 37.2),
+        glucose_mgdl=_uniform(r, 80, 139),
+        steps_drop_pct=_uniform(r, 0, 15),
+        sleep_worsen_pct=_uniform(r, 0, 15),
+        hr_baseline_rise=_uniform(r, 0, 8),
+        spo2_drop_points=_uniform(r, 0, 1.5),
+        consciousness_altered=False,
+    )
+
+
+def _sample_false_positive(r: random.Random) -> VitalSnapshot:
+    """
+    Anomalias isoladas / limítrofes que NÃO devem acionar a matriz
+    (ou só acionariam ruído sem cruzamento completo).
+    """
+    kind = r.choice(
+        [
+            "borderline_hr",
+            "borderline_spo2",
+            "prehyper",
+            "low_grade_temp",
+            "pre_hyperglycemia",
+            "mild_steps",
+            "isolated_hr_100",
+        ]
+    )
+    base = _sample_normal(r)
+    if kind == "borderline_hr":
+        base.hr = _uniform(r, 100, 110)  # taquicardia isolada leve sem PA/SpO2 críticos
+        base.pas = _uniform(r, 110, 129)
+        base.pad = _uniform(r, 70, 85)
+        base.spo2 = _uniform(r, 97, 99)
+        base.temp_c = _uniform(r, 36.3, 37.2)
+    elif kind == "borderline_spo2":
+        base.spo2 = _uniform(r, 96.2, 97.0)  # fora de 95-96 isolado da matriz
+        base.hr = _uniform(r, 70, 90)
+    elif kind == "prehyper":
+        base.pas = _uniform(r, 130, 139)
+        base.pad = _uniform(r, 80, 89)
+        base.hr = _uniform(r, 70, 90)
+    elif kind == "low_grade_temp":
+        base.temp_c = _uniform(r, 37.5, 38.05)
+        base.hr = _uniform(r, 70, 90)
+    elif kind == "pre_hyperglycemia":
+        base.glucose_mgdl = _uniform(r, 140, 180)
+        base.hr = _uniform(r, 70, 90)
+        base.temp_c = _uniform(r, 36.3, 37.2)
+    elif kind == "mild_steps":
+        base.steps_drop_pct = _uniform(r, 20, 39)
+        base.sleep_worsen_pct = _uniform(r, 10, 25)
+        base.hr = _uniform(r, 70, 90)
+    else:
+        base.hr = _uniform(r, 100, 109)
+        base.pas = 118
+        base.pad = 76
+        base.spo2 = 98
+        base.temp_c = 36.7
+        base.glucose_mgdl = 105
+    return base
+
+
+def generate_dataset(
+    n_per_rule: int = 80,
+    n_normal: int = 1500,
+    n_false_positive: int = 2000,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """
+    Gera DataFrame com features + labels.
+
+    Labels:
+      - severity: none | leve | moderado | critico
+      - is_true_alert: 0/1
+      - is_false_positive: 1 se amostra de FP sintético e engine não alertou
+      - rule_id: regra alvo (se true alert) ou ''
+    """
+    r = _rng(seed)
+    engine = AlertMatrixEngine()
+    rows: List[Dict[str, Any]] = []
+
+    # True positives por regra
+    for rule in ALERT_RULES:
+        rid = rule["rule_id"]
+        for _ in range(n_per_rule):
+            vitals = _fill_baseline_context(_sample_for_rule(rid, r), r)
+            result = engine.evaluate(vitals)
+            # Re-sample até a regra principal bater (ou qualquer true alert)
+            attempts = 0
+            while not result.is_true_alert and attempts < 8:
+                vitals = _fill_baseline_context(_sample_for_rule(rid, r), r)
+                result = engine.evaluate(vitals)
+                attempts += 1
+            if not result.is_true_alert:
+                continue
+            feats = vitals.to_feature_dict()
+            rows.append(
+                {
+                    **feats,
+                    "severity": result.max_severity,
+                    "is_true_alert": 1,
+                    "is_false_positive": 0,
+                    "rule_id": result.primary_rule_id or rid,
+                    "alert_name": result.primary_alert_name or "",
+                    "sample_type": "true_alert",
+                }
+            )
+
+    # Normais
+    for _ in range(n_normal):
+        vitals = _sample_normal(r)
+        result = engine.evaluate(vitals)
+        feats = vitals.to_feature_dict()
+        rows.append(
+            {
+                **feats,
+                "severity": result.max_severity if result.is_true_alert else "none",
+                "is_true_alert": int(result.is_true_alert),
+                "is_false_positive": 0,
+                "rule_id": result.primary_rule_id or "",
+                "alert_name": result.primary_alert_name or "",
+                "sample_type": "normal",
+            }
+        )
+
+    # Falsos positivos candidatos (label is_false_positive=1 somente se engine NÃO alertar)
+    for _ in range(n_false_positive):
+        vitals = _fill_baseline_context(_sample_false_positive(r), r)
+        result = engine.evaluate(vitals)
+        feats = vitals.to_feature_dict()
+        if result.is_true_alert:
+            # Acidentalmente bateu regra — conta como true alert
+            rows.append(
+                {
+                    **feats,
+                    "severity": result.max_severity,
+                    "is_true_alert": 1,
+                    "is_false_positive": 0,
+                    "rule_id": result.primary_rule_id or "",
+                    "alert_name": result.primary_alert_name or "",
+                    "sample_type": "true_alert_from_fp_sampler",
+                }
+            )
+        else:
+            rows.append(
+                {
+                    **feats,
+                    "severity": "none",
+                    "is_true_alert": 0,
+                    "is_false_positive": 1,
+                    "rule_id": "",
+                    "alert_name": "",
+                    "sample_type": "false_positive",
+                }
+            )
+
+    df = pd.DataFrame(rows)
+    return df

@@ -9,10 +9,15 @@ from src.clinical_intelligence.pipeline import ClinicalIntelligencePipeline
 from src.clinical_intelligence.fuzzy_engine import FuzzyClinicalEngine
 from src.clinical_intelligence.ghost_signals import GhostSignalDetector
 from src.clinical_intelligence.signal_processing import WearableSignalProcessor
+from src.clinical_intelligence.alert_matrix_rules import AlertMatrixEngine, VitalSnapshot
+from src.clinical_intelligence.alert_matrix_classifier import AlertMatrixClassifier
 
 __all__ = [
     "ClinicalIntelligencePipeline",
     "FuzzyClinicalEngine",
     "GhostSignalDetector",
     "WearableSignalProcessor",
+    "AlertMatrixEngine",
+    "VitalSnapshot",
+    "AlertMatrixClassifier",
 ]

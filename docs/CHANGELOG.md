@@ -5,6 +5,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **Matriz de alertas clínicos + FP** — 51 regras (PA/SpO2/temp/glicemia/FC/passos-sono), dataset sintético, classificador `data/models/alert_matrix_classifier.pkl` (`run_alert_matrix_training.py`)
 - **HBand / Veepoo companion** — contrato OpenAPI `docs/openapi/hband-wearable.yaml`
 - `HBandNormalizer` + `HBandCompanionAdapter` (`src/ingestion/real/hband_*`)
 - Métricas Bronze: `blood_pressure_sys/dia`, `calories`, `distance_km`

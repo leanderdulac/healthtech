@@ -1,0 +1,308 @@
+[
+  {
+    "rule_id": "pa_elev_1",
+    "category": "pa_alta",
+    "severity": "leve",
+    "name": "Possível elevação pressórica associada a taquicardia leve"
+  },
+  {
+    "rule_id": "pa_elev_2",
+    "category": "pa_alta",
+    "severity": "moderado",
+    "name": "Possível descompensação hipertensiva com taquicardia"
+  },
+  {
+    "rule_id": "pa_elev_3",
+    "category": "pa_alta",
+    "severity": "critico",
+    "name": "Possível crise hipertensiva associada a taquicardia"
+  },
+  {
+    "rule_id": "pa_elev_4",
+    "category": "pa_alta",
+    "severity": "critico",
+    "name": "Possível crise hipertensiva com comprometimento cardiorrespiratório"
+  },
+  {
+    "rule_id": "pa_elev_5",
+    "category": "pa_alta",
+    "severity": "critico",
+    "name": "Possível descompensação hipertensiva associada a quadro febril agudo"
+  },
+  {
+    "rule_id": "pa_elev_6",
+    "category": "pa_alta",
+    "severity": "critico",
+    "name": "Possível descompensação cardiovascular e metabólica"
+  },
+  {
+    "rule_id": "pa_baixa_1",
+    "category": "pa_baixa",
+    "severity": "leve",
+    "name": "Possível hipotensão associada a taquicardia leve"
+  },
+  {
+    "rule_id": "pa_baixa_2",
+    "category": "pa_baixa",
+    "severity": "moderado",
+    "name": "Possível hipovolemia ou instabilidade circulatória"
+  },
+  {
+    "rule_id": "pa_baixa_3",
+    "category": "pa_baixa",
+    "severity": "critico",
+    "name": "Possível infecção com repercussão hemodinâmica"
+  },
+  {
+    "rule_id": "pa_baixa_4",
+    "category": "pa_baixa",
+    "severity": "critico",
+    "name": "Possível deterioração cardiorrespiratória"
+  },
+  {
+    "rule_id": "pa_baixa_5",
+    "category": "pa_baixa",
+    "severity": "critico",
+    "name": "Possível instabilidade hemodinâmica"
+  },
+  {
+    "rule_id": "pa_baixa_6",
+    "category": "pa_baixa",
+    "severity": "critico",
+    "name": "Possível hipotensão associada a hipoxemia"
+  },
+  {
+    "rule_id": "spo2_1",
+    "category": "spo2",
+    "severity": "leve",
+    "name": "Possível dessaturação leve"
+  },
+  {
+    "rule_id": "spo2_2",
+    "category": "spo2",
+    "severity": "moderado",
+    "name": "Possível dessaturação moderada"
+  },
+  {
+    "rule_id": "spo2_3",
+    "category": "spo2",
+    "severity": "moderado",
+    "name": "Possível comprometimento respiratório com resposta cardíaca compensatória"
+  },
+  {
+    "rule_id": "spo2_4",
+    "category": "spo2",
+    "severity": "critico",
+    "name": "Possível infecção com repercussão sistêmica"
+  },
+  {
+    "rule_id": "spo2_5",
+    "category": "spo2",
+    "severity": "critico",
+    "name": "Possível hipoxemia importante"
+  },
+  {
+    "rule_id": "spo2_6",
+    "category": "spo2",
+    "severity": "critico",
+    "name": "Possível comprometimento cardiorrespiratório agudo"
+  },
+  {
+    "rule_id": "spo2_7",
+    "category": "spo2",
+    "severity": "critico",
+    "name": "Possível infecção aguda com hipoxemia"
+  },
+  {
+    "rule_id": "temp_1",
+    "category": "temperatura",
+    "severity": "leve",
+    "name": "Possível estado febril com resposta cardíaca leve"
+  },
+  {
+    "rule_id": "temp_2",
+    "category": "temperatura",
+    "severity": "moderado",
+    "name": "Possível estado febril associado a taquicardia"
+  },
+  {
+    "rule_id": "temp_3",
+    "category": "temperatura",
+    "severity": "critico",
+    "name": "Possível infecção com deterioração clínica"
+  },
+  {
+    "rule_id": "temp_4",
+    "category": "temperatura",
+    "severity": "critico",
+    "name": "Possível infecção com instabilidade hemodinâmica"
+  },
+  {
+    "rule_id": "temp_5",
+    "category": "temperatura",
+    "severity": "critico",
+    "name": "Possível febre alta com repercussão cardiovascular"
+  },
+  {
+    "rule_id": "temp_6",
+    "category": "temperatura",
+    "severity": "critico",
+    "name": "Possível infecção grave ou desidratação com instabilidade clínica"
+  },
+  {
+    "rule_id": "temp_7",
+    "category": "temperatura",
+    "severity": "critico",
+    "name": "Possível hipotermia com instabilidade fisiológica"
+  },
+  {
+    "rule_id": "hypo_1",
+    "category": "hipoglicemia",
+    "severity": "moderado",
+    "name": "Possível hipoglicemia"
+  },
+  {
+    "rule_id": "hypo_2",
+    "category": "hipoglicemia",
+    "severity": "moderado",
+    "name": "Possível hipoglicemia com resposta adrenérgica"
+  },
+  {
+    "rule_id": "hypo_3",
+    "category": "hipoglicemia",
+    "severity": "critico",
+    "name": "Possível hipoglicemia associada a instabilidade hemodinâmica"
+  },
+  {
+    "rule_id": "hypo_4",
+    "category": "hipoglicemia",
+    "severity": "critico",
+    "name": "Possível hipoglicemia clinicamente significativa"
+  },
+  {
+    "rule_id": "hypo_5",
+    "category": "hipoglicemia",
+    "severity": "critico",
+    "name": "Possível hipoglicemia grave"
+  },
+  {
+    "rule_id": "hyper_1",
+    "category": "hiperglicemia",
+    "severity": "leve",
+    "name": "Possível hiperglicemia acima da meta"
+  },
+  {
+    "rule_id": "hyper_2",
+    "category": "hiperglicemia",
+    "severity": "moderado",
+    "name": "Possível hiperglicemia importante"
+  },
+  {
+    "rule_id": "hyper_3",
+    "category": "hiperglicemia",
+    "severity": "moderado",
+    "name": "Possível hiperglicemia associada a quadro infeccioso"
+  },
+  {
+    "rule_id": "hyper_4",
+    "category": "hiperglicemia",
+    "severity": "critico",
+    "name": "Possível descompensação metabólica associada a infecção"
+  },
+  {
+    "rule_id": "hyper_5",
+    "category": "hiperglicemia",
+    "severity": "critico",
+    "name": "Possível crise hiperglicêmica com desidratação ou instabilidade circulatória"
+  },
+  {
+    "rule_id": "hyper_6",
+    "category": "hiperglicemia",
+    "severity": "critico",
+    "name": "Possível hiperglicemia severa"
+  },
+  {
+    "rule_id": "hyper_7",
+    "category": "hiperglicemia",
+    "severity": "critico",
+    "name": "Possível estado hiperglicêmico hiperosmolar"
+  },
+  {
+    "rule_id": "fc_1",
+    "category": "fc",
+    "severity": "moderado",
+    "name": "Possível bradicardia relativa"
+  },
+  {
+    "rule_id": "fc_2",
+    "category": "fc",
+    "severity": "critico",
+    "name": "Possível bradicardia com repercussão hemodinâmica"
+  },
+  {
+    "rule_id": "fc_3",
+    "category": "fc",
+    "severity": "critico",
+    "name": "Possível bradicardia associada a dessaturação"
+  },
+  {
+    "rule_id": "fc_4",
+    "category": "fc",
+    "severity": "critico",
+    "name": "Possível bradicardia importante"
+  },
+  {
+    "rule_id": "fc_5",
+    "category": "fc",
+    "severity": "leve",
+    "name": "Possível taquicardia persistente"
+  },
+  {
+    "rule_id": "fc_6",
+    "category": "fc",
+    "severity": "critico",
+    "name": "Possível taquicardia importante"
+  },
+  {
+    "rule_id": "fc_7",
+    "category": "fc",
+    "severity": "critico",
+    "name": "Possível deterioração sistêmica ou cardiovascular"
+  },
+  {
+    "rule_id": "func_1",
+    "category": "funcional",
+    "severity": "leve",
+    "name": "Possível redução funcional associada à piora do sono"
+  },
+  {
+    "rule_id": "func_2",
+    "category": "funcional",
+    "severity": "moderado",
+    "name": "Possível estresse fisiológico com redução funcional"
+  },
+  {
+    "rule_id": "func_3",
+    "category": "funcional",
+    "severity": "moderado",
+    "name": "Possível comprometimento respiratório associado à redução funcional"
+  },
+  {
+    "rule_id": "func_4",
+    "category": "funcional",
+    "severity": "critico",
+    "name": "Possível deterioração clínica aguda"
+  },
+  {
+    "rule_id": "func_5",
+    "category": "funcional",
+    "severity": "moderado",
+    "name": "Possível estresse cardiovascular associado à piora do sono"
+  },
+  {
+    "rule_id": "func_6",
+    "category": "funcional",
+    "severity": "moderado",
+    "name": "Possível descompensação cardiovascular associada à piora do sono"
+  }
+]
