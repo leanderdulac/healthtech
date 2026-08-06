@@ -1,0 +1,1 @@
+{"columns": ["bpm", "spo2", "hrv", "stress", "quality_score", "hour_of_day", "is_active", "is_sleeping"]}

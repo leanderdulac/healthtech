@@ -34,16 +34,22 @@ class VertexOnlineDetector:
         """Envia um pulso para o Vertex AI para classificação em tempo real."""
         return self.processar_features({"bpm": valor_bpm})
 
+    # Ordem das features do IsolationForest servido no Vertex (sklearn prebuilt)
+    ONLINE_FEATURE_ORDER = [
+        "bpm", "spo2", "hrv", "stress", "quality_score",
+        "hour_of_day", "is_active", "is_sleeping",
+    ]
+
     def processar_features(self, features: dict) -> dict:
         """Envia features completas do datalake para o Vertex AI Endpoint."""
         if features.get("sequence") and self.is_ready:
             return self._predict_tcn_sequence(features)
 
         instance = {
-            "bpm": float(features.get("bpm", 0)),
+            "bpm": float(features.get("bpm", features.get("heart_rate", 0))),
             "spo2": float(features.get("spo2", 97)),
-            "hrv": float(features.get("hrv", 50)),
-            "stress": float(features.get("stress", 0)),
+            "hrv": float(features.get("hrv", features.get("hrv_rmssd", 50))),
+            "stress": float(features.get("stress", features.get("activity_level", 0))),
             "quality_score": float(features.get("quality_score", 1.0)),
             "hour_of_day": int(features.get("hour_of_day", 12)),
             "is_active": int(features.get("is_active", 0)),
@@ -52,7 +58,9 @@ class VertexOnlineDetector:
 
         if self.is_ready:
             try:
-                response = self._call_vertex_predict([instance])
+                # sklearn prebuilt espera lista de valores na ordem de treino
+                vector = [instance[k] for k in self.ONLINE_FEATURE_ORDER]
+                response = self._call_vertex_predict([vector])
                 prediction = response.predictions[0]
                 if isinstance(prediction, dict) and "prob_6h" in prediction:
                     return self._format_tcn_response(prediction, features, instance)
@@ -62,8 +70,19 @@ class VertexOnlineDetector:
                     is_anomalia = prediction.get("is_anomaly", prediction.get("alerta", False))
                     score = prediction.get("score", prediction.get("anomaly_score", 0.5))
                 else:
-                    is_anomalia = bool(prediction)
-                    score = 0.9 if is_anomalia else 0.1
+                    # IsolationForest: -1 = anomalia, 1 = normal
+                    val = float(prediction)
+                    is_anomalia = val < 0
+                    score = 0.95 if is_anomalia else 0.08
+
+                bpm = instance["bpm"]
+                # Híbrido: Vertex + regra fisiológica quando só BPM muda no request
+                if not is_anomalia and (bpm > 120 or bpm < 40 or instance["spo2"] < 90):
+                    is_anomalia = True
+                    score = max(float(score), 0.9)
+                    modo = "Vertex AI + regra local"
+                else:
+                    modo = "Produção Vertex AI"
 
                 return {
                     "alerta": bool(is_anomalia),
@@ -73,7 +92,8 @@ class VertexOnlineDetector:
                     "patient_id": features.get("patient_id"),
                     "timestamp": features.get("timestamp"),
                     "status": "ALERTA CRÍTICO (Vertex)" if is_anomalia else "Normal",
-                    "modo": "Produção GCP",
+                    "modo": modo,
+                    "vertex_raw": prediction,
                 }
             except GoogleAPIError as api_err:
                 logger.error("Erro na API do Vertex: %s", api_err)

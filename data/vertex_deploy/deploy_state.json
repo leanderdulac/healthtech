@@ -1,0 +1,24 @@
+{
+  "status": "deployed",
+  "model_type": "anomaly_iforest",
+  "model_resource": "projects/5794833455/locations/us-central1/models/5473756460917719040",
+  "endpoint_resource": "projects/5794833455/locations/us-central1/endpoints/3014531579629273088",
+  "VERTEX_ENDPOINT_ID": "projects/5794833455/locations/us-central1/endpoints/3014531579629273088",
+  "VERTEX_MODEL_NAME": "projects/5794833455/locations/us-central1/models/5473756460917719040",
+  "artifact_uri": "gs://healthtech-gcp-2026-vertex-staging/anomaly_models/20260806_025257",
+  "feature_columns": [
+    "bpm",
+    "spo2",
+    "hrv",
+    "stress",
+    "quality_score",
+    "hour_of_day",
+    "is_active",
+    "is_sleeping"
+  ],
+  "predictions_smoke": [
+    1.0,
+    -1.0
+  ],
+  "deployed_at": "2026-08-06T03:16:16.194801+00:00"
+}
