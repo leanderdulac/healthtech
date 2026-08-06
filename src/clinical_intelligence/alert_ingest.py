@@ -1,8 +1,8 @@
 """
 Integração da matriz de alertas com a ingestão de wearables (API / HBand).
 
-Mapeia telemetria + phantom/estimativas → VitalSnapshot → AlertMatrixClassifier.assess().
-Carrega o modelo de forma lazy e degradável (só regras se o .pkl não existir).
+Mapeia telemetria + phantom/estimativas → VitalSnapshot → AlertMatrixClassifier.assess()
++ detecção de discrepância amostra vs alerta (ex.: crise hipertensiva com FC 78–90).
 """
 
 from __future__ import annotations
@@ -11,8 +11,9 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
+from src.clinical_intelligence.alert_discrepancy import evaluate_discrepancy
 from src.clinical_intelligence.alert_matrix_rules import (
     AlertMatrixEngine,
     VitalSnapshot,
@@ -65,66 +66,73 @@ def vitals_from_ingest_context(
     phantom: Optional[Dict[str, Any]] = None,
     hband_ext: Optional[Dict[str, Any]] = None,
     raw_telemetry: Optional[Dict[str, Any]] = None,
-) -> VitalSnapshot:
+    use_unreliable_phantom: bool = False,
+) -> Tuple[VitalSnapshot, Dict[str, Any]]:
     """
-    Monta VitalSnapshot a partir do payload de ingestão e estimativas phantom.
+    Monta VitalSnapshot + metadados de origem (measured/phantom).
 
-    Prioridade de PA/glicose:
-      1. campos explícitos HBand (_hband / extras)
-      2. phantom_data do monólito (systolic_bp, diastolic_bp, glucose, map)
-      3. None (regra não usa o eixo)
+    PA/glicose phantom só entram se reliable=True (ou use_unreliable_phantom).
     """
     hband = hband_ext or {}
     raw = raw_telemetry or {}
     ph = phantom or {}
+    meta: Dict[str, Any] = {
+        "bp_source": "unknown",
+        "glucose_source": "unknown",
+        "bp_reliable": True,
+        "glucose_reliable": True,
+    }
 
-    def phantom_est(*keys: str) -> Optional[float]:
+    def phantom_est(*keys: str) -> Tuple[Optional[float], bool]:
         for k in keys:
             node = ph.get(k)
             if isinstance(node, dict) and "estimate" in node:
-                return _num(node["estimate"])
+                rel = bool(node.get("reliable", True))
+                if not rel and not use_unreliable_phantom:
+                    continue
+                return _num(node["estimate"]), rel
             if node is not None and not isinstance(node, dict):
-                return _num(node)
-        return None
+                return _num(node), True
+        return None, True
 
-    pas = (
-        _num(hband.get("blood_pressure_sys"))
-        or _num(raw.get("blood_pressure_sys"))
-        or phantom_est("systolic_bp", "sbp", "pas")
-    )
-    pad = (
-        _num(hband.get("blood_pressure_dia"))
-        or _num(raw.get("blood_pressure_dia"))
-        or phantom_est("diastolic_bp", "dbp", "pad")
-    )
-    # Fallback MAP → aproximar PAS/PAD se só MAP existir
-    if pas is None and pad is None:
-        map_v = phantom_est("map_mmhg", "map", "mean_arterial_pressure")
-        if map_v is not None:
-            # MAP ≈ (PAS + 2*PAD)/3; assume PP=40 → PAS=MAP+13.3, PAD=MAP-6.7
-            pas = map_v + 13.3
-            pad = map_v - 6.7
+    # PA medida
+    pas_m = _num(hband.get("blood_pressure_sys")) or _num(raw.get("blood_pressure_sys"))
+    pad_m = _num(hband.get("blood_pressure_dia")) or _num(raw.get("blood_pressure_dia"))
+    if pas_m is not None or pad_m is not None:
+        pas, pad = pas_m, pad_m
+        meta["bp_source"] = "measured"
+        meta["bp_reliable"] = True
+    else:
+        pas, pas_rel = phantom_est("systolic_bp", "sbp", "pas")
+        pad, pad_rel = phantom_est("diastolic_bp", "dbp", "pad")
+        if pas is None and pad is None:
+            map_v, map_rel = phantom_est("map_mmhg", "map", "mean_arterial_pressure")
+            if map_v is not None:
+                pas = map_v + 13.3
+                pad = map_v - 6.7
+                meta["bp_source"] = "phantom"
+                meta["bp_reliable"] = map_rel
+        elif pas is not None or pad is not None:
+            meta["bp_source"] = "phantom"
+            meta["bp_reliable"] = pas_rel and pad_rel
 
-    glucose = (
-        _num(hband.get("glucose_mgdl"))
-        or _num(raw.get("glucose_mgdl"))
-        or phantom_est("glucose_mgdl", "glucose", "blood_glucose")
-    )
-    resp = (
-        _num(hband.get("respiratory_rate"))
-        or _num(raw.get("respiratory_rate"))
-        or phantom_est("respiratory_rate")
-    )
+    # Glicose
+    glu_m = _num(hband.get("glucose_mgdl")) or _num(raw.get("glucose_mgdl"))
+    if glu_m is not None:
+        glucose = glu_m
+        meta["glucose_source"] = "measured"
+        meta["glucose_reliable"] = True
+    else:
+        glucose, glu_rel = phantom_est("glucose_mgdl", "glucose", "blood_glucose")
+        if glucose is not None:
+            meta["glucose_source"] = "phantom"
+            meta["glucose_reliable"] = glu_rel
 
     temp = _num(skin_temp)
-    # skin_temp wearable ~33°C; matriz usa corporal ~36–40.
-    # Se valor parece de pele (<35), converter heurística para corporal de referência.
     if temp is not None and 25.0 <= temp < 35.0:
-        # Mantém valor de pele para hipo termia de superfície; febre via hband explicit
         body = _num(hband.get("body_temp_c")) or _num(raw.get("body_temp_c"))
         if body is not None:
             temp = body
-        # senão deixa skin; regras de febre (≥38.1) não disparam com 33°C (correto)
 
     steps_drop = _num(hband.get("steps_drop_pct")) or _num(raw.get("steps_drop_pct"))
     sleep_worsen = _num(hband.get("sleep_worsen_pct")) or _num(raw.get("sleep_worsen_pct"))
@@ -134,11 +142,16 @@ def vitals_from_ingest_context(
         hband.get("consciousness_altered") or raw.get("consciousness_altered")
     )
 
-    # activity_level 0–100 como proxy leve de stress (não força regra sozinho)
     if hr_rise is None and activity_level is not None and float(activity_level) > 40:
         hr_rise = min(25.0, float(activity_level) * 0.2)
 
-    return VitalSnapshot(
+    # Sono "Bom" implícito se não informado
+    if sleep_worsen is None:
+        sleep_worsen = 5.0
+    if steps_drop is None:
+        steps_drop = 5.0
+
+    vitals = VitalSnapshot(
         pas=pas,
         pad=pad,
         hr=_num(heart_rate),
@@ -151,6 +164,45 @@ def vitals_from_ingest_context(
         spo2_drop_points=spo2_drop,
         consciousness_altered=consciousness,
     )
+    return vitals, meta
+
+
+def _apply_discrepancy(full: Dict[str, Any], vitals: VitalSnapshot, meta: Dict[str, Any]) -> Dict[str, Any]:
+    disc = evaluate_discrepancy(
+        vitals,
+        full.get("rule_hits") or [],
+        primary_rule_id=full.get("primary_rule_id"),
+        primary_alert_name=full.get("primary_alert_name"),
+        bp_source=meta.get("bp_source", "unknown"),
+        glucose_source=meta.get("glucose_source", "unknown"),
+        glucose_reliable=bool(meta.get("glucose_reliable", True)),
+        bp_reliable=bool(meta.get("bp_reliable", True)),
+    )
+    full = dict(full)
+    full["discrepancy"] = disc.to_dict()
+    full["source_meta"] = meta
+
+    if disc.should_suppress_alert and full.get("is_true_alert"):
+        full["is_true_alert"] = False
+        full["is_false_positive"] = True
+        full["severity"] = "none"
+        full["decision"] = "suppressed_sample_discrepancy"
+        conf = float(full.get("confidence") or 0.5) * disc.confidence_penalty
+        full["confidence"] = max(0.05, conf)
+        full["suppressed_alert_name"] = full.get("primary_alert_name")
+        full["suppressed_rule_id"] = full.get("primary_rule_id")
+        # mantém rule_hits para auditoria, mas marca como FP
+        full["rule_explanation"] = (
+            (full.get("rule_explanation") or "")
+            + " | SUPRIMIDO: "
+            + "; ".join(disc.reasons)
+        )
+    elif disc.is_discrepant and full.get("is_true_alert"):
+        full["confidence"] = max(
+            0.1, float(full.get("confidence") or 0.5) * disc.confidence_penalty
+        )
+        full["decision"] = "rule_match_discrepancy_penalty"
+    return full
 
 
 def assess_ingest_alerts(
@@ -169,7 +221,7 @@ def assess_ingest_alerts(
 
     Retorno enxuto para embutir em processed_frame['clinical_alerts'].
     """
-    vitals = vitals_from_ingest_context(
+    vitals, meta = vitals_from_ingest_context(
         heart_rate=heart_rate,
         spo2=spo2,
         skin_temp=skin_temp,
@@ -182,7 +234,10 @@ def assess_ingest_alerts(
 
     clf = _load_classifier()
     if clf is not None:
-        full = clf.assess(vitals)
+        full = clf.assess(
+            vitals,
+            source_meta=meta,
+        )
     else:
         engine = AlertMatrixEngine()
         rule = engine.evaluate(vitals)
@@ -203,6 +258,7 @@ def assess_ingest_alerts(
             "ml": None,
             "vitals": vitals.to_feature_dict(),
         }
+        full = _apply_discrepancy(full, vitals, meta)
 
     # Payload estável para API / WebSocket / dashboard
     return {
@@ -211,12 +267,17 @@ def assess_ingest_alerts(
         "severity": full.get("severity") or "none",
         "confidence": round(float(full.get("confidence") or 0.0), 4),
         "decision": full.get("decision"),
-        "primary_alert_name": full.get("primary_alert_name"),
-        "primary_rule_id": full.get("primary_rule_id"),
+        "primary_alert_name": full.get("primary_alert_name")
+        if full.get("is_true_alert")
+        else None,
+        "primary_rule_id": full.get("primary_rule_id") if full.get("is_true_alert") else None,
         "rule_hits": full.get("rule_hits") or [],
         "rule_explanation": full.get("rule_explanation"),
         "vitals_used": full.get("vitals") or vitals.to_feature_dict(),
         "ml": full.get("ml"),
+        "discrepancy": full.get("discrepancy"),
+        "source_meta": full.get("source_meta") or meta,
+        "suppressed_alert_name": full.get("suppressed_alert_name"),
         "engine": "alert_matrix_ml" if clf is not None else "alert_matrix_rules",
     }
 
@@ -228,7 +289,7 @@ def merge_anomaly_with_alerts(
     """
     Ajusta flag de anomalia local com a matriz:
       - true alert → reforça alerta
-      - FP suprimido → não escalar anomalia isolada por FC limítrofe
+      - FP / discrepância suprimida → não escalar anomalia isolada
     """
     out = dict(anomaly or {})
     if clinical_alerts.get("is_true_alert"):
@@ -239,11 +300,20 @@ def merge_anomaly_with_alerts(
         out["modo"] = f"Matriz Clínica ({sev})"
         out["clinical_rule_id"] = clinical_alerts.get("primary_rule_id")
         out["clinical_alert_name"] = clinical_alerts.get("primary_alert_name")
-    elif clinical_alerts.get("is_false_positive") and clinical_alerts.get("severity") == "none":
-        # Suprime alerta ruidoso de heurística local se matriz classifica FP
-        if out.get("modo") in {"Detecção Local BMO", "Deteção Local", "Deteção Local BMO"}:
+    elif clinical_alerts.get("is_false_positive") or clinical_alerts.get(
+        "decision"
+    ) == "suppressed_sample_discrepancy":
+        if out.get("modo") in {
+            "Detecção Local BMO",
+            "Deteção Local",
+            "Deteção Local BMO",
+        } or out.get("alerta"):
             out["alerta"] = False
             out["score"] = min(float(out.get("score") or 0.05), 0.15)
-            out["modo"] = "Suprimido (falso positivo / matriz)"
+            out["modo"] = "Suprimido (falso positivo / discrepância amostra)"
             out["suppressed_by_matrix"] = True
+            if clinical_alerts.get("discrepancy"):
+                out["discrepancy_reasons"] = clinical_alerts["discrepancy"].get(
+                    "reasons", []
+                )
     return out

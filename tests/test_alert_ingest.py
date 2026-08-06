@@ -10,7 +10,7 @@ from src.clinical_intelligence.alert_ingest import (
 
 
 def test_vitals_prefer_explicit_bp_over_phantom():
-    v = vitals_from_ingest_context(
+    v, meta = vitals_from_ingest_context(
         heart_rate=80,
         spo2=98,
         skin_temp=33.0,
@@ -20,6 +20,32 @@ def test_vitals_prefer_explicit_bp_over_phantom():
     assert v.pas == 190
     assert v.pad == 115
     assert v.hr == 80
+    assert meta["bp_source"] == "measured"
+
+
+def test_ui_screenshot_false_positive_suppressed():
+    """Caso da UI: FC 78, temp 36.5, sono bom + 'crise hipertensiva' / hiperglicemia phantom."""
+    alerts = assess_ingest_alerts(
+        heart_rate=78,
+        spo2=98,
+        skin_temp=36.5,
+        phantom={
+            "systolic_bp": {"estimate": 190, "reliable": True},
+            "diastolic_bp": {"estimate": 115, "reliable": True},
+            "glucose_mgdl": {"estimate": 200, "reliable": True},
+        },
+        hband_ext={"steps_drop_pct": 5, "sleep_worsen_pct": 5},
+    )
+    assert alerts["is_true_alert"] is False
+    assert alerts["severity"] == "none"
+    assert alerts["is_false_positive"] is True or alerts["decision"] in {
+        "suppressed_sample_discrepancy",
+        "suppressed_false_positive",
+        "stable_or_noise",
+    }
+    # Se regras phantom bateram, discrepancy deve ter suprimido
+    if alerts.get("discrepancy"):
+        assert alerts["discrepancy"].get("is_discrepant") or not alerts["is_true_alert"]
 
 
 def test_assess_critical_hypoxemia_on_ingest():

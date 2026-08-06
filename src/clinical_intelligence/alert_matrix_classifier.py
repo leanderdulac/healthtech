@@ -30,6 +30,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
+from src.clinical_intelligence.alert_discrepancy import evaluate_discrepancy
 from src.clinical_intelligence.alert_matrix_dataset import FEATURE_COLUMNS, SEVERITY_LABELS
 from src.clinical_intelligence.alert_matrix_rules import (
     AlertMatrixEngine,
@@ -185,18 +186,30 @@ class AlertMatrixClassifier:
         vitals: VitalSnapshot,
         fp_suppress_threshold: float = 0.55,
         alert_threshold: float = 0.80,
+        source_meta: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Inferência combinada regras + ML.
+        Inferência combinada regras + ML + discrepância amostra↔alerta.
 
         - Regras definem hits e severidade ground-truth operacional
-        - ML estima FP e confidência; se FP alto e regra não bate → suppress
-        - Se regra bate → true alert (nome da matriz)
-        - Sem regra: prioridade absoluta é suprimir falso positivo
+        - ML estima FP e confidência
+        - Discrepância (ex. crise hipertensiva com FC 78–90 estável) → suprimir FP
         """
+        meta = source_meta or {}
         rule_result: AlertMatrixResult = self.engine.evaluate(vitals)
         feats = vitals.to_feature_dict()
-        ml = self.predict_features(feats) if self.severity_clf else {
+        # features de discrepância para ML (se modelo treinado com elas)
+        from src.clinical_intelligence.alert_discrepancy import discrepancy_feature_flags
+
+        disc_flags = discrepancy_feature_flags(
+            vitals,
+            bp_source=str(meta.get("bp_source", "unknown")),
+            glucose_source=str(meta.get("glucose_source", "unknown")),
+        )
+        feats_ml = {**feats, **disc_flags}
+        # predizer só com colunas conhecidas do modelo
+        ml_input = {c: feats_ml.get(c, feats.get(c, 0.0)) for c in self.feature_columns}
+        ml = self.predict_features(ml_input) if self.severity_clf else {
             "ml_severity": "none",
             "ml_severity_proba": {},
             "ml_false_positive_prob": 0.0,
@@ -207,6 +220,8 @@ class AlertMatrixClassifier:
         final_severity = rule_result.max_severity
         final_alert = rule_result.is_true_alert
         decision = "rule_match" if rule_result.is_true_alert else "no_rule"
+        suppressed_name = None
+        suppressed_rid = None
 
         if rule_result.is_true_alert:
             confidence = max(
@@ -253,7 +268,7 @@ class AlertMatrixClassifier:
                     0.6,
                 )
 
-        return {
+        result = {
             "is_true_alert": final_alert,
             "is_false_positive": suppressed
             or (
@@ -274,7 +289,43 @@ class AlertMatrixClassifier:
             "rule_explanation": rule_result.explanation,
             "ml": ml,
             "vitals": feats,
+            "source_meta": meta,
         }
+
+        # Gate de discrepância amostra ↔ alerta (caso UI: crise + FC estável)
+        disc = evaluate_discrepancy(
+            vitals,
+            result["rule_hits"],
+            primary_rule_id=result.get("primary_rule_id"),
+            primary_alert_name=result.get("primary_alert_name"),
+            bp_source=str(meta.get("bp_source", "unknown")),
+            glucose_source=str(meta.get("glucose_source", "unknown")),
+            glucose_reliable=bool(meta.get("glucose_reliable", True)),
+            bp_reliable=bool(meta.get("bp_reliable", True)),
+        )
+        result["discrepancy"] = disc.to_dict()
+        if disc.should_suppress_alert and result["is_true_alert"]:
+            result["suppressed_alert_name"] = result.get("primary_alert_name")
+            result["suppressed_rule_id"] = result.get("primary_rule_id")
+            result["is_true_alert"] = False
+            result["is_false_positive"] = True
+            result["severity"] = "none"
+            result["decision"] = "suppressed_sample_discrepancy"
+            result["confidence"] = max(
+                0.05, float(result["confidence"]) * disc.confidence_penalty
+            )
+            result["rule_explanation"] = (
+                (result.get("rule_explanation") or "")
+                + " | SUPRIMIDO por discrepância: "
+                + "; ".join(disc.reasons)
+            )
+        elif disc.is_discrepant and result["is_true_alert"]:
+            result["confidence"] = max(
+                0.1, float(result["confidence"]) * disc.confidence_penalty
+            )
+            result["decision"] = "rule_match_discrepancy_penalty"
+
+        return result
 
     def save(self, model_dir: Path | str = DEFAULT_MODEL_DIR) -> Path:
         out = Path(model_dir)

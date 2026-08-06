@@ -18,6 +18,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from src.clinical_intelligence.alert_discrepancy import (
+    discrepancy_feature_flags,
+    evaluate_discrepancy,
+)
 from src.clinical_intelligence.alert_matrix_rules import (
     ALERT_RULES,
     AlertMatrixEngine,
@@ -38,6 +42,12 @@ FEATURE_COLUMNS = [
     "consciousness_altered",
     "map_approx",
     "pulse_pressure",
+    # Discrepância amostra↔alerta (UI FP: crise + vitais estáveis)
+    "disc_stable_core",
+    "disc_hr_mid_stable",
+    "disc_bp_phantom",
+    "disc_glucose_phantom",
+    "disc_ui_fp_pattern",
 ]
 
 SEVERITY_LABELS = ["none", "leve", "moderado", "critico"]
@@ -388,6 +398,27 @@ def _sample_normal(r: random.Random) -> VitalSnapshot:
     )
 
 
+def _sample_ui_screenshot_fp(r: random.Random) -> Tuple[VitalSnapshot, Dict[str, str]]:
+    """
+    Padrão do print da UI: paciente 'CRÍTICO' com FC 78, temp 36.5, sono Boa,
+    alertas 'crise hipertensiva' (FC 90) + 'hiperglicemia' — discrepância clássica.
+    """
+    v = VitalSnapshot(
+        pas=_uniform(r, 185, 200),  # phantom PA alta (falso)
+        pad=_uniform(r, 110, 125),
+        hr=_uniform(r, 75, 92),  # amostra real estável / 90 no alerta
+        spo2=_uniform(r, 97, 99),
+        temp_c=_uniform(r, 36.3, 36.8),
+        glucose_mgdl=_uniform(r, 185, 230),  # phantom hiperglicemia leve
+        steps_drop_pct=_uniform(r, 0, 15),
+        sleep_worsen_pct=_uniform(r, 0, 12),  # sono "Bom"
+        hr_baseline_rise=_uniform(r, 0, 5),
+        spo2_drop_points=_uniform(r, 0, 1),
+    )
+    meta = {"bp_source": "phantom", "glucose_source": "phantom"}
+    return v, meta
+
+
 def _sample_false_positive(r: random.Random) -> VitalSnapshot:
     """
     Anomalias isoladas / limítrofes que NÃO devem acionar a matriz
@@ -402,9 +433,24 @@ def _sample_false_positive(r: random.Random) -> VitalSnapshot:
             "pre_hyperglycemia",
             "mild_steps",
             "isolated_hr_100",
+            "ui_screenshot_fp",
+            "phantom_crisis_stable_hr",
+            "phantom_hyper_stable",
         ]
     )
     base = _sample_normal(r)
+    if kind == "ui_screenshot_fp" or kind == "phantom_crisis_stable_hr":
+        v, _ = _sample_ui_screenshot_fp(r)
+        return v
+    if kind == "phantom_hyper_stable":
+        base.hr = _uniform(r, 70, 88)
+        base.temp_c = _uniform(r, 36.3, 36.9)
+        base.spo2 = _uniform(r, 97, 99)
+        base.pas = _uniform(r, 110, 125)
+        base.pad = _uniform(r, 70, 82)
+        base.glucose_mgdl = _uniform(r, 190, 240)
+        base.sleep_worsen_pct = _uniform(r, 0, 10)
+        return base
     if kind == "borderline_hr":
         base.hr = _uniform(r, 100, 110)  # taquicardia isolada leve sem PA/SpO2 críticos
         base.pas = _uniform(r, 110, 129)
@@ -439,10 +485,26 @@ def _sample_false_positive(r: random.Random) -> VitalSnapshot:
     return base
 
 
+def _feats_for(
+    vitals: VitalSnapshot,
+    *,
+    bp_source: str = "measured",
+    glucose_source: str = "measured",
+) -> Dict[str, float]:
+    feats = vitals.to_feature_dict()
+    feats.update(
+        discrepancy_feature_flags(
+            vitals, bp_source=bp_source, glucose_source=glucose_source
+        )
+    )
+    return feats
+
+
 def generate_dataset(
     n_per_rule: int = 80,
     n_normal: int = 1500,
     n_false_positive: int = 2000,
+    n_ui_fp: int = 800,
     seed: int = 42,
 ) -> pd.DataFrame:
     """
@@ -451,20 +513,19 @@ def generate_dataset(
     Labels:
       - severity: none | leve | moderado | critico
       - is_true_alert: 0/1
-      - is_false_positive: 1 se amostra de FP sintético e engine não alertou
+      - is_false_positive: 1 se FP (inclui discrepância UI/phantom)
       - rule_id: regra alvo (se true alert) ou ''
     """
     r = _rng(seed)
     engine = AlertMatrixEngine()
     rows: List[Dict[str, Any]] = []
 
-    # True positives por regra
+    # True positives por regra (BP/glicose "medidos")
     for rule in ALERT_RULES:
         rid = rule["rule_id"]
         for _ in range(n_per_rule):
             vitals = _fill_baseline_context(_sample_for_rule(rid, r), r)
             result = engine.evaluate(vitals)
-            # Re-sample até a regra principal bater (ou qualquer true alert)
             attempts = 0
             while not result.is_true_alert and attempts < 8:
                 vitals = _fill_baseline_context(_sample_for_rule(rid, r), r)
@@ -472,7 +533,20 @@ def generate_dataset(
                 attempts += 1
             if not result.is_true_alert:
                 continue
-            feats = vitals.to_feature_dict()
+            # True alerts medidos não devem ser suprimidos por discrepância phantom
+            disc = evaluate_discrepancy(
+                vitals,
+                [h.to_dict() for h in result.hits],
+                primary_rule_id=result.primary_rule_id,
+                primary_alert_name=result.primary_alert_name,
+                bp_source="measured",
+                glucose_source="measured",
+                bp_reliable=True,
+                glucose_reliable=True,
+            )
+            if disc.should_suppress_alert:
+                continue
+            feats = _feats_for(vitals, bp_source="measured", glucose_source="measured")
             rows.append(
                 {
                     **feats,
@@ -489,7 +563,7 @@ def generate_dataset(
     for _ in range(n_normal):
         vitals = _sample_normal(r)
         result = engine.evaluate(vitals)
-        feats = vitals.to_feature_dict()
+        feats = _feats_for(vitals, bp_source="measured", glucose_source="measured")
         rows.append(
             {
                 **feats,
@@ -502,13 +576,31 @@ def generate_dataset(
             }
         )
 
-    # Falsos positivos candidatos (label is_false_positive=1 somente se engine NÃO alertar)
+    # Falsos positivos genéricos
     for _ in range(n_false_positive):
         vitals = _fill_baseline_context(_sample_false_positive(r), r)
         result = engine.evaluate(vitals)
-        feats = vitals.to_feature_dict()
-        if result.is_true_alert:
-            # Acidentalmente bateu regra — conta como true alert
+        # UI/phantom pattern: marcar fontes phantom
+        is_ui = (
+            vitals.hr is not None
+            and 70 <= vitals.hr <= 92
+            and vitals.pas is not None
+            and vitals.pas >= 180
+        )
+        bp_src = "phantom" if is_ui else "unknown"
+        glu_src = "phantom" if (vitals.glucose_mgdl or 0) >= 181 and is_ui else "unknown"
+        disc = evaluate_discrepancy(
+            vitals,
+            [h.to_dict() for h in result.hits],
+            primary_rule_id=result.primary_rule_id,
+            primary_alert_name=result.primary_alert_name,
+            bp_source=bp_src,
+            glucose_source=glu_src,
+            bp_reliable=bp_src != "phantom",
+            glucose_reliable=glu_src != "phantom",
+        )
+        feats = _feats_for(vitals, bp_source=bp_src, glucose_source=glu_src)
+        if result.is_true_alert and not disc.should_suppress_alert:
             rows.append(
                 {
                     **feats,
@@ -533,5 +625,41 @@ def generate_dataset(
                 }
             )
 
+    # Extra: padrões explícitos do screenshot (crise + hiperglicemia fantasma + estável)
+    for _ in range(n_ui_fp):
+        vitals, meta = _sample_ui_screenshot_fp(r)
+        result = engine.evaluate(vitals)
+        disc = evaluate_discrepancy(
+            vitals,
+            [h.to_dict() for h in result.hits],
+            primary_rule_id=result.primary_rule_id,
+            primary_alert_name=result.primary_alert_name,
+            bp_source=meta["bp_source"],
+            glucose_source=meta["glucose_source"],
+            bp_reliable=False,
+            glucose_reliable=False,
+        )
+        feats = _feats_for(
+            vitals,
+            bp_source=meta["bp_source"],
+            glucose_source=meta["glucose_source"],
+        )
+        # Sempre FP rotulado — mesmo se regras phantom batessem
+        rows.append(
+            {
+                **feats,
+                "severity": "none",
+                "is_true_alert": 0,
+                "is_false_positive": 1,
+                "rule_id": "",
+                "alert_name": "",
+                "sample_type": "ui_screenshot_fp",
+            }
+        )
+
     df = pd.DataFrame(rows)
+    # garantir colunas de disc
+    for c in FEATURE_COLUMNS:
+        if c not in df.columns:
+            df[c] = 0.0
     return df

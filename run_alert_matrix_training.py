@@ -40,6 +40,12 @@ def main() -> int:
     parser.add_argument("--n-per-rule", type=int, default=100)
     parser.add_argument("--n-normal", type=int, default=2000)
     parser.add_argument("--n-fp", type=int, default=2500)
+    parser.add_argument(
+        "--n-ui-fp",
+        type=int,
+        default=800,
+        help="Amostras do padrão UI (crise hipertensiva + vitais estáveis)",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--model-dir", default="data/models")
     parser.add_argument(
@@ -61,6 +67,7 @@ def main() -> int:
         n_per_rule=args.n_per_rule,
         n_normal=args.n_normal,
         n_false_positive=args.n_fp,
+        n_ui_fp=args.n_ui_fp,
         seed=args.seed,
     )
     out_csv = Path(args.dataset_out)
@@ -87,17 +94,31 @@ def main() -> int:
         ("fp_borderline_hr", VitalSnapshot(pas=118, pad=76, hr=105, spo2=98, temp_c=36.7, glucose_mgdl=105)),
         ("normal", VitalSnapshot(pas=118, pad=76, hr=72, spo2=98, temp_c=36.6, glucose_mgdl=100)),
         ("hipo_grave", VitalSnapshot(pas=95, pad=60, hr=120, spo2=97, temp_c=36.5, glucose_mgdl=45, consciousness_altered=True)),
+        # Caso print UI: CRÍTICO + crise hipertensiva com FC 78 e temp 36.5
+        ("ui_fp_crise", VitalSnapshot(pas=190, pad=115, hr=78, spo2=98, temp_c=36.5, glucose_mgdl=200, sleep_worsen_pct=5, steps_drop_pct=5)),
     ]
-    print("\n=== Smoke assess (regras + ML) ===")
+    print("\n=== Smoke assess (regras + ML + discrepância) ===")
     for name, vitals in demos:
-        res = clf.assess(vitals)
+        meta = {}
+        if name == "ui_fp_crise":
+            meta = {
+                "bp_source": "phantom",
+                "glucose_source": "phantom",
+                "bp_reliable": False,
+                "glucose_reliable": False,
+            }
+        res = clf.assess(vitals, source_meta=meta)
         print(
             f"{name:20s} severity={res['severity']:10s} "
             f"alert={res['is_true_alert']} fp={res['is_false_positive']} "
             f"decision={res['decision']}"
         )
-        if res.get("primary_alert_name"):
+        if res.get("primary_alert_name") and res.get("is_true_alert"):
             print(f"  → {res['primary_alert_name']}")
+        if res.get("suppressed_alert_name"):
+            print(f"  ⊘ suprimido: {res['suppressed_alert_name']}")
+        if res.get("discrepancy", {}).get("reasons"):
+            print(f"  disc: {res['discrepancy']['reasons'][0][:80]}...")
 
     summary = {
         "n_rules": len(catalog),
