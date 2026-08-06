@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class WearableTelemetryRequest(BaseModel):
+    model_config = {"extra": "allow"}
+
     patient_id: str = Field(..., min_length=3, max_length=64, pattern=r"^[A-Za-z0-9\-_]+$")
     device_id: Optional[str] = Field("wrist_wearable", max_length=64)
     timestamp: Optional[str] = Field(None, max_length=64)
@@ -18,6 +20,13 @@ class WearableTelemetryRequest(BaseModel):
     activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
     ppg_signal: Optional[List[float]] = None
     filter_type: Optional[str] = Field("BMO", max_length=32)
+    # Opcionais matriz de alertas / HBand
+    blood_pressure_sys: Optional[float] = Field(None, ge=50.0, le=300.0)
+    blood_pressure_dia: Optional[float] = Field(None, ge=20.0, le=200.0)
+    glucose_mgdl: Optional[float] = Field(None, ge=20.0, le=1000.0)
+    body_temp_c: Optional[float] = Field(None, ge=30.0, le=45.0)
+    steps_drop_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
+    sleep_worsen_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
 
     @field_validator("filter_type")
     @classmethod

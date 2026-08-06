@@ -11,6 +11,10 @@ from src.clinical_intelligence.ghost_signals import GhostSignalDetector
 from src.clinical_intelligence.signal_processing import WearableSignalProcessor
 from src.clinical_intelligence.alert_matrix_rules import AlertMatrixEngine, VitalSnapshot
 from src.clinical_intelligence.alert_matrix_classifier import AlertMatrixClassifier
+from src.clinical_intelligence.alert_ingest import (
+    assess_ingest_alerts,
+    merge_anomaly_with_alerts,
+)
 
 __all__ = [
     "ClinicalIntelligencePipeline",
@@ -20,4 +24,6 @@ __all__ = [
     "AlertMatrixEngine",
     "VitalSnapshot",
     "AlertMatrixClassifier",
+    "assess_ingest_alerts",
+    "merge_anomaly_with_alerts",
 ]

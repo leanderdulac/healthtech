@@ -306,6 +306,8 @@ patient_history: Dict[str, list[dict]] = {}
 
 
 class WearableTelemetryRequest(BaseModel):
+    model_config = {"extra": "allow"}
+
     patient_id: str = Field(..., min_length=3, max_length=64, pattern=r"^[A-Za-z0-9\-_]+$")
     device_id: Optional[str] = Field("wrist_wearable", max_length=64)
     timestamp: Optional[str] = Field(None, max_length=64)
@@ -316,6 +318,13 @@ class WearableTelemetryRequest(BaseModel):
     activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
     ppg_signal: Optional[list[float]] = None
     filter_type: Optional[str] = Field("BMO", max_length=32)
+    # Opcionais HBand / matriz de alertas
+    blood_pressure_sys: Optional[float] = Field(None, ge=50.0, le=300.0)
+    blood_pressure_dia: Optional[float] = Field(None, ge=20.0, le=200.0)
+    glucose_mgdl: Optional[float] = Field(None, ge=20.0, le=1000.0)
+    body_temp_c: Optional[float] = Field(None, ge=30.0, le=45.0)
+    steps_drop_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
+    sleep_worsen_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
 
     @field_validator("filter_type")
     @classmethod
@@ -408,6 +417,66 @@ def ingest_wearable_reading(
 
     ts = req.timestamp or datetime.datetime.now(datetime.timezone.utc).isoformat()
 
+    # 5. Matriz de alertas clínicos (regras + ML de falsos positivos)
+    phantom_for_alerts = {
+        name: {
+            "estimate": float(details["estimate"]),
+            "ci_lower": float(details["ci_lower"]),
+            "ci_upper": float(details["ci_upper"]),
+            "reliable": details["reliable"],
+        }
+        for name, details in states.items()
+    }
+    # Extensões HBand / campos opcionais da matriz de alertas
+    extra = getattr(req, "model_extra", None) or {}
+    hband_ext = {}
+    if isinstance(extra, dict):
+        hband_ext = dict(extra.get("_hband") or extra.get("hband") or {})
+    for key in (
+        "blood_pressure_sys",
+        "blood_pressure_dia",
+        "glucose_mgdl",
+        "body_temp_c",
+        "steps_drop_pct",
+        "sleep_worsen_pct",
+    ):
+        val = getattr(req, key, None)
+        if val is not None:
+            hband_ext[key] = val
+    try:
+        from src.clinical_intelligence.alert_ingest import (
+            assess_ingest_alerts,
+            merge_anomaly_with_alerts,
+        )
+
+        clinical_alerts = assess_ingest_alerts(
+            heart_rate=bpm_clean,
+            spo2=req.spo2,
+            skin_temp=req.body_temp_c if req.body_temp_c is not None else req.skin_temp,
+            hrv_rmssd=req.hrv_rmssd,
+            activity_level=req.activity_level,
+            phantom=phantom_for_alerts,
+            hband_ext=hband_ext,
+            raw_telemetry={
+                "heart_rate_bpm": req.heart_rate,
+                "spo2_percent": req.spo2,
+                "skin_temp_celsius": req.skin_temp,
+                "blood_pressure_sys": req.blood_pressure_sys,
+                "blood_pressure_dia": req.blood_pressure_dia,
+                "glucose_mgdl": req.glucose_mgdl,
+            },
+        )
+        anomaly_res = merge_anomaly_with_alerts(anomaly_res, clinical_alerts)
+    except Exception as alert_err:
+        logger.warning("Matriz de alertas indisponível no ingest: %s", alert_err)
+        clinical_alerts = {
+            "is_true_alert": False,
+            "is_false_positive": False,
+            "severity": "none",
+            "decision": "unavailable",
+            "error": str(alert_err),
+        }
+
     processed_frame = {
         "patient_id": req.patient_id,
         "device_id": req.device_id,
@@ -433,6 +502,7 @@ def ingest_wearable_reading(
             } for name, details in states.items()
         },
         "anomaly_detection": anomaly_res,
+        "clinical_alerts": clinical_alerts,
         "diagnostic_hypotheses": [
             {
                 "category": h['category'],
