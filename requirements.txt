@@ -20,8 +20,8 @@ fhir.resources>=7.0.0,<8.0.0
 torch>=2.0.0
 
 # Advanced signal processing
-# scipy 1.15+ / 1.17 puxa APIs de NumPy 2 (VoidDType); manter <1.15 com numpy 1.26
-scipy>=1.11.0,<1.15
+# Com numpy 1.26 use scipy<1.15; com numpy 2.x use scipy>=1.14
+scipy>=1.11.0,<1.18
 PyWavelets>=1.4.0
 filterpy>=1.4.5
 
