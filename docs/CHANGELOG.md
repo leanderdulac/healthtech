@@ -5,6 +5,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **Smoke online** — `run_online_smoke.py` valida Cloud Run (`/api/health` + ingest) e Vertex (IsolationForest + TCN); relatório em `data/vertex_deploy/online_smoke_last.json`
 - **Vertex AI — IsolationForest online** — deploy do detector de anomalias no Endpoint Vertex + cliente `VertexOnlineDetector` no monólito; estado em `data/vertex_deploy/deploy_state.json`
 - **Vertex AI — TCN custom container** — serving self-contained multi-horizonte (6h/24h/72h)
   - `src/integrations/vertex/deploy/tcn_server.py` — runtime + `/health` + `/predict` (contrato Vertex)

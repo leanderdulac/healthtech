@@ -434,6 +434,8 @@ python run_vertex_deploy.py --deploy --sync     # GCS + build imagem + Endpoint 
 python run_vertex_deploy.py --deploy --skip-build  # Reusa imagem :latest
 python run_production_pipeline.py               # Pipeline F17 completo
 pytest tests/test_tcn_server.py -q              # Smoke de carga/predict
+python run_online_smoke.py                      # Cloud Run + Vertex IF + TCN
+python run_online_smoke.py --also-secure        # + API secure
 ```
 
 **Integração:** Fase 9 no `VertexIntegrationOrchestrator`.

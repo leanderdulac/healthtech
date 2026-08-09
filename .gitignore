@@ -32,6 +32,7 @@ data/vertex_exports/
 data/fhir_exports/
 data/chroma_db/
 data/lake/
+data/vertex_deploy/online_smoke_last.json
 
 # Formatos voláteis (exceto scraping USP e modelos versionados)
 *.csv
