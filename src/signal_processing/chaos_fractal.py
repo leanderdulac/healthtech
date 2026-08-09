@@ -67,7 +67,10 @@ class FractalChaosAnalyzer:
             return 1.0
 
         # Regressão linear slope = Dimensão Fractal
-        poly = np.polyfit(x_reg, y_reg, 1)
+        # rcond=None evita path "warn" que quebra com NumPy recarregado no CI
+        x_arr = np.asarray(x_reg, dtype=np.float64)
+        y_arr = np.asarray(y_reg, dtype=np.float64)
+        poly = np.polyfit(x_arr, y_arr, 1, rcond=None)
         hfd = float(poly[0])
         return max(1.0, min(2.0, hfd))
 
@@ -136,7 +139,9 @@ class FractalChaosAnalyzer:
         if len(rs_means) < 2:
             return 0.5
 
-        poly = np.polyfit(np.log(n_vals[:len(rs_means)]), np.log(rs_means), 1)
+        x_arr = np.log(np.asarray(n_vals[: len(rs_means)], dtype=np.float64))
+        y_arr = np.log(np.asarray(rs_means, dtype=np.float64))
+        poly = np.polyfit(x_arr, y_arr, 1, rcond=None)
         h = float(poly[0])
         return float(max(0.0, min(1.0, h)))
 

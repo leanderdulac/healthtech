@@ -194,6 +194,7 @@ class WearableSignalProcessor:
         y = np.array(signal.filtered[-window:])
         if len(y) < 3:
             return 0.0
-        x = np.arange(len(y), dtype=float)
-        slope = np.polyfit(x, y, 1)[0]
+        x = np.arange(len(y), dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64)
+        slope = np.polyfit(x, y, 1, rcond=None)[0]
         return float(slope)
