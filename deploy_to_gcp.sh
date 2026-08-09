@@ -33,8 +33,30 @@ ALLOW_UNAUTHENTICATED=${ALLOW_UNAUTHENTICATED:-"true"}
 API_KEY=${API_KEY:-"ht_admin_live_key_2026_safe_token_32c"}
 INGEST_API_KEY=${INGEST_API_KEY:-"ht_ingest_live_key_2026_safe_token_32c"}
 READ_API_KEY=${READ_API_KEY:-"ht_read_live_key_2026_safe_token_32c"}
-SECRET_SALT=${SECRET_SALT:-$(openssl rand -hex 32 2>/dev/null || echo "healthtech_strong_salt_$(date +%s)")}
+# SECRET_SALT: preserve existing Cloud Run value when unset (stable FHIR hashes)
+if [[ -z "${SECRET_SALT:-}" ]]; then
+  EXISTING_SALT=$(gcloud run services describe "$SERVICE_NAME" \
+    --region "$GCP_REGION" --project "$GCP_PROJECT_ID" --format=json 2>/dev/null \
+    | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    envs=d['spec']['template']['spec']['containers'][0].get('env') or []
+    print(next((e['value'] for e in envs if e.get('name')=='SECRET_SALT'), ''), end='')
+except Exception:
+    pass
+" || true)
+  if [[ -n "${EXISTING_SALT:-}" ]]; then
+    SECRET_SALT="$EXISTING_SALT"
+    echo "Reusando SECRET_SALT do serviço Cloud Run existente."
+  else
+    SECRET_SALT=$(openssl rand -hex 32 2>/dev/null || echo "healthtech_strong_salt_$(date +%s)")
+    echo "Gerando novo SECRET_SALT."
+  fi
+fi
 CORS_ORIGINS=${CORS_ORIGINS:-"https://healthtech-responsive-5794833455.us-central1.run.app,http://localhost:8000"}
+# Skip BigQuery/Chroma pré-deploy (redeploy rápido só da API)
+SKIP_PREP=${SKIP_PREP:-"false"}
 
 if [[ -z "$GCP_PROJECT_ID" || "$GCP_PROJECT_ID" == "project-placeholder" ]]; then
   echo "ERRO: defina GCP_PROJECT_ID com o ID real do projeto."
@@ -42,6 +64,17 @@ if [[ -z "$GCP_PROJECT_ID" || "$GCP_PROJECT_ID" == "project-placeholder" ]]; the
 fi
 
 STAGING_BUCKET="gs://${GCP_PROJECT_ID}-vertex-staging"
+
+# Vertex endpoints a partir de deploy_state.json (não perder no --set-env-vars)
+DEPLOY_STATE="${DEPLOY_STATE:-data/vertex_deploy/deploy_state.json}"
+if [[ -f "$DEPLOY_STATE" ]]; then
+  VERTEX_ENDPOINT_ID=${VERTEX_ENDPOINT_ID:-$(python3 -c "import json;print(json.load(open('$DEPLOY_STATE')).get('VERTEX_ENDPOINT_ID') or '')" 2>/dev/null || true)}
+  VERTEX_MODEL_NAME=${VERTEX_MODEL_NAME:-$(python3 -c "import json;print(json.load(open('$DEPLOY_STATE')).get('VERTEX_MODEL_NAME') or '')" 2>/dev/null || true)}
+  VERTEX_TCN_ENDPOINT_ID=${VERTEX_TCN_ENDPOINT_ID:-$(python3 -c "import json;print(json.load(open('$DEPLOY_STATE')).get('VERTEX_TCN_ENDPOINT_ID') or '')" 2>/dev/null || true)}
+fi
+VERTEX_ENDPOINT_ID=${VERTEX_ENDPOINT_ID:-""}
+VERTEX_MODEL_NAME=${VERTEX_MODEL_NAME:-""}
+VERTEX_TCN_ENDPOINT_ID=${VERTEX_TCN_ENDPOINT_ID:-""}
 
 echo "========================================================================"
 echo " INICIANDO DEPLOY NA NUVEM (GCP & VERTEX AI) "
@@ -66,7 +99,7 @@ gcloud services enable \
     secretmanager.googleapis.com \
     storage.googleapis.com --project="$GCP_PROJECT_ID"
 
-if [[ "$APP_MODE" == "full" ]]; then
+if [[ "$APP_MODE" == "full" && "$SKIP_PREP" != "true" ]]; then
   echo "Garantindo Bucket GCS para Staging e Modelos..."
   if ! gsutil ls -b "$STAGING_BUCKET" >/dev/null 2>&1; then
       gsutil mb -l "$GCP_REGION" "$STAGING_BUCKET"
@@ -98,6 +131,8 @@ try:
 except Exception as e:
     print('Indexação pulada/falhou (não bloqueante):', e)
 " || true
+elif [[ "$APP_MODE" == "full" && "$SKIP_PREP" == "true" ]]; then
+  echo "SKIP_PREP=true — pulando BigQuery/GCS/Chroma (redeploy só do container)."
 else
   echo "Modo secure: pulando BigQuery/GCS/Chroma pré-deploy (API enxuta)."
 fi
@@ -106,6 +141,17 @@ AUTH_FLAG="--allow-unauthenticated"
 AUTH_DISABLED_VAL="false"
 
 ENV_VARS="^@^GCP_PROJECT_ID=${GCP_PROJECT_ID}@GCS_STAGING_BUCKET=${STAGING_BUCKET}@GCP_LOCATION=${GCP_REGION}@ENVIRONMENT=production@APP_MODE=${APP_MODE}@AUTH_DISABLED=${AUTH_DISABLED_VAL}@API_KEY=${API_KEY}@ADMIN_API_KEY=${API_KEY}@INGEST_API_KEY=${INGEST_API_KEY}@READ_API_KEY=${READ_API_KEY}@SECRET_SALT=${SECRET_SALT}@CORS_ORIGINS=${CORS_ORIGINS}"
+if [[ -n "$VERTEX_ENDPOINT_ID" ]]; then
+  ENV_VARS="${ENV_VARS}@VERTEX_ENDPOINT_ID=${VERTEX_ENDPOINT_ID}"
+fi
+if [[ -n "$VERTEX_MODEL_NAME" ]]; then
+  ENV_VARS="${ENV_VARS}@VERTEX_MODEL_NAME=${VERTEX_MODEL_NAME}"
+fi
+if [[ -n "$VERTEX_TCN_ENDPOINT_ID" ]]; then
+  ENV_VARS="${ENV_VARS}@VERTEX_TCN_ENDPOINT_ID=${VERTEX_TCN_ENDPOINT_ID}"
+fi
+echo "Vertex IF:  ${VERTEX_ENDPOINT_ID:-'(não definido)'}"
+echo "Vertex TCN: ${VERTEX_TCN_ENDPOINT_ID:-'(não definido)'}"
 
 echo "Compilando imagem Docker e enviando para o Google Cloud Run..."
 if [[ "$APP_MODE" == "secure" ]]; then

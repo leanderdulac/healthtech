@@ -82,6 +82,8 @@ APP_MODE=secure ./deploy_to_gcp.sh
 | `python run_e2e_smoke.py` | Smoke local: alertas + HBand + TCN + deploy_state |
 | `python run_online_smoke.py` | Smoke online: Cloud Run + Vertex IF + TCN |
 | `python run_online_smoke.py --also-secure` | Inclui `healthtech-secure-api` |
+| `SKIP_PREP=true APP_MODE=full ./deploy_to_gcp.sh` | Redeploy rápido Cloud Run (preserva Vertex env) |
+| `companion-android/` | Esboço Sprint A companion HBand (Kotlin) |
 | `python run_production_pipeline.py` | Pipeline de produção F17 completo |
 | `cd health-aggregator && uvicorn main:app --port 8000` | API REST de agregação multimodal |
 | `uvicorn src.api_server:app --port 8080` | API full (factory secure + monólito) |

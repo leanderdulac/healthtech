@@ -5,6 +5,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **Companion Android Sprint A** — esboço Kotlin em `companion-android/` (API client, BLE facades, guia DoD); checklist HBand aponta o path
+- **Deploy Cloud Run** — `deploy_to_gcp.sh` preserva `SECRET_SALT` e injeta `VERTEX_*` de `deploy_state.json`; `SKIP_PREP=true` para redeploy rápido
 - **Smoke online** — `run_online_smoke.py` valida Cloud Run (`/api/health` + ingest) e Vertex (IsolationForest + TCN); relatório em `data/vertex_deploy/online_smoke_last.json`
 - **Vertex AI — IsolationForest online** — deploy do detector de anomalias no Endpoint Vertex + cliente `VertexOnlineDetector` no monólito; estado em `data/vertex_deploy/deploy_state.json`
 - **Vertex AI — TCN custom container** — serving self-contained multi-horizonte (6h/24h/72h)

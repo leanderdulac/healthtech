@@ -23,6 +23,7 @@ O lado **servidor** já está pronto para o companion. O trabalho restante é o 
 | Auth `X-API-Key` / scopes | ✅ | F19 + secure factory |
 | Testes de contrato normalizer | ✅ | `tests/test_hband_normalizer.py` |
 | App companion (BLE → HTTP) | ⬜ pendente | este checklist (sprints A–D) |
+| Esboço Sprint A (Kotlin stubs) | ✅ | [`companion-android/`](../companion-android/) |
 | Device físico + AARs | ⬜ pendente | hardware / SDK fabricante |
 
 ---
