@@ -18,10 +18,29 @@ Métodos Implementados:
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def _linreg_slope(x: np.ndarray, y: np.ndarray) -> float:
+    """Slope da regressão linear OLS sem np.polyfit/lstsq (robusto a reload de NumPy no CI)."""
+    x = np.asarray(x, dtype=np.float64).ravel()
+    y = np.asarray(y, dtype=np.float64).ravel()
+    n = float(x.size)
+    if n < 2.0:
+        return 0.0
+    sx = float(np.sum(x))
+    sy = float(np.sum(y))
+    sxx = float(np.sum(x * x))
+    sxy = float(np.sum(x * y))
+    den = n * sxx - sx * sx
+    if abs(den) < 1e-18:
+        return 0.0
+    return (n * sxy - sx * sy) / den
+
 
 class FractalChaosAnalyzer:
     """
@@ -67,11 +86,7 @@ class FractalChaosAnalyzer:
             return 1.0
 
         # Regressão linear slope = Dimensão Fractal
-        # rcond=None evita path "warn" que quebra com NumPy recarregado no CI
-        x_arr = np.asarray(x_reg, dtype=np.float64)
-        y_arr = np.asarray(y_reg, dtype=np.float64)
-        poly = np.polyfit(x_arr, y_arr, 1, rcond=None)
-        hfd = float(poly[0])
+        hfd = _linreg_slope(x_reg, y_reg)
         return max(1.0, min(2.0, hfd))
 
     def katz_fractal_dimension(self, series: np.ndarray) -> float:
@@ -141,8 +156,7 @@ class FractalChaosAnalyzer:
 
         x_arr = np.log(np.asarray(n_vals[: len(rs_means)], dtype=np.float64))
         y_arr = np.log(np.asarray(rs_means, dtype=np.float64))
-        poly = np.polyfit(x_arr, y_arr, 1, rcond=None)
-        h = float(poly[0])
+        h = _linreg_slope(x_arr, y_arr)
         return float(max(0.0, min(1.0, h)))
 
     def local_lyapunov_exponent(self, series: np.ndarray) -> float:

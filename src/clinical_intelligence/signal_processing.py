@@ -194,7 +194,17 @@ class WearableSignalProcessor:
         y = np.array(signal.filtered[-window:])
         if len(y) < 3:
             return 0.0
-        x = np.arange(len(y), dtype=np.float64)
         y = np.asarray(y, dtype=np.float64)
-        slope = np.polyfit(x, y, 1, rcond=None)[0]
-        return float(slope)
+        x = np.arange(len(y), dtype=np.float64)
+        # OLS manual — evita np.polyfit/lstsq (path rcond=="warn" frágil com NumPy recarregado)
+        n = float(len(y))
+        if n < 3.0:
+            return 0.0
+        sx = float(np.sum(x))
+        sy = float(np.sum(y))
+        sxx = float(np.sum(x * x))
+        sxy = float(np.sum(x * y))
+        den = n * sxx - sx * sx
+        if abs(den) < 1e-18:
+            return 0.0
+        return (n * sxy - sx * sy) / den
