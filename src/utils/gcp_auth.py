@@ -1,10 +1,7 @@
 import logging
 import os
 import subprocess
-from typing import Tuple, Optional
-
-import google.auth
-from google.oauth2.credentials import Credentials
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +13,30 @@ def get_gcp_credentials(project_id: Optional[str] = None) -> Tuple[Optional[obje
     2. Fallback para o token ativo do `gcloud auth print-access-token` (dev local).
 
     Retorna uma tupla (credentials, resolved_project_id).
+    Em ambientes sem google-auth ou sem login, retorna (None, project_id).
     """
     target_project = project_id or os.getenv("GCP_PROJECT_ID", "healthtech-gcp-2026")
+
+    try:
+        import google.auth  # type: ignore
+        from google.oauth2.credentials import Credentials  # type: ignore
+    except ImportError:
+        logger.debug("google-auth não instalado — credenciais GCP indisponíveis.")
+        return None, target_project
+
     try:
         credentials, project = google.auth.default()
         resolved_project = project or target_project
         return credentials, resolved_project
     except Exception as e:
-        logger.debug("google.auth.default() não encontrou ADC (%s). Tentando gcloud CLI token...", e)
+        logger.debug(
+            "google.auth.default() não encontrou ADC (%s). Tentando gcloud CLI token...", e
+        )
         try:
             token = subprocess.check_output(
                 ["gcloud", "auth", "print-access-token"],
                 stderr=subprocess.DEVNULL,
-                text=True
+                text=True,
             ).strip()
             if token:
                 logger.info("Credencial GCP autenticada com sucesso via gcloud OAuth token.")

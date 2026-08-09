@@ -7,6 +7,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+# CI leve não instala torch/flask — pular o módulo inteiro nesse ambiente.
+torch = pytest.importorskip("torch")
+pytest.importorskip("flask")
+
 DEPLOY_SRC = Path(__file__).resolve().parents[1] / "src" / "integrations" / "vertex" / "deploy"
 ARTIFACTS = Path(__file__).resolve().parents[1] / "data" / "vertex_deploy" / "artifacts"
 MODELS = Path(__file__).resolve().parents[1] / "data" / "models"
