@@ -77,7 +77,9 @@ APP_MODE=secure ./deploy_to_gcp.sh
 | `python run_clinical_sync.py` | Sync FHIR Server → baseline clínico |
 | `python run_conformal_calibration.py` | Calibração conformal nos TCNs |
 | `python run_clinical_validation.py` | Validação clínica (métricas + relatório) |
-| `python run_vertex_deploy.py` | Deploy dos 3 TCNs no Vertex AI |
+| `python run_vertex_deploy.py --smoke-only` | Smoke local do serving TCN |
+| `python run_vertex_deploy.py --deploy --sync` | Deploy TCN custom container no Vertex AI |
+| `python run_e2e_smoke.py` | Smoke local: alertas + HBand + TCN + deploy_state |
 | `python run_production_pipeline.py` | Pipeline de produção F17 completo |
 | `cd health-aggregator && uvicorn main:app --port 8000` | API REST de agregação multimodal |
 | `uvicorn src.api_server:app --port 8080` | API full (factory secure + monólito) |

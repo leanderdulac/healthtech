@@ -85,11 +85,19 @@ orchestrator.query_engine.extract_high_risk_cohort(min_risk_score=0.3)
 - `src/integrations/vertex/online_pipeline.py` — inferência em tempo real
 - `src/integrations/vertex/batch_pipeline.py` — inferência em lote (coorte)
 - `src/integrations/vertex/local_model.py` — Isolation Forest local
+- `src/ml_pipeline/online_inference.py` — `VertexOnlineDetector` (cliente Endpoint online)
+
+**Endpoints Vertex (produção):**
+
+| Modelo | Papel | Deploy |
+|--------|-------|--------|
+| IsolationForest | Anomalia pontual (bpm, spo2, hrv, …) | Endpoint dedicado; IDs em `deploy_state.json` |
+| TCN per-horizon | Risco 6h/24h/72h + conformal | Custom container (F17); **endpoint separado** |
 
 **Fases do pipeline integrado:**
 1. Datalake completo
 2. Treinamento → `data/models/anomaly_detector.pkl`
-3. Inferência online (stream vitals)
+3. Inferência online (stream vitals → local ou Vertex IF)
 4. Inferência batch (JSONL → predições)
 5. Sync BigQuery + FHIR
 
@@ -398,22 +406,34 @@ python run_temporal_training.py --skip-pipeline  # usa datalake existente
 
 | Pilar | Módulo | Descrição |
 |-------|--------|-----------|
-| Ingestão real | `src/ingestion/real/` | Apple Health XML/JSON, Google Fit API/cache, BLE HR |
+| Ingestão real | `src/ingestion/real/` | Apple Health, Google Fit, BLE, HBand/Veepoo |
 | Clínico FHIR | `src/integrations/clinical/` | Cliente REST R4, bridge → `PatientBaseline` |
-| Deploy Vertex | `src/integrations/vertex/deploy/` | Predictor TCN, packager, endpoint manager |
+| Deploy TCN | `deploy/tcn_server.py` + `Dockerfile.tcn` | Custom container Flask/gunicorn (self-contained) |
+| Deploy TCN CLI | `deploy/deploy_tcn_custom.py` | Package → GCS → AR → Model/Endpoint (não toca IF) |
+| Packager legado | `deploy/packager.py`, `endpoint_manager.py` | Empacotamento/helpers anteriores |
 | Conformal | `src/clinical_intelligence/conformal/` | Split conformal multi-horizonte (90% cobertura) |
 | Validação | `src/clinical_intelligence/validation/` | Sensibilidade, especificidade, PPV, NPV |
 | Orquestrador | `src/integrations/production/` | Pipeline F17 unificado |
+
+**Contrato de predict TCN (instance):**
+```json
+{"sequence": [[/* 32 x 24 floats */]]}
+```
+Resposta inclui `prob_6h` / `prob_24h` / `prob_72h`, `conformal_intervals`, `horizon_at_risk`, `alerta`.
+
+**Estado de deploy:** `data/vertex_deploy/deploy_state.json` (chaves `VERTEX_*` para IF e `VERTEX_TCN_*` para TCN).
 
 **Execução:**
 ```bash
 python run_real_ingestion.py                    # Wearables reais → Bronze → Silver → Gold
 python run_clinical_sync.py --patient-ids ID    # FHIR → baseline clínico
 python run_conformal_calibration.py             # Intervalos conformais nos TCNs
-python run_clinical_validation.py                 # Relatório em data/clinical_validation/
-python run_vertex_deploy.py --smoke-only          # Teste local do predictor
-python run_vertex_deploy.py --deploy              # Upload GCS + Vertex Endpoint
-python run_production_pipeline.py                 # Pipeline F17 completo
+python run_clinical_validation.py               # Relatório em data/clinical_validation/
+python run_vertex_deploy.py --smoke-only        # Runtime TCN local (sem GCP)
+python run_vertex_deploy.py --deploy --sync     # GCS + build imagem + Endpoint TCN
+python run_vertex_deploy.py --deploy --skip-build  # Reusa imagem :latest
+python run_production_pipeline.py               # Pipeline F17 completo
+pytest tests/test_tcn_server.py -q              # Smoke de carga/predict
 ```
 
 **Integração:** Fase 9 no `VertexIntegrationOrchestrator`.
@@ -483,8 +503,10 @@ F02 (Simulação) → F01 (Datalake) → F03 (Quality Gates)
 F07 (Anonimização) → F08 (FHIR)
 F12 (Scraper USP) → F13 (Ontologia) → F05 (Treino ML) + F08 (FHIR)
 F13 (Ontologia) → F14 (Hemodinâmica) → F15 (Predição Clínica) → F08 (FHIR Flags)
-F16 (TCN temporal) → F17 (Produção) → Vertex Endpoint + Conformal + Validação
-F17 (Ingestão real) → F01 (Datalake) | F17 (FHIR) → F15 (Fusão clínica)
+F16 (TCN temporal) → F17 (Produção) → Vertex Endpoint TCN + Conformal + Validação
+F05 (IF online) ∥ F17 (TCN container) → endpoints Vertex separados
+F17 (Ingestão real / HBand) → F01 (Datalake) | F17 (FHIR) → F15 (Fusão clínica)
 F18 (Dashboard + phantom + bayes) → F15/F16 (sinais) + deploy Cloud Run
+Matriz alertas + FP → ingest realtime → F15 / dashboard
 F19 (Auth/CI) → F18 APIs + F07 anonimização
 ```

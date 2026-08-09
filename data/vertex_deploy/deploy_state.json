@@ -20,5 +20,41 @@
     1.0,
     -1.0
   ],
-  "deployed_at": "2026-08-06T03:16:16.194801+00:00"
+  "deployed_at": "2026-08-06T03:16:16.194801+00:00",
+  "tcn_status": "deployed",
+  "tcn_model_resource": "projects/5794833455/locations/us-central1/models/4320834956310872064",
+  "tcn_endpoint_resource": "projects/5794833455/locations/us-central1/endpoints/8560714520736038912",
+  "VERTEX_TCN_ENDPOINT_ID": "projects/5794833455/locations/us-central1/endpoints/8560714520736038912",
+  "VERTEX_TCN_MODEL_NAME": "projects/5794833455/locations/us-central1/models/4320834956310872064",
+  "tcn_artifact_uri": "gs://healthtech-gcp-2026-vertex-staging/tcn_models/20260806_040547",
+  "tcn_image_uri": "us-central1-docker.pkg.dev/healthtech-gcp-2026/cloud-run-source-deploy/healthtech-tcn-server:latest",
+  "tcn_deployed_at": "2026-08-06T04:29:27.783442+00:00",
+  "tcn_predictions_smoke": [
+    {
+      "alerta": true,
+      "prob_6h": 1.0,
+      "horizon_at_risk": "6h",
+      "architecture": "TCN-per-horizon",
+      "conformal_intervals": {
+        "72h": [
+          0.1647,
+          1.0
+        ],
+        "24h": [
+          1.0,
+          1.0
+        ],
+        "6h": [
+          0.0,
+          1.0
+        ]
+      },
+      "prob_72h": 0.9995,
+      "prob_24h": 1.0,
+      "max_probability": 1.0,
+      "modo": "Vertex-TCN-per-horizon"
+    }
+  ],
+  "updated_at": "2026-08-06T04:29:27.783486+00:00",
+  "tcn_predictions_smoke_error": null
 }

@@ -5,13 +5,22 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **Vertex AI — IsolationForest online** — deploy do detector de anomalias no Endpoint Vertex + cliente `VertexOnlineDetector` no monólito; estado em `data/vertex_deploy/deploy_state.json`
+- **Vertex AI — TCN custom container** — serving self-contained multi-horizonte (6h/24h/72h)
+  - `src/integrations/vertex/deploy/tcn_server.py` — runtime + `/health` + `/predict` (contrato Vertex)
+  - `src/integrations/vertex/deploy/Dockerfile.tcn` — imagem CPU (torch + flask)
+  - `src/integrations/vertex/deploy/deploy_tcn_custom.py` — package → GCS → Artifact Registry → Model/Endpoint (não sobrescreve IF)
+  - `run_vertex_deploy.py` — wrapper CLI (`--smoke-only`, `--deploy`, `--skip-build`)
+  - Scaler portátil `temporal_scaler.json` (evita mismatch sklearn no container)
+  - Testes: `tests/test_tcn_server.py`
 - **Matriz de alertas clínicos + FP** — 51 regras (PA/SpO2/temp/glicemia/FC/passos-sono), dataset sintético, classificador `data/models/alert_matrix_classifier.pkl` (`run_alert_matrix_training.py`)
 - **Ingest em tempo real** — `clinical_alerts` em `POST /api/v1/wearables/ingest` (monólito + secure) via `alert_ingest.py`; suprime FP e reforça anomalia quando regra crítica bate
 - **HBand / Veepoo companion** — contrato OpenAPI `docs/openapi/hband-wearable.yaml`
 - `HBandNormalizer` + `HBandCompanionAdapter` (`src/ingestion/real/hband_*`)
 - Métricas Bronze: `blood_pressure_sys/dia`, `calories`, `distance_km`
-- Checklist companion Android: `docs/HBAND_COMPANION_CHECKLIST.md`
+- Checklist companion Android: `docs/HBAND_COMPANION_CHECKLIST.md` (backend ready / app pendente)
 - Testes: `tests/test_hband_normalizer.py`; registry ingestão fonte `hband`
+- Pacote `saude_responsiva_secure/` — factory secure unificada, RBAC scopes, anti-IDOR, rate limit, audit log, LGPD; deploy dual `APP_MODE=full|secure`
 - **F20** — Teoria e Algoritmos do Espaço BMO (Bounded Mean Oscillation) e VMO (`src/signal_processing/bmo_analysis.py`)
   - Denoising 1D adaptativo e filtragem 2D de imagens médicas (RM, TC, Ultrassom) preservando bordas sem efeito escada (*staircasing*).
   - Perfil multiescala BMO e índice VMO no `FractalChaosAnalyzer` e `HRVAnalyzer`.
@@ -29,7 +38,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 - **F17** — Framework de produção (`src/integrations/production/`, `run_production_pipeline.py`)
 - Ingestão real: Apple Health, Google Fit, BLE (`src/ingestion/real/`, `run_real_ingestion.py`)
 - Integração clínica FHIR Server (`src/integrations/clinical/`, `run_clinical_sync.py`)
-- Deploy Vertex AI dos 3 TCNs (`src/integrations/vertex/deploy/`, `run_vertex_deploy.py`)
+- Deploy Vertex AI dos 3 TCNs + IsolationForest (`src/integrations/vertex/deploy/`, `run_vertex_deploy.py`)
 - Conformal prediction multi-horizonte (`run_conformal_calibration.py`)
 - Validação clínica com relatório JSON (`run_clinical_validation.py`)
 - Fase 9 no VertexIntegrationOrchestrator

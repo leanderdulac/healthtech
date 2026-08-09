@@ -10,6 +10,23 @@ Schemas: `src/ingestion/real/hband_schemas.py`
 
 ---
 
+## Status do backend (repo)
+
+O lado **servidor** já está pronto para o companion. O trabalho restante é o app Android.
+
+| Capacidade backend | Status | Onde |
+|--------------------|--------|------|
+| Contrato OpenAPI HBand/Veepoo | ✅ | `docs/openapi/hband-wearable.yaml` |
+| Normalizer + adapter Bronze | ✅ | `src/ingestion/real/hband_*` |
+| Registry fonte `hband` | ✅ | ingestão real |
+| `POST /api/v1/wearables/ingest` + matriz de alertas | ✅ | monólito + `saude_responsiva_secure` |
+| Auth `X-API-Key` / scopes | ✅ | F19 + secure factory |
+| Testes de contrato normalizer | ✅ | `tests/test_hband_normalizer.py` |
+| App companion (BLE → HTTP) | ⬜ pendente | este checklist (sprints A–D) |
+| Device físico + AARs | ⬜ pendente | hardware / SDK fabricante |
+
+---
+
 ## 0. Pré-requisitos
 
 | Item | Status |
@@ -19,7 +36,7 @@ Schemas: `src/ingestion/real/hband_schemas.py`
 | AARs em `libs/`: vpprotocol, vpbluetooth, gson, JL_*, abpartool | ☐ |
 | Nordic mcumgr + scanner (Gradle) | ☐ |
 | Device HBand/Veepoo físico ou empréstimo do fabricante | ☐ |
-| `INGEST_API_KEY` e URL da API (secure ou full) | ☐ |
+| `INGEST_API_KEY` e URL da API (secure ou full) | ☐ backend ready; preencher no app |
 | `patient_id` estável por usuário (ex.: `PAT-HBAND-001`) | ☐ |
 
 ---
