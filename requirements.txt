@@ -1,7 +1,8 @@
 # Core data
 pandas>=2.0.3,<2.3
-numpy>=1.24.3,<2.0
-pyarrow>=14.0.0
+# NumPy 1.26 (CI) ou 2.x (Python 3.12+ / scipy recente) — ver pin do workflow CI
+numpy>=1.26.0,<2.3
+pyarrow>=14.0.0,<20
 scikit-learn>=1.3.0,<1.6
 joblib>=1.3.0
 python-dotenv>=1.0.0
@@ -19,7 +20,8 @@ fhir.resources>=7.0.0,<8.0.0
 torch>=2.0.0
 
 # Advanced signal processing
-scipy>=1.11.0
+# scipy 1.15+ / 1.17 puxa APIs de NumPy 2 (VoidDType); manter <1.15 com numpy 1.26
+scipy>=1.11.0,<1.15
 PyWavelets>=1.4.0
 filterpy>=1.4.5
 

@@ -26,12 +26,15 @@ jobs:
           # Core + test stack (evita torch/chromadb pesados no CI unitário)
           # requests: adapters de ingestão; google-auth: import soft de gcp_auth
           # joblib: modelos sklearn serializados (alert matrix / anomaly)
+          # Pares fixos: scipy>=1.16 exige NumPy 2 (VoidDType). Em 3.11 usamos
+          # o stack manylinux testado (evita rebuild source e mismatch binário).
           pip install \
-            "pandas>=2.0.3,<2.3" \
-            "numpy>=1.24.3,<2.0" \
-            "pyarrow>=14.0.0" \
-            "scikit-learn>=1.3.0,<1.6" \
-            "joblib>=1.3.0" \
+            "numpy==1.26.4" \
+            "scipy==1.14.1" \
+            "pandas==2.2.3" \
+            "pyarrow==17.0.0" \
+            "scikit-learn==1.5.2" \
+            "joblib==1.4.2" \
             "requests>=2.31.0" \
             "google-auth>=2.28.0" \
             "python-dotenv>=1.0.0" \
