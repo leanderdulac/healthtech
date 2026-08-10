@@ -27,7 +27,7 @@ via BLE e envia telemetria para a API Healthtech.
 
 ```properties
 HEALTHTECH_BASE_URL=https://healthtech-responsive-5794833455.us-central1.run.app
-HEALTHTECH_INGEST_API_KEY=ht_ingest_live_key_2026_safe_token_32c
+HEALTHTECH_INGEST_API_KEY=<sua-chave-ingest-do-env-nunca-commitar>
 HEALTHTECH_PATIENT_ID=PAT-HBAND-001
 ```
 
@@ -36,7 +36,8 @@ HEALTHTECH_PATIENT_ID=PAT-HBAND-001
 ## Smoke da API (sem device)
 
 ```bash
-# a partir da raiz do monorepo
+# a partir da raiz do monorepo — exporte INGEST_API_KEY antes
+export INGEST_API_KEY  # openssl rand -hex 32 (mesma do Cloud Run)
 python run_online_smoke.py --skip-vertex
 curl -sS -X POST "$CLOUD_RUN_URL/api/v1/wearables/ingest" \
   -H "X-API-Key: $INGEST_API_KEY" \

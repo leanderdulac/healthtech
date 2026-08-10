@@ -117,9 +117,8 @@ python run_online_smoke.py --skip-vertex
 | secure | `https://healthtech-secure-api-5794833455.us-central1.run.app` |
 | local | `http://10.0.2.2:8080` (emulador → host) |
 
-Chave de ingestão de deploy (dev/demo — rotacionar em produção real):
-
-`ht_ingest_live_key_2026_safe_token_32c`
+Chave de ingestão: use a mesma `INGEST_API_KEY` do Cloud Run (Secret Manager /
+variável de ambiente). **Nunca** commite chaves no repositório.
 
 ---
 

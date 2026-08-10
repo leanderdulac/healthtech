@@ -36,8 +36,9 @@ DEFAULT_CLOUD_RUN = "https://healthtech-responsive-5794833455.us-central1.run.ap
 DEFAULT_PROJECT = "healthtech-gcp-2026"
 DEFAULT_LOCATION = "us-central1"
 # Defaults alinhados a deploy_to_gcp.sh (podem ser sobrescritos por env)
-DEFAULT_INGEST_KEY = "ht_ingest_live_key_2026_safe_token_32c"
-DEFAULT_API_KEY = "ht_admin_live_key_2026_safe_token_32c"
+# Sem chaves embutidas no repositório — defina INGEST_API_KEY / API_KEY no env
+DEFAULT_INGEST_KEY = ""
+DEFAULT_API_KEY = ""
 
 
 def _load_deploy_state() -> Dict[str, Any]:

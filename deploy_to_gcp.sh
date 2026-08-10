@@ -29,10 +29,21 @@ else
   SOURCE_DIR=${SOURCE_DIR:-"."}
 fi
 
+# IAM: preferir false em produção real (somente identidades autenticadas no Cloud Run).
 ALLOW_UNAUTHENTICATED=${ALLOW_UNAUTHENTICATED:-"true"}
-API_KEY=${API_KEY:-"ht_admin_live_key_2026_safe_token_32c"}
-INGEST_API_KEY=${INGEST_API_KEY:-"ht_ingest_live_key_2026_safe_token_32c"}
-READ_API_KEY=${READ_API_KEY:-"ht_read_live_key_2026_safe_token_32c"}
+# Chaves: NUNCA commitar valores reais. Exija env ou Secret Manager.
+if [[ -z "${API_KEY:-}" || -z "${INGEST_API_KEY:-}" || -z "${READ_API_KEY:-}" ]]; then
+  echo "AVISO: API_KEY / INGEST_API_KEY / READ_API_KEY não definidos."
+  echo "        Defina-os no ambiente ou use Secret Manager antes do deploy de produção."
+fi
+API_KEY=${API_KEY:-""}
+INGEST_API_KEY=${INGEST_API_KEY:-""}
+READ_API_KEY=${READ_API_KEY:-""}
+if [[ -z "$API_KEY" || -z "$INGEST_API_KEY" ]]; then
+  echo "ERRO: defina API_KEY e INGEST_API_KEY (openssl rand -hex 32)."
+  exit 1
+fi
+READ_API_KEY=${READ_API_KEY:-"$API_KEY"}
 # SECRET_SALT: preserve existing Cloud Run value when unset (stable FHIR hashes)
 if [[ -z "${SECRET_SALT:-}" ]]; then
   EXISTING_SALT=$(gcloud run services describe "$SERVICE_NAME" \

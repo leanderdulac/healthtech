@@ -103,9 +103,22 @@ def mask_api_key(key: Optional[str]) -> str:
     return f"{key[:7]}***{key[-4:]}"
 
 
+def _safe_eq(a: str, b: str) -> bool:
+    """Comparação em tempo constante; nunca use startswith para escopos."""
+    if not a or not b:
+        return False
+    try:
+        return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
+    except Exception:
+        return False
+
+
 def get_key_scopes(provided_key: Optional[str]) -> Set[str]:
     """
     Retorna o conjunto de escopos concedidos para a chave fornecida.
+
+    Apenas comparação exata (hmac.compare_digest). Prefixos ht_admin_ / ht_ingest_
+    NÃO concedem escopo — isso era um bypass crítico.
     """
     if auth_disabled():
         return {"wearables:write", "wearables:read", "admin"}
@@ -113,27 +126,46 @@ def get_key_scopes(provided_key: Optional[str]) -> Set[str]:
     if not provided_key:
         return set()
 
-    admin_key = os.getenv("ADMIN_API_KEY") or os.getenv("API_KEY") or "ht_admin_live_key_2026_safe_token_32c"
-    ingest_key = os.getenv("INGEST_API_KEY") or "ht_ingest_dev_key_2026_safe_token_32c"
-    read_key = os.getenv("READ_API_KEY") or "ht_read_dev_key_2026_safe_token_32c"
+    # Sem defaults hardcoded em produção: chave ausente no env = sem aquele escopo
+    admin_key = (os.getenv("ADMIN_API_KEY") or os.getenv("API_KEY") or "").strip()
+    ingest_key = (os.getenv("INGEST_API_KEY") or "").strip()
+    read_key = (os.getenv("READ_API_KEY") or "").strip()
 
-    scopes = set()
+    # Defaults apenas em development (testes/local) — nunca em production
+    if not is_production():
+        admin_key = admin_key or "ht_admin_test_key_32chars_long_tokenxx"
+        ingest_key = ingest_key or "ht_ingest_test_key_32chars_long_token"
+        read_key = read_key or "ht_read_test_key_32chars_long_token"
 
-    # Admin Key tem todos os escopos
-    if hmac.compare_digest(provided_key.encode("utf-8"), admin_key.encode("utf-8")) or provided_key.startswith("ht_admin_"):
+    scopes: Set[str] = set()
+
+    if admin_key and _safe_eq(provided_key, admin_key):
         scopes.update(["wearables:write", "wearables:read", "admin"])
 
-    # Ingest Key
-    if hmac.compare_digest(provided_key.encode("utf-8"), ingest_key.encode("utf-8")) or provided_key.startswith("ht_ingest_"):
+    if ingest_key and _safe_eq(provided_key, ingest_key):
         scopes.add("wearables:write")
 
-    # Read Key
-    if hmac.compare_digest(provided_key.encode("utf-8"), read_key.encode("utf-8")) or provided_key.startswith("ht_read_"):
+    if read_key and _safe_eq(provided_key, read_key):
         scopes.add("wearables:read")
 
-    # Compatibilidade em DEV para chaves de teste legadas se não estiver em produção
-    if not is_production() and provided_key == "healthtech_live_key_2026":
-        scopes.update(["wearables:write", "wearables:read"])
+    # Dev-only: chaves de teste longas usadas nos unit tests (nunca em prod)
+    if not is_production():
+        dev_map = {
+            "ht_admin_test_key_32chars_long_token": {
+                "wearables:write",
+                "wearables:read",
+                "admin",
+            },
+            "ht_admin_test_key_32chars_long_tokenxx": {
+                "wearables:write",
+                "wearables:read",
+                "admin",
+            },
+            "ht_ingest_test_key_32chars_long_token": {"wearables:write"},
+            "ht_read_test_key_32chars_long_token": {"wearables:read"},
+        }
+        if provided_key in dev_map:
+            scopes.update(dev_map[provided_key])
 
     return scopes
 
@@ -212,6 +244,7 @@ def check_patient_authorization(provided_key: Optional[str], target_patient_id: 
     Verifica se a chave tem permissão para o paciente especificado (Proteção IDOR).
     - Escopo 'admin' tem permissão universal.
     - Se ALLOWED_PATIENT_IDS estiver definido no ambiente, exige inclusão na whitelist.
+    - Em produção, sem whitelist e sem admin: nega (fail-closed) para dados clínicos.
     """
     if auth_disabled():
         return True
@@ -226,6 +259,13 @@ def check_patient_authorization(provided_key: Optional[str], target_patient_id: 
         allowed = {p.strip() for p in allowed_raw.split(",") if p.strip()}
         return target_patient_id in allowed
 
+    # Fail-open só em development (UX de demo). Em production exige whitelist ou admin.
+    if is_production():
+        logger.warning(
+            "IDOR: ALLOWED_PATIENT_IDS não configurado em produção — "
+            "negando acesso cross-patient para chave não-admin."
+        )
+        return False
     return True
 
 
