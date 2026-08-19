@@ -16,6 +16,7 @@ from src.datalake.utils.telemetry_simulator import PatientProfile
 from src.fhir.builders import (
     build_device,
     build_flag,
+    build_game_theory_flag,
     build_observation,
     build_patient,
     resource_to_dict,
@@ -120,6 +121,22 @@ def gold_alert_to_flag(alert: GoldPatientAlert) -> dict:
     except Exception:
         pass
     return flag_dict
+
+
+def game_theory_to_flag(assessment: Any) -> dict:
+    """Converte GameTheoryAssessment em FHIR Flag com extensões comportamentais."""
+    flag = build_game_theory_flag(
+        flag_id=f"gt-{assessment.patient_id}-{uuid.uuid4().hex[:8]}",
+        patient_id=assessment.patient_id,
+        ama_evasion_risk=assessment.ama_evasion_risk,
+        overtreatment_pressure=assessment.overtreatment_pressure,
+        discharge_assurance=assessment.discharge_assurance,
+        team_deadlock_risk=assessment.team_deadlock_risk,
+        recommendation=assessment.recommended_alignment,
+        period_start=datetime.utcnow(),
+        period_end=datetime.utcnow(),
+    )
+    return resource_to_dict(flag)
 
 
 def device_binding_to_fhir(binding: DeviceBinding) -> dict:

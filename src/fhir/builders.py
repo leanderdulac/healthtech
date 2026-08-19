@@ -283,6 +283,89 @@ def build_flag(
     return fhir_parse(Flag, resource)
 
 
+def build_game_theory_flag(
+    flag_id: Any = None,
+    patient_id: Optional[str] = None,
+    ama_evasion_risk: Optional[float] = None,
+    overtreatment_pressure: Optional[float] = None,
+    discharge_assurance: Optional[float] = None,
+    team_deadlock_risk: Optional[float] = None,
+    recommendation: Optional[str] = None,
+    period_start: Optional[datetime] = None,
+    period_end: Optional[datetime] = None,
+    assessment: Optional[Any] = None,
+) -> Flag:
+    """Constroi recurso FHIR Flag para avaliacoes de Teoria dos Jogos."""
+    ass = assessment or (flag_id if hasattr(flag_id, "patient_id") and hasattr(flag_id, "ama_evasion_risk") else None)
+    if ass:
+        final_flag_id = getattr(ass, "flag_id", None) or f"flag-gt-{ass.patient_id.lower()}-{int(datetime.utcnow().timestamp())}"
+        patient_id = ass.patient_id
+        ama_evasion_risk = ass.ama_evasion_risk
+        overtreatment_pressure = ass.overtreatment_pressure
+        discharge_assurance = ass.discharge_assurance
+        team_deadlock_risk = ass.team_deadlock_risk
+        recommendation = getattr(ass, "recommended_alignment", "Incentive alignment evaluation")
+        period_start = getattr(ass, "period_start", datetime.utcnow())
+        period_end = getattr(ass, "period_end", datetime.utcnow())
+    else:
+        final_flag_id = str(flag_id or f"flag-gt-{str(patient_id).lower()}-{int(datetime.utcnow().timestamp())}")
+        period_start = period_start or datetime.utcnow()
+        period_end = period_end or datetime.utcnow()
+        recommendation = recommendation or "Game Theory Incentive Alignment"
+
+    resource = {
+        "resourceType": "Flag",
+        "id": final_flag_id,
+        "meta": _meta("http://healthtech.local/fhir/StructureDefinition/game-theory-assessment-flag"),
+        "status": "active",
+        "category": [
+            {
+                "coding": [
+                    {
+                        "system": "http://terminology.hl7.org/CodeSystem/flag-category",
+                        "code": "behavioral",
+                        "display": "Behavioral",
+                    }
+                ]
+            }
+        ],
+        "code": {
+            "coding": [
+                {
+                    "system": "http://healthtech.local/fhir/CodeSystem/game-theory-assessment",
+                    "code": "game-theory-incentive-alignment",
+                    "display": "Game Theory Incentive Alignment",
+                }
+            ],
+            "text": recommendation,
+        },
+        "subject": _reference("Patient", _fhir_safe_id(patient_id or "unknown")),
+        "period": {
+            "start": period_start.isoformat(),
+            "end": period_end.isoformat(),
+        },
+        "extension": [
+            {
+                "url": "http://healthtech.local/fhir/StructureDefinition/ama-evasion-risk",
+                "valueDecimal": round(ama_evasion_risk or 0.0, 4),
+            },
+            {
+                "url": "http://healthtech.local/fhir/StructureDefinition/overtreatment-pressure",
+                "valueDecimal": round(overtreatment_pressure or 0.0, 4),
+            },
+            {
+                "url": "http://healthtech.local/fhir/StructureDefinition/discharge-assurance",
+                "valueDecimal": round(discharge_assurance or 0.0, 4),
+            },
+            {
+                "url": "http://healthtech.local/fhir/StructureDefinition/team-deadlock-risk",
+                "valueDecimal": round(team_deadlock_risk or 0.0, 4),
+            },
+        ],
+    }
+    return fhir_parse(Flag, resource)
+
+
 def build_bundle(
     resources: List[Any],
     bundle_id: str,

@@ -1,29 +1,85 @@
-# Healthtech — Datalake de Telemetria + FHIR + Vertex AI
+# 🏥 HealthTech — Advanced Biomedical Intelligence & Telemetry Platform
 
-Plataforma de processamento de telemetria contínua 24h de wearables com arquitetura **Medallion** (Bronze → Silver → Gold), interoperabilidade **HL7 FHIR R4** e detecção de anomalias via **Vertex AI**.
+[![CI/CD Pipeline](https://github.com/leanderdulac/healthtech/actions/workflows/ci.yml/badge.svg)](https://github.com/leanderdulac/healthtech/actions)
+[![Docker Build](https://github.com/leanderdulac/healthtech/actions/workflows/docker-build.yml/badge.svg)](https://github.com/leanderdulac/healthtech/actions)
+[![Release](https://img.shields.io/badge/release-v3.0.0-blue.svg)](https://github.com/leanderdulac/healthtech/releases)
+[![Python 3.10 | 3.11](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue)](https://www.python.org/)
+[![HL7 FHIR R4](https://img.shields.io/badge/interoperability-HL7%20FHIR%20R4-orange)](http://hl7.org/fhir/R4/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## Visão geral
+---
 
-O projeto simula e processa dados biométricos de relógios inteligentes (frequência cardíaca, SpO2, HRV, passos, stress), aplica qualidade e reconciliação multi-sensor, gera agregações clínicas, exporta recursos FHIR e alimenta pipelines de ML para detecção de anomalias.
+## 🌐 Visão Geral
 
+A **HealthTech** é uma plataforma médica de alta precisão que combina **Física Cardiovascular Computacional (Windkessel 4-Elementos & Navier-Stokes 3D)**, **Inferência Estocástica em Espaço de Estados (Adaptive UKF & Dados Fantasmas)**, **Fusão Sensorial Bayesiana (BLUE)**, **Calibração Estatística Conforme (Split Conformal 1-α)** e **Interoperabilidade Nativa HL7 FHIR R4**.
+
+O sistema opera sobre arquitetura **Medallion Lakehouse (Bronze / Silver / Gold)** com suporte nativo para nuvem (GCP Cloud Run, Vertex AI e BigQuery).
+
+---
+
+## 📐 Arquitetura do Sistema
+
+```mermaid
+graph TD
+    A[Wearables Brutos: PPG, ECG, Temp, Acelerômetro] --> B[Processamento de Sinais: Wavelet DWT + Butterworth]
+    B --> C[Sensor Fusion Bayesiana BLUE + EWMA]
+    C --> D[Adaptive UKF: Inferência de Dados Fantasmas PAS, PAD, SpO2, Vagal, Glicose]
+    D --> E[Simulador Hemodinâmico Windkessel 4-Elementos + Barorreflexo]
+    E --> F[Inteligência Clínica: Lógica Fuzzy + Dempster-Shafer + Teoria dos Jogos]
+    F --> G[Conformal Prediction: Intervalos Calibrados 1 - alpha]
+    G --> H[Exportador HL7 FHIR R4: Bundles, Observations, Patients, Flags]
+    H --> I[FastAPI Streaming WebSocket 4Hz + Glassmorphic Dashboard]
+    I --> J[GCP Cloud Run / Vertex AI / BigQuery / Cloud Storage]
 ```
-Wearables → Bronze → Silver → Gold → Extração / FHIR / Vertex AI / BigQuery
-```
 
-Diagramas detalhados em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) e [`docs/diagrams/`](docs/diagrams/).
+---
 
-## Requisitos
+## 🔬 Módulos Científicos e Engenharia
 
-- Python 3.11+
-- Dependências em `requirements.txt`
-- Google Cloud (opcional): Vertex AI, BigQuery, Cloud Storage
+1. **Processamento de Sinais & Separação de Ruído (`src/signal_processing/`)**:
+   - Processos de Ornstein-Uhlenbeck ($dX_t = \theta(\mu - X_t)dt + \sigma dW_t$).
+   - DWT Denoising com decomposição Wavelet `db4` e limiarização universal de Donoho-Johnstone.
+   - Fusão Sensorial Bayesiana BLUE com pesos inversamente proporcionais à variância instantânea.
 
-## Instalação
+2. **Espaço de Estados & Dados Fantasmas (`src/phantom_data/`)**:
+   - Extended Kalman Filter (EKF) e Unscented Kalman Filter (UKF).
+   - **Adaptive Unscented Kalman Filter (A-UKF)** com adaptação online de Sage-Husa para matrizes de ruído $Q$ e $R$.
+   - Análise espectral de HRV (SDNN, RMSSD, pNN50, Densidade Espectral de Potência Welch, Lomb-Scargle e SampEn).
+   - Verificação do **Gramiano de Observabilidade** $\mathcal{W}_o$ para certificação de reconstruibilidade de biomarcadores.
 
+3. **Hemodinâmica Computacional (`src/hemodynamics/`)**:
+   - **Modelo Windkessel de 4 Elementos (WK4)**: Resistência Periférica ($R_p$), Complacência ($C$), Impedância Aórtica ($Z_c$) e Inertância ($L$) integrado via RK4.
+   - Cálculo da Velocidade da Onda de Pulso (PWV) via equação de Bramwell-Hill.
+   - Alça de regulação autonômica do **Barorreflexo** para estabilização de PAM e FC.
+   - Operadores diferenciais 3D em malha contínua: $\nabla \phi$, $\nabla \cdot \mathbf{u}$, $\nabla \times \mathbf{u}$.
+
+4. **Inteligência Clínica & Teoria dos Jogos (`src/clinical_intelligence/`)**:
+   - Motor de Teoria dos Jogos para alinhamento de incentivos clínicos (Evasão de Alta AMA, Overtreatment, Dilema do Plantonista).
+   - **Triage Game Engine**: Alocação ótima de leitos hospitalares e UTI via Equilíbrio de Nash e Fronteira de Pareto.
+   - **Split Conformal Predictor**: Intervalos de probabilidade com garantia teórica de cobertura $\ge 1 - \alpha$.
+
+5. **Interoperabilidade em Saúde (`src/fhir/`)**:
+   - Serialização e validação nativa HL7 FHIR Release 4 (Patient, Observation, Device, Flag, Bundle).
+
+6. **Medallion Lakehouse (`src/datalake/`)**:
+   - Camada Bronze (telemetria bruta particionada por data).
+   - Camada Silver (reconciliação temporal e flags de qualidade).
+   - Camada Gold (resumos horários, diários e alertas clínicos agregados).
+
+---
+
+## 🚀 Como Executar
+
+### 1. Pré-requisitos
+- Python 3.10 ou 3.11
+- Gerenciador de pacotes `pip`
+
+### 2. Instalação
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+git clone https://github.com/leanderdulac/healthtech.git
+cd healthtech
 pip install -r requirements.txt
+<<<<<<< HEAD
 # opcional (dev/CI):
 pip install -r requirements-dev.txt
 cp .env.example .env   # configure GCP, SECRET_SALT e API_KEY
@@ -124,53 +180,45 @@ healthtech-main/
 │   ├── security/               # Auth API + anonimização FHIR
 │   └── ...
 └── docs/
+=======
 ```
 
-## Artefatos gerados
+### 3. Executando a Suíte Completa de Testes
+```bash
+python -m unittest discover -s tests -v
+>>>>>>> dc998f1 (feat(core): elevate platform to v3.0.0 with Windkessel 4E, Adaptive UKF, complete automated test suite and CI/CD GitHub Actions)
+```
 
-| Caminho | Conteúdo |
-|---------|----------|
-| `data/lakehouse/` | Parquet Bronze/Silver/Gold |
-| `data/fhir_exports/` | Bundle JSON, NDJSON bulk FHIR |
-| `data/vertex_exports/` | CSV treino, JSONL batch |
-| `data/models/` | Modelo local `anomaly_detector.pkl` |
-| `data/bigquery_simulation/` | Fallback local quando GCP não configurado |
-| `data/scraping/usp_teses/` | Teses USP, ontologia e corpus NLP |
-| `data/hemodynamics/` | Análises hemodinâmicas e FHIR Flags |
-| `data/clinical_intelligence/` | Predições clínicas com lead time |
+### 4. Executando os Pipelines Demonstrativos
+```bash
+# Pipeline Completo do Datalake Medallion 24h
+python run_datalake_pipeline.py
 
-## Interoperabilidade FHIR R4
+# Diagnóstico Clínico Multimodal com Dados Fantasmas
+python run_clinical_prediction.py
 
-Recursos suportados: `Patient`, `Device`, `Observation`, `Flag`, `Bundle`.
+# Simulação Hemodinâmica 3D e Windkessel 4-Elementos
+python run_hemodynamics_analysis.py
 
-| Métrica | LOINC | UCUM |
-|---------|-------|------|
-| Frequência cardíaca | 8867-4 | /min |
-| SpO2 | 2708-6 | % |
-| Passos | 55423-8 | {steps} |
-| HRV | 80404-7 | ms |
+# Calibração Conforme de Incerteza
+python run_conformal_calibration.py
+```
 
-Documentação completa em [`docs/FEATURES.md`](docs/FEATURES.md#f08--interoperabilidade-fhir-r4--hl7).
+### 5. Executando o Servidor Web e Dashboard
+```bash
+python src/api_server.py
+```
+Acesse no navegador: **`http://localhost:8080`**
 
-## Configuração GCP
+---
 
-Variáveis em `.env.example`:
+## 📖 Documentação Adicional
 
-- `GCP_PROJECT_ID`, `GCP_LOCATION`
-- `VERTEX_ENDPOINT_ID`, `VERTEX_MODEL_NAME`
-- `GCS_STAGING_BUCKET`, `GCS_INPUT_DATA`, `GCS_OUTPUT_DATA`
-- `BQ_DATASET`, `BQ_LOCATION`
-- `SECRET_SALT` (anonimização FHIR)
-- `FHIR_VERSION`, `FHIR_EXPORT_DIR`
+- [Fundamentos Matemáticos e Biofísicos](docs/MATHEMATICAL_FOUNDATIONS.md)
+- [Guia de Deploy no Google Cloud Platform](deploy_to_gcp.sh)
 
-Sem GCP configurado, o projeto opera em **modo local** com simulação de BigQuery e Vertex.
+---
 
-## Documentação
+## 📄 Licença
 
-- [Arquitetura](docs/ARCHITECTURE.md)
-- [Features](docs/FEATURES.md)
-- [Changelog](docs/CHANGELOG.md)
-
-## Licença
-
-Projeto interno — uso conforme políticas da organização.
+Distribuído sob licença **MIT**. Consulte `LICENSE` para mais informações.

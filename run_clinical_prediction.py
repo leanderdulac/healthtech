@@ -71,15 +71,35 @@ def main():
         print(f"  Fuzzy            : {result.fuzzy.linguistic_summary}")
         print(f"  Ghost signals    : {len(result.ghost_signals)}")
         for g in result.ghost_signals:
-            print(f"    • {g.name}: {g.value:.2f} (conf={g.confidence:.2f}) — {g.clinical_relevance}")
+            print(f"    - {g.name}: {g.value:.2f} (conf={g.confidence:.2f}) - {g.clinical_relevance}")
 
         print(f"  Ruído/artefatos  : noise={result.fuzzy.noise_gate:.2f}, fp_risk={result.fuzzy.false_positive_risk:.2f}")
         print(f"  Persistência     : {result.fuzzy.persistence_score:.2f}")
 
+        if result.game_theory:
+            gt = result.game_theory
+            print(f"  Teoria dos Jogos (Incentivos):")
+            print(f"    - Risco Evasão (Centopeia)      : {gt.ama_evasion_risk:.3f}")
+            print(f"    - Pressão Sobretratamento (DP)  : {gt.overtreatment_pressure:.3f}")
+            print(f"    - Garantia de Alta (Stag Hunt)  : {gt.discharge_assurance:.3f}")
+            print(f"    - Risco de Impasse (Frango)     : {gt.team_deadlock_risk:.3f}")
+            print(f"    - Ação recomendada              : {gt.recommended_alignment}")
+            
+            try:
+                from src.fhir import game_theory_to_flag, validate_resource
+                
+                flag_dict = game_theory_to_flag(gt)
+                is_valid, errors = validate_resource(flag_dict)
+                print(f"    - FHIR Flag gerada com sucesso! ID: {flag_dict.get('id')} | Válida: {is_valid}")
+                if not is_valid:
+                    print(f"      Erros FHIR: {errors}")
+            except Exception as e:
+                print(f"    - Erro ao gerar/validar FHIR Flag: {e}")
+
         if result.predictions:
             print(f"  Predições:")
             for p in result.predictions[:3]:
-                print(f"    → [{p.probability:.0%}] {p.event_type}")
+                print(f"    -> [{p.probability:.0%}] {p.event_type}")
                 print(f"      Lead time: {p.lead_time_hours:.0f}h ({p.lead_time_days:.1f} dias)")
                 print(f"      {p.recommendation}")
         else:
@@ -93,7 +113,7 @@ def main():
     print(f"  Pacientes analisados : {len(results)}")
     print(f"  Com predição ativa   : {sum(1 for r in results if r.predictions)}")
     print(f"  Batch summary        : {summary_path}")
-    print(f"\n  Pipeline: Kalman+Hampel → Ghost → Fuzzy Mamdani → Bayes Fusion → CUSUM")
+    print(f"\n  Pipeline: Kalman+Hampel -> Ghost -> Fuzzy Mamdani -> Bayes Fusion -> CUSUM")
     print(f"  Saída   : data/clinical_intelligence/")
 
 

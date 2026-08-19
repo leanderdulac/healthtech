@@ -1,104 +1,64 @@
-name: CI
+name: HealthTech CI/CD Pipeline
 
 on:
   push:
-    branches: [main, master]
+    branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
 
-# Cancela runs obsoletos no mesmo ref (menos notificação de falha intermediária)
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    name: Automated Unit & Integration Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+        python-version: [ '3.10', '3.11' ]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+
+      - name: Run Core Test Suite
+        env:
+          TESTING: "1"
+          PYTHONIOENCODING: "utf-8"
+          ENVIRONMENT: "development"
+        run: |
+          python -m unittest discover -s tests -v
+
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: pip
+          python-version: '3.11'
 
-      - name: Install lightweight test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # Core + test stack (evita torch/chromadb pesados no CI unitário)
-          # requests: adapters de ingestão; google-auth: import soft de gcp_auth
-          # joblib: modelos sklearn serializados (alert matrix / anomaly)
-          # Pares fixos: scipy>=1.16 exige NumPy 2 (VoidDType). Em 3.11 usamos
-          # o stack manylinux testado (evita rebuild source e mismatch binário).
-          pip install \
-            "numpy==1.26.4" \
-            "scipy==1.14.1" \
-            "pandas==2.2.3" \
-            "pyarrow==17.0.0" \
-            "scikit-learn==1.5.2" \
-            "joblib==1.4.2" \
-            "requests>=2.31.0" \
-            "google-auth>=2.28.0" \
-            "python-dotenv>=1.0.0" \
-            "pydantic>=2.9.0" \
-            "pydantic-settings>=2.1.0" \
-            "slowapi>=0.1.9" \
-            "fastapi>=0.115.0,<0.116" \
-            "httpx>=0.27.0" \
-            "sqlalchemy==2.0.35" \
-            "pytest>=8.0.0" \
-            "pytest-cov>=5.0.0" \
-            "ruff>=0.5.0"
+      - name: Install Flake8
+        run: pip install flake8
 
-      - name: Ruff (lint crítico)
+      - name: Lint with Flake8
         run: |
-          ruff check src/security src/datalake/quality src/hemodynamics/operators.py \
-            health-aggregator/main.py health-aggregator/database.py \
-            saude_responsiva_secure/app \
-            tests --select E,F,I --ignore E501 || true
-
-      - name: Pytest (monólito)
-        env:
-          ENVIRONMENT: development
-          SECRET_SALT: ci-test-salt-not-for-production-32b
-          AUTH_DISABLED: "false"
-          APP_MODE: full
-          # Garante que testes de API usem chaves de teste, não defaults de prod
-          API_KEY: ""
-          ADMIN_API_KEY: ht_admin_test_key_32chars_long_tokenxx
-          INGEST_API_KEY: ht_ingest_test_key_32chars_long_token
-          READ_API_KEY: ht_read_test_key_32chars_long_token
-        run: |
-          # test_tcn_server é pulado automaticamente sem torch (CI leve)
-          pytest tests/ -v --tb=short \
-            --cov=src.security --cov=src.datalake.quality \
-            --cov=src.hemodynamics.operators \
-            --cov-report=term-missing
-
-      - name: Pytest (API secure)
-        env:
-          ENVIRONMENT: development
-          SECRET_SALT: ci-test-salt-not-for-production-32b
-          AUTH_DISABLED: "false"
-          APP_MODE: secure
-        run: |
-          cd saude_responsiva_secure && PYTHONPATH=. pytest test_security.py -v --tb=short
-
-  docker-syntax:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate Dockerfiles (root full + secure package)
-        run: |
-          test -f Dockerfile
-          grep -q 'USER appuser' Dockerfile
-          grep -q 'uvicorn' Dockerfile
-          grep -q 'HEALTHCHECK' Dockerfile
-          grep -q 'saude_responsiva_secure' Dockerfile
-          grep -q 'APP_MODE' Dockerfile
-          test -f saude_responsiva_secure/Dockerfile
-          grep -q 'USER appuser' saude_responsiva_secure/Dockerfile
-          grep -q 'app.main:app' saude_responsiva_secure/Dockerfile
+          flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics

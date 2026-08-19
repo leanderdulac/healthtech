@@ -23,7 +23,8 @@ try:
     import torch.nn as nn
     import torch.nn.functional as F
     TORCH_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError) as e:
+    logger.warning("PyTorch nao disponivel ou falhou ao carregar DLLs. Ativando fallback: %s", e)
     TORCH_AVAILABLE = False
     torch = None
     nn = None
