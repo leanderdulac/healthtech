@@ -294,9 +294,11 @@ def build_game_theory_flag(
     period_start: Optional[datetime] = None,
     period_end: Optional[datetime] = None,
     assessment: Optional[Any] = None,
+    flag_id_or_assessment: Optional[Any] = None,
 ) -> Flag:
     """Constroi recurso FHIR Flag para avaliacoes de Teoria dos Jogos."""
-    ass = assessment or (flag_id if hasattr(flag_id, "patient_id") and hasattr(flag_id, "ama_evasion_risk") else None)
+    raw_id = flag_id if flag_id is not None else flag_id_or_assessment
+    ass = assessment or (raw_id if hasattr(raw_id, "patient_id") and hasattr(raw_id, "ama_evasion_risk") else None)
     if ass:
         final_flag_id = getattr(ass, "flag_id", None) or f"flag-gt-{ass.patient_id.lower()}-{int(datetime.utcnow().timestamp())}"
         patient_id = ass.patient_id

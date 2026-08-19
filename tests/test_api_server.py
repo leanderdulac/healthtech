@@ -1,7 +1,9 @@
 import os
+import sys
 import unittest
 from unittest.mock import patch
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 os.environ["TESTING"] = "1"
 
 
@@ -19,13 +21,14 @@ class TestApiServer(unittest.TestCase):
         self.assertTrue("dashboard" in response.headers["location"])
 
     def test_get_status_structure(self):
-        from src.api_server import get_status
-        status = get_status()
-        self.assertIn("status", status)
-        self.assertEqual(status["status"], "online")
-        self.assertIn("config", status)
-        self.assertIn("simulation_running", status["config"])
+        with patch("src.api_server.dl_manager.load_latest_knowledge", return_value=[]):
+            from src.api_server import get_status
+            status = get_status()
+            self.assertIn("status", status)
+            self.assertEqual(status["status"], "online")
+            self.assertIn("config", status)
+            self.assertIn("simulation_running", status["config"])
 
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(argv=["first-arg-is-ignored"], exit=False)
