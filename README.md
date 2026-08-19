@@ -2,7 +2,7 @@
 
 [![CI/CD Pipeline](https://github.com/leanderdulac/healthtech/actions/workflows/ci.yml/badge.svg)](https://github.com/leanderdulac/healthtech/actions)
 [![Docker Build](https://github.com/leanderdulac/healthtech/actions/workflows/docker-build.yml/badge.svg)](https://github.com/leanderdulac/healthtech/actions)
-[![Release](https://img.shields.io/badge/release-v3.0.0-blue.svg)](https://github.com/leanderdulac/healthtech/releases)
+[![Release](https://img.shields.io/badge/release-v3.1.0-blue.svg)](https://github.com/leanderdulac/healthtech/releases)
 [![Python 3.10 | 3.11](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue)](https://www.python.org/)
 [![HL7 FHIR R4](https://img.shields.io/badge/interoperability-HL7%20FHIR%20R4-orange)](http://hl7.org/fhir/R4/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -11,7 +11,7 @@
 
 ## 🌐 Visão Geral
 
-A **HealthTech** é uma plataforma médica de alta precisão que combina **Física Cardiovascular Computacional (Windkessel 4-Elementos & Navier-Stokes 3D)**, **Inferência Estocástica em Espaço de Estados (Adaptive UKF & Dados Fantasmas)**, **Fusão Sensorial Bayesiana (BLUE)**, **Calibração Estatística Conforme (Split Conformal 1-α)** e **Interoperabilidade Nativa HL7 FHIR R4**.
+A **HealthTech** é uma plataforma médica de alta precisão que combina **Física Cardiovascular Computacional (Windkessel 4-Elementos & Navier-Stokes 3D)**, **Inferência Estocástica em Espaço de Estados (Adaptive UKF & Dados Fantasmas)**, **Fusão Sensorial Bayesiana (BLUE)**, **Conselho Clínico Multi-Agente (Dempster-Shafer)**, **Calibração Estatística Conforme (Split Conformal 1-α)** e **Interoperabilidade Nativa HL7 FHIR R4**.
 
 O sistema opera sobre arquitetura **Medallion Lakehouse (Bronze / Silver / Gold)** com suporte nativo para nuvem (GCP Cloud Run, Vertex AI e BigQuery).
 
@@ -25,10 +25,10 @@ graph TD
     B --> C[Sensor Fusion Bayesiana BLUE + EWMA]
     C --> D[Adaptive UKF: Inferência de Dados Fantasmas PAS, PAD, SpO2, Vagal, Glicose]
     D --> E[Simulador Hemodinâmico Windkessel 4-Elementos + Barorreflexo]
-    E --> F[Inteligência Clínica: Lógica Fuzzy + Dempster-Shafer + Teoria dos Jogos]
-    F --> G[Conformal Prediction: Intervalos Calibrados 1 - alpha]
-    G --> H[Exportador HL7 FHIR R4: Bundles, Observations, Patients, Flags]
-    H --> I[FastAPI Streaming WebSocket 4Hz + Glassmorphic Dashboard]
+    E --> F[Conselho Clínico Multi-Agente: Cardio + Pulmo + Intensivista via Dempster-Shafer]
+    F --> G[Teoria dos Jogos & Conformal Prediction: Nash, Pareto e Intervalos 1 - alpha]
+    G --> H[Exportador HL7 FHIR R4: DiagnosticReport, CarePlan, Bundles, Observations]
+    H --> I[FastAPI Streaming WebSocket 4Hz + Glassmorphic Dashboard com Simulador WK4]
     I --> J[GCP Cloud Run / Vertex AI / BigQuery / Cloud Storage]
 ```
 

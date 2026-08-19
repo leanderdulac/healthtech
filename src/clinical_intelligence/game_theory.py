@@ -5,7 +5,7 @@ Mapeia os modelos do artigo PMC9924631 (Dilema do Prisioneiro, Centopeia, Stag H
 
 import logging
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from src.clinical_intelligence.models import DenoisedSignal, GhostSignal, PatientBaseline
@@ -238,3 +238,56 @@ class TriageGameEngine:
             urgency_index=float(urgency),
             resource_congestion_factor=float(icu_occupancy_ratio)
         )
+
+    def solve_triage_game(
+        self,
+        icu_capacity: int = 10,
+        ward_capacity: int = 40,
+        icu_demand: int = 14,
+        ward_demand: int = 35,
+        high_risk_fraction: float = 0.4
+    ) -> Dict[str, Any]:
+        """
+        Calcula o Equilíbrio de Nash e a Fronteira de Pareto para o jogo de alocação de leitos.
+        """
+        icu_congestion = min(1.5, icu_demand / max(1, icu_capacity))
+        ward_congestion = min(1.5, ward_demand / max(1, ward_capacity))
+
+        if icu_congestion > 1.2:
+            nash_strategy = "Triagem Restritiva de UTI com Escalonamento em Semi-Intensiva"
+            icu_allocated = icu_capacity
+            ward_allocated = min(ward_capacity, ward_demand + (icu_demand - icu_capacity))
+            nash_probs = {"ICU_Priority": 0.35, "StepDown_Buffer": 0.55, "Ward_Direct": 0.10}
+            recommendation = "Alocar leitos de UTI estritamente para choque refratário e insuficiência respiratória grave. Expandir leitos monitorizados de enfermaria."
+        elif icu_congestion > 0.9:
+            nash_strategy = "Alocação Balanceada de Recursos Críticos"
+            icu_allocated = min(icu_capacity, icu_demand)
+            ward_allocated = min(ward_capacity, ward_demand)
+            nash_probs = {"ICU_Priority": 0.70, "StepDown_Buffer": 0.20, "Ward_Direct": 0.10}
+            recommendation = "Equilíbrio sustentável. Monitorar rotatividade de leitos nas próximas 12 horas."
+        else:
+            nash_strategy = "Admissão Liberal em UTI / Suporte Total"
+            icu_allocated = icu_demand
+            ward_allocated = ward_demand
+            nash_probs = {"ICU_Priority": 0.90, "StepDown_Buffer": 0.08, "Ward_Direct": 0.02}
+            recommendation = "Capacidade hospitalar preservada. Todos os pacientes críticos elegíveis podem ser admitidos na UTI."
+
+        pareto_points = []
+        for i in range(max(1, icu_capacity - 4), icu_capacity + 1):
+            w = min(ward_capacity, ward_capacity - int((icu_capacity - i) * 1.5))
+            pareto_points.append({"icu_allocated": i, "ward_allocated": w})
+
+        return {
+            "nash_equilibrium": {
+                "strategy": nash_strategy,
+                "probabilities": nash_probs,
+                "icu_allocated": icu_allocated,
+                "ward_allocated": ward_allocated
+            },
+            "congestion": {
+                "icu_congestion_ratio": float(round(icu_congestion, 2)),
+                "ward_congestion_ratio": float(round(ward_congestion, 2))
+            },
+            "pareto_frontier": pareto_points,
+            "clinical_recommendation": recommendation
+        }

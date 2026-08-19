@@ -27,3 +27,18 @@ __all__ = [
     "assess_ingest_alerts",
     "merge_anomaly_with_alerts",
 ]
+from src.clinical_intelligence.agents import (
+    SpecialistOpinion,
+    CardiologyAgent,
+    PulmonologyAgent,
+    IntensivistTriageAgent,
+    ClinicalConsensusCoordinator,
+)
+
+__all__ += [
+    "SpecialistOpinion",
+    "CardiologyAgent",
+    "PulmonologyAgent",
+    "IntensivistTriageAgent",
+    "ClinicalConsensusCoordinator",
+]

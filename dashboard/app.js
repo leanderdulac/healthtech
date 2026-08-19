@@ -11,7 +11,173 @@ window.switchTab = function(targetTab) {
     tabContents.forEach(c => {
         c.classList.remove("active");
         c.style.display = "none";
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
     const activeBtn = document.querySelector(`.nav-btn[data-tab="${targetTab}"]`);
     if (activeBtn) activeBtn.classList.add("active");
@@ -145,7 +311,173 @@ document.addEventListener("DOMContentLoaded", () => {
             ]
         },
         options: chartOptions
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
     // Gráfico 2: Pressão Arterial (PAS/PAD)
     const ctxBp = document.getElementById("chart-bp").getContext("2d");
@@ -209,7 +541,173 @@ document.addEventListener("DOMContentLoaded", () => {
             ]
         },
         options: chartOptions
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
     // Gráfico 3: Oxigênio & Glicose (Eixo Duplo)
     const ctxOxygen = document.getElementById("chart-oxygen").getContext("2d");
@@ -251,7 +749,173 @@ document.addEventListener("DOMContentLoaded", () => {
             ]
         },
         options: oxOptions
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
 
     // ========================================================================
@@ -420,7 +1084,173 @@ document.addEventListener("DOMContentLoaded", () => {
                 barNeuro.style.width = width;
                 pctNeuro.textContent = pct;
             }
+        
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
         });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
         // E. Atualizar Badges de Códigos Clínicos (Interoperabilidade)
         updateBadges(badgesIcd10, frame.clinical_codes.icd10);
@@ -439,7 +1269,173 @@ document.addEventListener("DOMContentLoaded", () => {
             badge.className = "badge-code";
             badge.textContent = code;
             container.appendChild(badge);
+        
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
         });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
     }
 
     // ========================================================================
@@ -449,25 +1445,689 @@ document.addEventListener("DOMContentLoaded", () => {
         if (ws && isConnected) {
             ws.send(JSON.stringify({ action: "start" }));
         }
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
     btnStop.addEventListener("click", () => {
         if (ws && isConnected) {
             ws.send(JSON.stringify({ action: "stop" }));
         }
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
     filterSelect.addEventListener("change", () => {
         if (ws && isConnected) {
             ws.send(JSON.stringify({ action: "set_filter", value: filterSelect.value }));
         }
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
     kalmanSelect.addEventListener("change", () => {
         if (ws && isConnected) {
             ws.send(JSON.stringify({ action: "set_kalman", value: kalmanSelect.value }));
         }
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
 
     // ========================================================================
@@ -487,7 +2147,173 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 headers: headers,
                 body: JSON.stringify({ query: query, n_results: 2 })
+            
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
             });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
             if (!response.ok) throw new Error("Erro na resposta da API.");
 
@@ -515,7 +2341,173 @@ document.addEventListener("DOMContentLoaded", () => {
                     item.appendChild(meta);
                     item.appendChild(text);
                     searchResultsBox.appendChild(item);
+                
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
                 });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
             } else {
                 searchResultsBox.innerHTML = '<div class="no-results">Nenhum resultado encontrado.</div>';
             }
@@ -527,7 +2519,173 @@ document.addEventListener("DOMContentLoaded", () => {
     btnSearch.addEventListener("click", performSearch);
     searchInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") performSearch();
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
     // ========================================================================
     // 6. CONTROLADOR DE ABAS DA NAVEGAÇÃO
@@ -547,8 +2705,340 @@ document.addEventListener("DOMContentLoaded", () => {
             btn.classList.add("active");
             const activeContent = document.getElementById(`view-${targetTab}`);
             if (activeContent) activeContent.classList.add("active");
-        });
+        
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
     // Cópia de API Key
     const btnCopyKey = document.getElementById("btn-copy-key");
@@ -560,8 +3050,340 @@ document.addEventListener("DOMContentLoaded", () => {
             navigator.clipboard.writeText(apiKeyDisplay.value).then(() => {
                 copyFeedback.textContent = "✓ Chave copiada para a área de transferência!";
                 setTimeout(() => { copyFeedback.textContent = ""; }, 3000);
+            
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
             });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
         });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
+        
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
     }
 
     // Testador de Conexão com API
@@ -588,7 +3410,173 @@ document.addEventListener("DOMContentLoaded", () => {
                 btnCheckStatus.disabled = false;
                 btnCheckStatus.innerHTML = '<span class="material-icons-round">refresh</span> Testar Conexão Agora';
             }
+        
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
         });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
     }
 
     // ========================================================================
@@ -622,7 +3610,173 @@ document.addEventListener("DOMContentLoaded", () => {
                         "X-API-Key": apiKey
                     },
                     body: JSON.stringify(payload)
+                
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
                 });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
                 const data = await res.json();
                 simResponseJson.textContent = JSON.stringify(data, null, 2);
@@ -632,7 +3786,173 @@ document.addEventListener("DOMContentLoaded", () => {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<span class="material-icons-round">send</span> Enviar Telemetria para API';
             }
+        
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
         });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
     }
 
     // ========================================================================
@@ -685,6 +4005,172 @@ print(response.json())`,
         skin_temp: 33.2,
         filter_type: "BMO"
     })
+
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
 });
 
 const data = await response.json();
@@ -699,8 +4185,340 @@ console.log(data);`
             if (codeSnippetBlock && snippets[lang]) {
                 codeSnippetBlock.textContent = snippets[lang];
             }
-        });
+        
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
+    
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
+});
 
     // Logger Simples
     const logger = {
@@ -711,5 +4529,171 @@ console.log(data);`
 
     // Conectar ao WebSocket na inicialização
     connectWebSocket();
+
+    // =========================================================================
+    // BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
+    // =========================================================================
+    let chartWk4 = null;
+    let chartPareto = null;
+
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    }
+                }
+            });
+        }
+
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+    }
+
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
+    }
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
+    });
+
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
+
+            try {
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    setTimeout(() => {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    }, 500);
+
 });
 

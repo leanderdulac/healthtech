@@ -37,9 +37,39 @@ class BaroreflexParams:
     gain_hr: float = 0.65       # Ganho da modulação de FC (bpm / mmHg)
     gain_rp: float = 0.008      # Ganho da modulação vasomotora de Rp (unidades / mmHg)
     tau_symp: float = 3.0       # Constante de tempo da resposta simpática (s)
-    tau_vagus: float = 0.5      # Constante de tempo da resposta parassimpática (s)
     f_max: float = 100.0        # Taxa de disparo barorreceptora máxima (Hz)
     k_slope: float = 0.08       # Inclinação da função sigmoide barorreceptora
+
+
+@dataclass
+class WindkesselSimResult:
+    t: np.ndarray
+    pressure: np.ndarray
+    flow: np.ndarray
+    systolic_bp: float
+    diastolic_bp: float
+    mean_arterial_pressure: float
+    pulse_pressure: float
+    pwv_bramwell_hill: float
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "time":
+            return self.t
+        return getattr(self, str(key))
+
+    def __contains__(self, key: Any) -> bool:
+        if not isinstance(key, str):
+            return False
+        return (key == "time") or hasattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except (AttributeError, KeyError):
+            return default
+
+    def keys(self) -> List[str]:
+        return ["time", "pressure", "flow", "systolic_bp", "diastolic_bp", "mean_arterial_pressure", "pulse_pressure", "pwv_bramwell_hill"]
 
 
 class Windkessel4ESimulator:
@@ -50,9 +80,9 @@ class Windkessel4ESimulator:
         (1 + Zc/Rp) * dP/dt + P/(Rp*C) = Q(t)/C + (Zc + L/(Rp*C)) * dQ/dt + L * d²Q/dt²
     """
 
-    def __init__(self, params: Optional[Windkessel4EParams] = None, baro_params: Optional[BaroreflexParams] = None):
+    def __init__(self, params: Optional[Windkessel4EParams] = None, baro_params: Optional[BaroreflexParams] = None, baroreflex: Optional[BaroreflexParams] = None):
         self.params = params or Windkessel4EParams()
-        self.baro = baro_params or BaroreflexParams()
+        self.baro = baro_params or baroreflex or BaroreflexParams()
 
     @staticmethod
     def generate_ejection_flow(
@@ -93,14 +123,28 @@ class Windkessel4ESimulator:
 
     def simulate(
         self,
-        time: np.ndarray,
-        flow: np.ndarray,
+        time: Optional[np.ndarray] = None,
+        flow: Optional[np.ndarray] = None,
+        duration_s: float = 3.0,
+        dt: float = 0.005,
+        heart_rate: float = 75.0,
+        stroke_volume: float = 70.0,
         initial_pressure: float = 80.0
-    ) -> Dict[str, np.ndarray]:
+    ) -> WindkesselSimResult:
         """
         Integra a equação de pressão arterial P(t) usando método de Runge-Kutta de 4ª ordem (RK4).
         """
-        dt = time[1] - time[0]
+        if time is None or flow is None:
+            num_cycles = max(2, int(duration_s * heart_rate / 60.0) + 1)
+            time, flow = self.generate_ejection_flow(
+                heart_rate=heart_rate,
+                stroke_volume=stroke_volume,
+                fs=1.0 / dt,
+                num_cycles=num_cycles
+            )
+        else:
+            dt = float(time[1] - time[0])
+
         n = len(time)
         
         # Derivadas do fluxo Q(t)
@@ -143,16 +187,18 @@ class Windkessel4ESimulator:
         pad = float(np.min(p[-int(len(p)*0.3):]))
         map_val = float(np.mean(p[-int(len(p)*0.3):]))
         pp = pas - pad
+        pwv = self.compute_pulse_wave_velocity(distensibility=c * 0.001)
 
-        return {
-            "time": time,
-            "pressure": p,
-            "flow": flow,
-            "systolic_bp": pas,
-            "diastolic_bp": pad,
-            "mean_arterial_pressure": map_val,
-            "pulse_pressure": pp
-        }
+        return WindkesselSimResult(
+            t=time,
+            pressure=p,
+            flow=flow,
+            systolic_bp=pas,
+            diastolic_bp=pad,
+            mean_arterial_pressure=map_val,
+            pulse_pressure=pp,
+            pwv_bramwell_hill=pwv
+        )
 
     def compute_pulse_wave_velocity(self, distensibility: float = 0.002, blood_density: float = 1060.0) -> float:
         """
