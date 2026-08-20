@@ -31,23 +31,41 @@ data/bigquery_simulation/
 data/vertex_exports/
 data/fhir_exports/
 data/chroma_db/
+data/chroma_db.tar.gz
 data/lake/
 data/vertex_deploy/online_smoke_last.json
 data/clinical_cache/baselines/
 data/clinical_intelligence/prediction_*.json
 data/clinical_intelligence/batch_summary.json
 
-# Formatos voláteis (exceto scraping USP e modelos versionados)
+# Formatos voláteis (exceto scraping USP)
 *.csv
 *.parquet
 !data/scraping/**
 *.jsonl
 !data/scraping/**
 
-# Pickle — liberado apenas em data/models/
+# Pesos treinados localmente — versionar só JSON de metadados
 *.pkl
-!data/models/
-!data/models/**
+*.pt
+*.joblib
+data/models/*.pkl
+data/models/*.pt
+data/vertex_deploy/**/*.pkl
+data/vertex_deploy/**/*.pt
+data/vertex_deploy/**/*.joblib
+
+# Companion Android (build, SDK local, APK)
+companion-android/local.properties
+companion-android/.gradle/
+companion-android/**/build/
+companion-android/**/*.apk
+companion-android/**/*.aab
+companion-android/**/*.dex
+companion-android/.idea/
+
+# Bytecode do vendor gerado
+saude_responsiva_secure/_vendor_src/**/__pycache__/
 
 # IDEs
 .idea/
