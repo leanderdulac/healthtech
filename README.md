@@ -79,7 +79,6 @@ graph TD
 git clone https://github.com/leanderdulac/healthtech.git
 cd healthtech
 pip install -r requirements.txt
-<<<<<<< HEAD
 # opcional (dev/CI):
 pip install -r requirements-dev.txt
 cp .env.example .env   # configure GCP, SECRET_SALT e API_KEY
@@ -180,7 +179,6 @@ healthtech-main/
 │   ├── security/               # Auth API + anonimização FHIR
 │   └── ...
 └── docs/
-=======
 ```
 
 ### 3. Executando a Suíte Completa de Testes

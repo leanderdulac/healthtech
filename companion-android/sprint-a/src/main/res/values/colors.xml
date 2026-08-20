@@ -1,0 +1,12 @@
+<resources>
+    <color name="primary">#00E5FF</color>
+    <color name="primary_dark">#00B0FF</color>
+    <color name="accent">#7C4DFF</color>
+    <color name="background_dark">#0A0F1D</color>
+    <color name="card_bg">#131D31</color>
+    <color name="text_white">#FFFFFF</color>
+    <color name="text_muted">#8E9AA8</color>
+    <color name="vital_green">#00E676</color>
+    <color name="vital_red">#FF5252</color>
+    <color name="vital_blue">#40C4FF</color>
+</resources>

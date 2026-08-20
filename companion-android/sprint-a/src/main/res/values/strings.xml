@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">HealthTech VE30</string>
+    <string name="title_dashboard">Monitoramento VE30 &amp; Inteligência Clínica</string>
+    <string name="status_disconnected">Desconectado</string>
+    <string name="btn_scan">Buscar VE30</string>
+    <string name="btn_connect">Conectar</string>
+    <string name="btn_start_sensors">Iniciar Sensores</string>
+    <string name="label_heart_rate">Frequência Cardíaca</string>
+    <string name="label_spo2">Oximetria SpO2</string>
+    <string name="label_temp">Temperatura Cutânea</string>
+    <string name="label_bp">Pressão Arterial</string>
+    <string name="label_ai_feedback">Diagnóstico da IA &amp; Dados Fantasmas (UKF)</string>
+</resources>
