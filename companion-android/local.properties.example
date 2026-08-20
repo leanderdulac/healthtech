@@ -1,0 +1,12 @@
+## Copie para local.properties (não commitar).
+## Android Studio gera sdk.dir automaticamente.
+
+# sdk.dir=/home/SEU_USER/Android/Sdk
+
+# Default debug = emulador → API no host. Device físico: IP da LAN.
+HEALTHTECH_BASE_URL=http://10.0.2.2:8080
+
+# Cole a chave com escopo wearables:write. Nunca commitar valor real.
+HEALTHTECH_INGEST_API_KEY=
+
+HEALTHTECH_PATIENT_ID=PAT-HBAND-001

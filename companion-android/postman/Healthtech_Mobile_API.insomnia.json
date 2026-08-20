@@ -1,0 +1,133 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-08-12T00:00:00.000Z",
+  "__export_source": "healthtech-companion",
+  "resources": [
+    {
+      "_id": "wrk_healthtech",
+      "_type": "workspace",
+      "name": "Healthtech Mobile API",
+      "description": "Secure API companion"
+    },
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_healthtech",
+      "name": "Base",
+      "data": {
+        "baseUrl": "https://healthtech-secure-api-5794833455.us-central1.run.app",
+        "ingestApiKey": "",
+        "readApiKey": "",
+        "patientId": "PAT-HBAND-001",
+        "deviceId": "HBAND-AA:BB:CC:DD:EE:FF"
+      }
+    },
+    {
+      "_id": "fld_health",
+      "_type": "request_group",
+      "parentId": "wrk_healthtech",
+      "name": "Health"
+    },
+    {
+      "_id": "req_health",
+      "_type": "request",
+      "parentId": "fld_health",
+      "name": "GET health",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/api/health",
+      "headers": [],
+      "body": {}
+    },
+    {
+      "_id": "fld_write",
+      "_type": "request_group",
+      "parentId": "wrk_healthtech",
+      "name": "Wearables Write"
+    },
+    {
+      "_id": "req_ingest",
+      "_type": "request",
+      "parentId": "fld_write",
+      "name": "POST ingest HR",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/api/v1/wearables/ingest",
+      "headers": [
+        { "name": "X-API-Key", "value": "{{ _.ingestApiKey }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"patient_id\": \"{{ _.patientId }}\",\n  \"device_id\": \"{{ _.deviceId }}\",\n  \"heart_rate\": 78.0,\n  \"filter_type\": \"BMO\"\n}"
+      }
+    },
+    {
+      "_id": "req_batch",
+      "_type": "request",
+      "parentId": "fld_write",
+      "name": "POST batch-ingest",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/api/v1/wearables/batch-ingest",
+      "headers": [
+        { "name": "X-API-Key", "value": "{{ _.ingestApiKey }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"patient_id\": \"{{ _.patientId }}\",\n  \"readings\": [\n    {\n      \"patient_id\": \"{{ _.patientId }}\",\n      \"device_id\": \"{{ _.deviceId }}\",\n      \"heart_rate\": 72.0\n    },\n    {\n      \"patient_id\": \"{{ _.patientId }}\",\n      \"device_id\": \"{{ _.deviceId }}\",\n      \"heart_rate\": 75.0\n    }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "fld_read",
+      "_type": "request_group",
+      "parentId": "wrk_healthtech",
+      "name": "Wearables Read"
+    },
+    {
+      "_id": "req_latest",
+      "_type": "request",
+      "parentId": "fld_read",
+      "name": "GET latest",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/api/v1/wearables/patient/{{ _.patientId }}/latest",
+      "headers": [
+        { "name": "X-API-Key", "value": "{{ _.readApiKey }}" }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "req_history",
+      "_type": "request",
+      "parentId": "fld_read",
+      "name": "GET history",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/api/v1/wearables/patient/{{ _.patientId }}/history?limit=20",
+      "headers": [
+        { "name": "X-API-Key", "value": "{{ _.readApiKey }}" }
+      ],
+      "body": {}
+    },
+    {
+      "_id": "fld_signal",
+      "_type": "request_group",
+      "parentId": "wrk_healthtech",
+      "name": "Signal"
+    },
+    {
+      "_id": "req_bmo",
+      "_type": "request",
+      "parentId": "fld_signal",
+      "name": "POST bmo-analysis",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/api/v1/signal/bmo-analysis",
+      "headers": [
+        { "name": "X-API-Key", "value": "{{ _.readApiKey }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"signal\": [120, 125, 130, 128, 122, 118, 121, 127, 124, 119, 123, 129]\n}"
+      }
+    }
+  ]
+}

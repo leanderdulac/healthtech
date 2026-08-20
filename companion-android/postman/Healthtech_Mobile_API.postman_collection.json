@@ -1,0 +1,225 @@
+{
+  "info": {
+    "name": "Healthtech Mobile API",
+    "description": "Collection para integração do app companion (wearables) com a Secure API Healthtech.\n\nAuth: header X-API-Key com escopo wearables:write (ingest) ou wearables:read (latest/history).\n\nContrato: docs/openapi/hband-wearable.yaml",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://healthtech-secure-api-5794833455.us-central1.run.app" },
+    { "key": "ingestApiKey", "value": "" },
+    { "key": "readApiKey", "value": "" },
+    { "key": "patientId", "value": "PAT-HBAND-001" },
+    { "key": "deviceId", "value": "HBAND-AA:BB:CC:DD:EE:FF" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /api/health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/health",
+            "description": "Probe público — sem API key."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wearables — Write",
+      "item": [
+        {
+          "name": "POST ingest (HR mínimo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('has patient_id', function () {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.patient_id || j).to.be.ok;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{ingestApiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": \"{{patientId}}\",\n  \"device_id\": \"{{deviceId}}\",\n  \"heart_rate\": 78.0,\n  \"hrv_rmssd\": 42.0,\n  \"filter_type\": \"BMO\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/wearables/ingest",
+            "description": "Sprint A — uma leitura de frequência cardíaca."
+          }
+        },
+        {
+          "name": "POST ingest (multi-vital + PPG)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{ingestApiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": \"{{patientId}}\",\n  \"device_id\": \"{{deviceId}}\",\n  \"heart_rate\": 82.0,\n  \"spo2\": 97.0,\n  \"skin_temp\": 33.4,\n  \"hrv_rmssd\": 38.0,\n  \"activity_level\": 15.0,\n  \"blood_pressure_sys\": 120,\n  \"blood_pressure_dia\": 80,\n  \"ppg_signal\": [120, 125, 130, 128, 122, 118, 121, 127],\n  \"filter_type\": \"BMO\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/wearables/ingest"
+          }
+        },
+        {
+          "name": "POST batch-ingest",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{ingestApiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": \"{{patientId}}\",\n  \"readings\": [\n    {\n      \"patient_id\": \"{{patientId}}\",\n      \"device_id\": \"{{deviceId}}\",\n      \"heart_rate\": 72.0,\n      \"spo2\": 98.0,\n      \"timestamp\": \"2026-08-12T08:00:00Z\"\n    },\n    {\n      \"patient_id\": \"{{patientId}}\",\n      \"device_id\": \"{{deviceId}}\",\n      \"heart_rate\": 75.0,\n      \"spo2\": 97.0,\n      \"timestamp\": \"2026-08-12T08:05:00Z\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/wearables/batch-ingest",
+            "description": "Sprint B — flush outbox / OriginData3 (máx. 200 readings)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wearables — Read",
+      "item": [
+        {
+          "name": "GET latest",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{readApiKey}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/wearables/patient/{{patientId}}/latest"
+          }
+        },
+        {
+          "name": "GET history",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{readApiKey}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wearables/patient/{{patientId}}/history?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "wearables", "patient", "{{patientId}}", "history"],
+              "query": [{ "key": "limit", "value": "20" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Signal",
+      "item": [
+        {
+          "name": "POST bmo-analysis",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{readApiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"signal\": [120, 125, 130, 128, 122, 118, 121, 127, 124, 119, 123, 129],\n  \"scales\": [2, 4, 8]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/signal/bmo-analysis",
+            "description": "Sprint C — PPG raw (~25 Hz). Escopo wearables:read."
+          }
+        },
+        {
+          "name": "POST bmo-denoise",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{ingestApiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"signal\": [120, 125, 130, 128, 122, 118, 121, 127],\n  \"window_size\": 8,\n  \"alpha\": 0.5\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/signal/bmo-denoise"
+          }
+        },
+        {
+          "name": "POST hrv/bmo-metrics",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{readApiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rr_intervals\": [800, 810, 790, 805, 820, 795, 812]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/signal/hrv/bmo-metrics"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth errors (smoke negativo)",
+      "item": [
+        {
+          "name": "POST ingest sem key → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 unauthorized', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": \"{{patientId}}\",\n  \"heart_rate\": 78.0\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/wearables/ingest"
+          }
+        },
+        {
+          "name": "POST ingest HR inválido → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{ingestApiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": \"{{patientId}}\",\n  \"heart_rate\": 5\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/wearables/ingest",
+            "description": "heart_rate fora de 20–250 deve retornar 422 (dead letter na outbox)."
+          }
+        }
+      ]
+    }
+  ]
+}

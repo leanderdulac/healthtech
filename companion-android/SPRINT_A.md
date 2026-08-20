@@ -5,7 +5,8 @@
 da API full ou secure.
 
 Contrato: [`docs/openapi/hband-wearable.yaml`](../docs/openapi/hband-wearable.yaml)  
-Stubs: [`sprint-a/`](sprint-a/)
+Cliente HTTP: [`client/`](client/) (módulo Gradle `:client`)  
+BLE: [`app/src/main/java/com/healthtech/companion/ble/`](app/src/main/java/com/healthtech/companion/ble/)
 
 ---
 
@@ -14,7 +15,9 @@ Stubs: [`sprint-a/`](sprint-a/)
 - [ ] Demo/app compila com AARs oficiais Veepoo
 - [ ] Scan BLE + connect + `confirmDevicePwd("0000")` + `syncPersonInfo`
 - [ ] `startDetectHeart` → callback com BPM no logcat
-- [ ] `HealthtechApiClient.ingestRealtime` → **200** com `heart_rate` + `device_id`
+- [x] Simulador BLE → ingest `ingest_source=ble_sim` → **200**
+- [ ] `HbandSdkTransport` + AARs Veepoo → ingest `ingest_source=ble_hband` → **200**
+- [x] `HealthtechRepository.ingest` → **200** com `heart_rate` + `device_id`
 - [ ] 401/403 exibidos na UI (chave inválida / escopo)
 - [ ] `patient_id` estável (`PAT-HBAND-001` em debug)
 
