@@ -16,15 +16,18 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Tentar importar SentenceTransformer (pode falhar no Windows por erros de DLL no torch)
-try:
-    from sentence_transformers import SentenceTransformer
-    _HAS_TRANSFORMERS = True
-except (ImportError, OSError) as e:
-    logger.warning(
-        f"Aviso: Falha ao carregar a biblioteca de Deep Learning 'sentence-transformers' ({e}). "
-        "O sistema utilizará codificação baseada em hashing de texto para busca como fallback."
-    )
+# Tentar importar SentenceTransformer (ignorado no modo de teste rápido)
+if not os.environ.get("TESTING"):
+    try:
+        from sentence_transformers import SentenceTransformer
+        _HAS_TRANSFORMERS = True
+    except (ImportError, OSError) as e:
+        logger.warning(
+            f"Aviso: Falha ao carregar a biblioteca de Deep Learning 'sentence-transformers' ({e}). "
+            "O sistema utilizará codificação baseada em hashing de texto para busca como fallback."
+        )
+        _HAS_TRANSFORMERS = False
+else:
     _HAS_TRANSFORMERS = False
 
 

@@ -81,6 +81,16 @@ ontology_mapper = ClinicalOntologyMapper()
 bayes_net = BayesianDiagnosticNetwork()
 report_generator = OntologyEnrichedReport(ontology_mapper, bayes_net)
 consensus_coordinator = ClinicalConsensusCoordinator()
+
+# Cache de motores de dados fantasmas e histórico por paciente
+patient_engines: Dict[str, PhantomDataEngine] = {}
+patient_telemetry_history: Dict[str, List[Dict[str, Any]]] = {}
+
+def get_patient_engine(patient_id: str, use_ukf: bool = False) -> PhantomDataEngine:
+    if patient_id not in patient_engines:
+        patient_engines[patient_id] = PhantomDataEngine(dt=sim_config.dt, use_ukf=use_ukf)
+    return patient_engines[patient_id]
+
 triage_engine = TriageGameEngine()
 
 # Inicializar clientes do GCP (BigQuery e Vertex Endpoint)
@@ -125,6 +135,43 @@ sim_config = SimConfig()
 class SearchQuery(BaseModel):
     query: str
     n_results: int = 3
+
+
+
+class WearableTelemetryRequest(BaseModel):
+    patient_id: str = Field(..., min_length=3, max_length=64, pattern=r"^[A-Za-z0-9\-_]+$")
+    device_id: str = Field(default="HBAND-VE30", min_length=2, max_length=128)
+    timestamp: Optional[str] = None
+    heart_rate: float = Field(..., ge=1.0, le=300.0)
+    spo2: Optional[float] = Field(None, ge=50.0, le=100.0)
+    skin_temp: Optional[float] = Field(None, ge=25.0, le=45.0)
+    blood_pressure_sys: Optional[float] = Field(None, ge=50.0, le=300.0)
+    blood_pressure_dia: Optional[float] = Field(None, ge=30.0, le=200.0)
+    hrv_rmssd: Optional[float] = Field(None, ge=0.0, le=300.0)
+    activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
+    steps: Optional[int] = Field(None, ge=0)
+    calories: Optional[float] = Field(None, ge=0.0)
+    wear_status: Optional[bool] = True
+    ppg_signal: Optional[List[float]] = None
+    filter_type: Optional[str] = "BMO"
+    device: Optional[Dict[str, Any]] = None
+
+
+class WearableBatchItem(BaseModel):
+    timestamp: str
+    heart_rate: Optional[float] = None
+    spo2: Optional[float] = None
+    blood_pressure_sys: Optional[float] = None
+    blood_pressure_dia: Optional[float] = None
+    hrv: Optional[float] = None
+    step_count: Optional[int] = None
+    cal_value: Optional[float] = None
+
+
+class WearableBatchIngestRequest(BaseModel):
+    patient_id: str = Field(..., min_length=3, max_length=64, pattern=r"^[A-Za-z0-9\-_]+$")
+    device_id: str = Field(default="HBAND-VE30", min_length=2, max_length=128)
+    readings: List[Dict[str, Any]]
 
 
 class WindkesselSimRequest(BaseModel):
@@ -195,6 +242,189 @@ def reindex_theses():
     
     count = slm_engine.index_theses(df_theses)
     return {"status": "success", "message": f"{count} teses indexadas no ChromaDB."}
+
+
+
+# =====================================================================
+# ENDPOINTS DE INGESTÃO DE WEARABLES (VE30 / HBAND / VEEPOO)
+# =====================================================================
+
+@app.post("/api/v1/wearables/ingest")
+def ingest_wearable_reading(req: WearableTelemetryRequest):
+    """
+    Endpoint principal para recepção de telemetria contínua de smartwatches VE30.
+    Executa: Denoising BMO/Wavelet, Inferência UKF de Dados Fantasmas, Detecção de Anomalias
+    e Parecer Deliberativo do Conselho Clínico Multi-Agente (Dempster-Shafer).
+    """
+    if req.heart_rate <= 0 or req.heart_rate > 300:
+        raise HTTPException(status_code=400, detail="Frequência cardíaca fora dos limites fisiológicos (1-300 BPM).")
+
+    # 1. Denoising Fisiológico
+    bpm_clean = req.heart_rate
+    if req.ppg_signal and len(req.ppg_signal) >= 4:
+        try:
+            w_denoiser = WaveletDenoiser()
+            clean_ppg = w_denoiser.denoise(np.array(req.ppg_signal))
+            bpm_clean = float(np.mean(clean_ppg)) if 30.0 < np.mean(clean_ppg) < 220.0 else req.heart_rate
+        except Exception:
+            bpm_clean = req.heart_rate
+
+    # 2. Inferência de Dados Fantasmas via UKF/EKF por Paciente
+    engine = get_patient_engine(req.patient_id, use_ukf=sim_config.use_ukf)
+    wearable_data = {
+        'heart_rate': bpm_clean,
+        'hrv_rmssd': req.hrv_rmssd or 42.0,
+        'skin_temp': req.skin_temp or 33.2,
+        'activity_level': req.activity_level or 0.0
+    }
+    phantom_res = engine.process_reading(wearable_data)
+    phantom_states = phantom_res.get('states', phantom_res)
+
+    # 3. Detecção de Anomalias Fisiológicas
+    anomaly_res = {"alerta": False, "score": 0.0, "modo": "Simulação Local"}
+    if vertex_detector:
+        try:
+            anomaly_res = vertex_detector.processar_nova_leitura(bpm_clean)
+        except Exception as e:
+            logger.error(f"Erro no Vertex AI: {e}")
+    else:
+        is_anomalia = bpm_clean > 105 or bpm_clean < 45 or (req.spo2 is not None and req.spo2 < 92)
+        anomaly_res = {
+            "alerta": bool(is_anomalia),
+            "score": 0.95 if is_anomalia else 0.05,
+            "modo": "Deteção Local"
+        }
+
+    # 4. Diagnóstico Ontológico e Rede Bayesiana
+    current_phantom_vals = {k: v['estimate'] for k, v in phantom_states.items() if isinstance(v, dict) and 'estimate' in v}
+    hrv_metrics = {'rmssd': req.hrv_rmssd or 42.0, 'sdnn': 50.0, 'pnn50': 20.0}
+
+    hypotheses = bayes_net.generate_diagnostic_hypotheses(
+        phantom_data=phantom_states,
+        hrv_metrics=hrv_metrics,
+        anomaly_score=anomaly_res,
+        top_k=3
+    )
+
+    report = report_generator.generate_patient_report(
+        patient_id=req.patient_id,
+        phantom_data=phantom_states,
+        hrv_metrics=hrv_metrics,
+        anomaly_score=anomaly_res
+    )
+
+    # 5. Parecer do Conselho Clínico Multi-Agente (Dempster-Shafer)
+    consensus_data = consensus_coordinator.reach_consensus(
+        patient_id=req.patient_id,
+        vitals={"heart_rate": bpm_clean, "spo2": req.spo2 or 98.0},
+        phantom_data=phantom_states,
+        hrv_metrics=hrv_metrics
+    )
+
+    ts = req.timestamp or datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    response_payload = {
+        "status": "success",
+        "patient_id": req.patient_id,
+        "device_id": req.device_id,
+        "timestamp": ts,
+        "raw_telemetry": {
+            "heart_rate_bpm": req.heart_rate,
+            "spo2_percent": req.spo2,
+            "skin_temp_c": req.skin_temp,
+            "blood_pressure_sys": req.blood_pressure_sys,
+            "blood_pressure_dia": req.blood_pressure_dia,
+            "hrv_rmssd_ms": req.hrv_rmssd,
+            "steps": req.steps,
+            "wear_status": req.wear_status,
+        },
+        "phantom_data": {
+            "systolic_bp": phantom_states.get("systolic_bp", {}),
+            "diastolic_bp": phantom_states.get("diastolic_bp", {}),
+            "spo2": phantom_states.get("spo2", {}),
+            "vagal_tone": phantom_states.get("vagal_tone", {}),
+            "glucose": phantom_states.get("glucose", {}),
+        },
+        "anomaly_detection": anomaly_res,
+        "diagnostic_hypotheses": [
+            {
+                "category": h['category'],
+                "probability": round(h['posterior_probability'], 4),
+                "severity": h['severity'],
+                "confidence": h['confidence_level']
+            } for h in hypotheses
+        ],
+        "clinical_codes": report['clinical_codes'],
+        "multi_agent_consensus": {
+            "consensus_risk": consensus_data["consensus_risk"],
+            "action_summary": consensus_data["action_summary"],
+            "probabilities": consensus_data["consensus_probabilities"]
+        },
+        "clinical_alerts": [h['category'] for h in hypotheses if h.get('severity') in ('critical', 'elevated')]
+    }
+
+    # Armazenar no buffer histórico do paciente
+    if req.patient_id not in patient_telemetry_history:
+        patient_telemetry_history[req.patient_id] = []
+    patient_telemetry_history[req.patient_id].append(response_payload)
+    if len(patient_telemetry_history[req.patient_id]) > 500:
+        patient_telemetry_history[req.patient_id].pop(0)
+
+    return response_payload
+
+
+@app.post("/api/v1/wearables/ingest/batch")
+def ingest_wearable_batch(req: WearableBatchIngestRequest):
+    """
+    Ingestão em lote de registros históricos descarregados da memória do VE30 (OriginData3).
+    """
+    if not req.readings:
+        return {"status": "warning", "message": "Lote vazio recebido.", "count": 0}
+
+    processed_count = 0
+    for item in req.readings:
+        hr = float(item.get("heart_rate") or item.get("rate_value") or 72.0)
+        if hr > 0:
+            single_req = WearableTelemetryRequest(
+                patient_id=req.patient_id,
+                device_id=req.device_id,
+                timestamp=str(item.get("timestamp") or datetime.datetime.now(datetime.timezone.utc).isoformat()),
+                heart_rate=hr,
+                spo2=float(item.get("spo2") or item.get("spo2_value") or 98.0),
+                blood_pressure_sys=float(item["blood_pressure_sys"]) if item.get("blood_pressure_sys") else None,
+                blood_pressure_dia=float(item["blood_pressure_dia"]) if item.get("blood_pressure_dia") else None,
+                hrv_rmssd=float(item["hrv"]) if item.get("hrv") else 42.0,
+                steps=int(item["step_count"]) if item.get("step_count") else None
+            )
+            ingest_wearable_reading(single_req)
+            processed_count += 1
+
+    return {
+        "status": "success",
+        "patient_id": req.patient_id,
+        "processed_samples": processed_count,
+        "message": f"{processed_count} amostras históricas do VE30 processadas com sucesso na IA."
+    }
+
+
+@app.get("/api/v1/wearables/patient/{patient_id}/latest")
+def get_patient_latest_telemetry(patient_id: str):
+    """Retorna a última leitura biométrica e inferência de IA para um paciente."""
+    history = patient_telemetry_history.get(patient_id, [])
+    if not history:
+        raise HTTPException(status_code=404, detail=f"Nenhuma telemetria encontrada para o paciente '{patient_id}'.")
+    return history[-1]
+
+
+@app.get("/api/v1/wearables/patient/{patient_id}/history")
+def get_patient_telemetry_history(patient_id: str, limit: int = 20):
+    """Retorna histórico de leituras biométricas de um paciente."""
+    history = patient_telemetry_history.get(patient_id, [])
+    return {
+        "patient_id": patient_id,
+        "total_records": len(history),
+        "records": history[-max(1, min(limit, 200)):]
+    }
 
 
 @app.post("/api/hemodynamics/simulate_wk4")
