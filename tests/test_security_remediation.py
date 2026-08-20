@@ -116,6 +116,23 @@ def test_security_headers_present():
     assert headers["X-Frame-Options"] == "DENY"
     assert "Referrer-Policy" in headers
     assert "Content-Security-Policy" in headers
+    # API JSON mantém CSP restritiva
+    assert "default-src 'none'" in headers["Content-Security-Policy"]
+
+
+def test_dashboard_csp_allows_frontend_assets():
+    """Dashboard precisa de CSP que permita CSS/JS locais, Chart.js e Google Fonts."""
+    response = client.get("/dashboard/index.html")
+    assert response.status_code == 200
+    csp = response.headers["Content-Security-Policy"]
+    assert "default-src 'self'" in csp
+    assert "cdn.jsdelivr.net" in csp
+    assert "fonts.googleapis.com" in csp
+    assert "fonts.gstatic.com" in csp
+    assert "style-src" in csp
+    assert "script-src" in csp
+    # Não pode ser a política da API (senão a UI fica sem CSS/JS)
+    assert "default-src 'none'" not in csp
 
 
 def test_x_request_id_header_injected():

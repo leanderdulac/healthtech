@@ -24,7 +24,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import admin, health, lgpd, signal, wearables
+from app.api import admin, connections, health, lgpd, signal, wearables
 from app.config import get_settings
 from app.security.auth import validate_api_keys_on_startup, validate_secret_salt
 from app.security.headers import SecurityHeadersMiddleware
@@ -155,6 +155,7 @@ def _create_secure_app() -> FastAPI:
 
     application.include_router(health.router)
     application.include_router(wearables.router)
+    application.include_router(connections.router)
     application.include_router(signal.router)
     application.include_router(admin.router)
     application.include_router(lgpd.router)

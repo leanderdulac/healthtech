@@ -12,19 +12,21 @@ Schemas: `src/ingestion/real/hband_schemas.py`
 
 ## Status do backend (repo)
 
-O lado **servidor** já está pronto para o companion. O trabalho restante é o app Android.
+O lado **servidor** e o **app MVP** (HTTP + simulador BLE) estão prontos.
+O trabalho restante é plugar os AARs Veepoo numa pulseira física.
 
-| Capacidade backend | Status | Onde |
-|--------------------|--------|------|
+| Capacidade | Status | Onde |
+|------------|--------|------|
 | Contrato OpenAPI HBand/Veepoo | ✅ | `docs/openapi/hband-wearable.yaml` |
 | Normalizer + adapter Bronze | ✅ | `src/ingestion/real/hband_*` |
 | Registry fonte `hband` | ✅ | ingestão real |
 | `POST /api/v1/wearables/ingest` + matriz de alertas | ✅ | monólito + `saude_responsiva_secure` |
-| Auth `X-API-Key` / scopes | ✅ | F19 + secure factory |
+| Auth `X-API-Key` / scopes | ✅ | F19 + factory secure |
 | Testes de contrato normalizer | ✅ | `tests/test_hband_normalizer.py` |
-| App companion (BLE → HTTP) | ⬜ pendente | este checklist (sprints A–D) |
-| Esboço Sprint A (Kotlin stubs) | ✅ | [`companion-android/`](../companion-android/) |
-| Device físico + AARs | ⬜ pendente | hardware / SDK fabricante |
+| App companion HTTP (ingest / latest / outbox) | ✅ | `companion-android/app` + `:client` |
+| Simulador BLE (`ingest_source=ble_sim`) | ✅ | `companion-android/.../ble/SimulatedBleTransport.kt` |
+| Gancho HBand SDK (sem fingir pairing) | ✅ | `HbandSdkTransport.kt` |
+| Device físico + AARs Veepoo | ⬜ pendente | hardware / SDK fabricante |
 
 ---
 

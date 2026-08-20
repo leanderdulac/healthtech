@@ -151,7 +151,15 @@ fi
 AUTH_FLAG="--allow-unauthenticated"
 AUTH_DISABLED_VAL="false"
 
-ENV_VARS="^@^GCP_PROJECT_ID=${GCP_PROJECT_ID}@GCS_STAGING_BUCKET=${STAGING_BUCKET}@GCP_LOCATION=${GCP_REGION}@ENVIRONMENT=production@APP_MODE=${APP_MODE}@AUTH_DISABLED=${AUTH_DISABLED_VAL}@API_KEY=${API_KEY}@ADMIN_API_KEY=${API_KEY}@INGEST_API_KEY=${INGEST_API_KEY}@READ_API_KEY=${READ_API_KEY}@SECRET_SALT=${SECRET_SALT}@CORS_ORIGINS=${CORS_ORIGINS}"
+# Rate limits: wearables em streaming + flushes de outbox (override via env)
+RATE_LIMIT_DEFAULT=${RATE_LIMIT_DEFAULT:-"120/minute"}
+RATE_LIMIT_INGEST=${RATE_LIMIT_INGEST:-"300/minute"}
+RATE_LIMIT_BATCH=${RATE_LIMIT_BATCH:-"60/minute"}
+RATE_LIMIT_ADMIN=${RATE_LIMIT_ADMIN:-"10/minute"}
+# Bridge dashboard (full) → secure-api (ingest do companion)
+SECURE_API_BASE_URL=${SECURE_API_BASE_URL:-"https://healthtech-secure-api-5794833455.us-central1.run.app"}
+
+ENV_VARS="^@^GCP_PROJECT_ID=${GCP_PROJECT_ID}@GCS_STAGING_BUCKET=${STAGING_BUCKET}@GCP_LOCATION=${GCP_REGION}@ENVIRONMENT=production@APP_MODE=${APP_MODE}@AUTH_DISABLED=${AUTH_DISABLED_VAL}@API_KEY=${API_KEY}@ADMIN_API_KEY=${API_KEY}@INGEST_API_KEY=${INGEST_API_KEY}@READ_API_KEY=${READ_API_KEY}@SECRET_SALT=${SECRET_SALT}@CORS_ORIGINS=${CORS_ORIGINS}@RATE_LIMIT_DEFAULT=${RATE_LIMIT_DEFAULT}@RATE_LIMIT_INGEST=${RATE_LIMIT_INGEST}@RATE_LIMIT_BATCH=${RATE_LIMIT_BATCH}@RATE_LIMIT_ADMIN=${RATE_LIMIT_ADMIN}@SECURE_API_BASE_URL=${SECURE_API_BASE_URL}"
 if [[ -n "$VERTEX_ENDPOINT_ID" ]]; then
   ENV_VARS="${ENV_VARS}@VERTEX_ENDPOINT_ID=${VERTEX_ENDPOINT_ID}"
 fi
@@ -166,6 +174,9 @@ echo "Vertex TCN: ${VERTEX_TCN_ENDPOINT_ID:-'(não definido)'}"
 
 echo "Compilando imagem Docker e enviando para o Google Cloud Run..."
 if [[ "$APP_MODE" == "secure" ]]; then
+  echo "Sincronizando vendor clinical_intelligence → ${SOURCE_DIR}/_vendor_src/"
+  python3 scripts/sync_secure_vendor.py
+  python3 scripts/sync_secure_vendor.py --check
   # Imagem enxuta a partir de saude_responsiva_secure/Dockerfile
   gcloud run deploy "$SERVICE_NAME" \
       --quiet \

@@ -40,9 +40,10 @@ class Settings(BaseSettings):
     )
 
     # Rate limiting (slowapi)
+    # ingest: wearables em streaming (~1 amostra / 4s = 15/min) + flushes de outbox
     rate_limit_default: str = "120/minute"
-    rate_limit_ingest: str = "60/minute"
-    rate_limit_batch: str = "30/minute"
+    rate_limit_ingest: str = "300/minute"
+    rate_limit_batch: str = "60/minute"
     rate_limit_admin: str = "10/minute"
 
     # Telemetria em memória

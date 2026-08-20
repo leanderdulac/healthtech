@@ -58,6 +58,11 @@ def test_assess_critical_hypoxemia_on_ingest():
     assert alerts["is_true_alert"] is True
     assert alerts["severity"] == "critico"
     assert alerts["primary_rule_id"] is not None
+    assert alerts.get("care_line")
+    assert alerts["care_line"]["acs_deadline_hours"] == 4
+    assert alerts["care_line"]["acs_dispatch"] is True
+    assert alerts["care_line"]["mandatory"] is False
+    assert alerts["decision_support"]["not_a_mandatory_protocol"] is True
 
 
 def test_assess_suppresses_borderline_hr_false_positive():

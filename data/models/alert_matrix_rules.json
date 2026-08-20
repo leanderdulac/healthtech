@@ -3,306 +3,1386 @@
     "rule_id": "pa_elev_1",
     "category": "pa_alta",
     "severity": "leve",
-    "name": "Possível elevação pressórica associada a taquicardia leve"
+    "name": "Possível elevação pressórica associada a taquicardia leve",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_elev_2",
     "category": "pa_alta",
     "severity": "moderado",
-    "name": "Possível descompensação hipertensiva com taquicardia"
+    "name": "Possível descompensação hipertensiva com taquicardia",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_elev_3",
     "category": "pa_alta",
     "severity": "critico",
-    "name": "Possível crise hipertensiva associada a taquicardia"
+    "name": "Possível crise hipertensiva associada a taquicardia",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_elev_4",
     "category": "pa_alta",
     "severity": "critico",
-    "name": "Possível crise hipertensiva com comprometimento cardiorrespiratório"
+    "name": "Possível crise hipertensiva com comprometimento cardiorrespiratório",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_elev_5",
     "category": "pa_alta",
     "severity": "critico",
-    "name": "Possível descompensação hipertensiva associada a quadro febril agudo"
+    "name": "Possível descompensação hipertensiva associada a quadro febril agudo",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_elev_6",
     "category": "pa_alta",
     "severity": "critico",
-    "name": "Possível descompensação cardiovascular e metabólica"
+    "name": "Possível descompensação cardiovascular e metabólica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_elev_7",
+    "category": "pa_alta",
+    "severity": "leve",
+    "name": "Possível elevação pressórica persistente",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_elev_8",
+    "category": "pa_alta",
+    "severity": "moderado",
+    "name": "Possível hipertensão importante sem outros sinais associados",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_elev_9",
+    "category": "pa_alta",
+    "severity": "moderado",
+    "name": "Possível sobrecarga cardiovascular associada a dessaturação",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_elev_10",
+    "category": "pa_alta",
+    "severity": "moderado",
+    "name": "Possível alteração pressórica aguda com resposta cardíaca",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_elev_11",
+    "category": "pa_alta",
+    "severity": "leve",
+    "name": "Possível elevação pressórica leve em medida isolada",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_elev_12",
+    "category": "pa_alta",
+    "severity": "leve",
+    "name": "Possível elevação sistólica isolada",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_elev_13",
+    "category": "pa_alta",
+    "severity": "leve",
+    "name": "Possível elevação diastólica isolada",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_elev_14",
+    "category": "pa_alta",
+    "severity": "moderado",
+    "name": "Possível elevação sistólica importante",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_elev_15",
+    "category": "pa_alta",
+    "severity": "moderado",
+    "name": "Possível elevação diastólica importante",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_baixa_1",
     "category": "pa_baixa",
     "severity": "leve",
-    "name": "Possível hipotensão associada a taquicardia leve"
+    "name": "Possível hipotensão associada a taquicardia leve",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_baixa_2",
     "category": "pa_baixa",
     "severity": "moderado",
-    "name": "Possível hipovolemia ou instabilidade circulatória"
+    "name": "Possível hipovolemia ou instabilidade circulatória",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_baixa_3",
     "category": "pa_baixa",
     "severity": "critico",
-    "name": "Possível infecção com repercussão hemodinâmica"
+    "name": "Possível infecção com repercussão hemodinâmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_baixa_4",
     "category": "pa_baixa",
     "severity": "critico",
-    "name": "Possível deterioração cardiorrespiratória"
+    "name": "Possível deterioração cardiorrespiratória",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_baixa_5",
     "category": "pa_baixa",
     "severity": "critico",
-    "name": "Possível instabilidade hemodinâmica"
+    "name": "Possível instabilidade hemodinâmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "pa_baixa_6",
     "category": "pa_baixa",
     "severity": "critico",
-    "name": "Possível hipotensão associada a hipoxemia"
+    "name": "Possível hipotensão associada a hipoxemia",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_baixa_7",
+    "category": "pa_baixa",
+    "severity": "leve",
+    "name": "Possível tendência à hipotensão",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_baixa_8",
+    "category": "pa_baixa",
+    "severity": "moderado",
+    "name": "Possível hipotensão",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_baixa_9",
+    "category": "pa_baixa",
+    "severity": "moderado",
+    "name": "Possível hipovolemia inicial ou estresse circulatório",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_baixa_10",
+    "category": "pa_baixa",
+    "severity": "moderado",
+    "name": "Possível comprometimento hemodinâmico e respiratório inicial",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_baixa_11",
+    "category": "pa_baixa",
+    "severity": "leve",
+    "name": "Possível queda pressórica aguda relativa ao basal",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "pa_baixa_12",
+    "category": "pa_baixa",
+    "severity": "moderado",
+    "name": "Possível redução pressórica importante em relação ao basal",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "spo2_1",
     "category": "spo2",
     "severity": "leve",
-    "name": "Possível dessaturação leve"
+    "name": "Possível dessaturação leve",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
   },
   {
     "rule_id": "spo2_2",
     "category": "spo2",
     "severity": "moderado",
-    "name": "Possível dessaturação moderada"
+    "name": "Possível dessaturação moderada",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "spo2_3",
     "category": "spo2",
     "severity": "moderado",
-    "name": "Possível comprometimento respiratório com resposta cardíaca compensatória"
+    "name": "Possível comprometimento respiratório com resposta cardíaca compensatória",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "spo2_4",
     "category": "spo2",
     "severity": "critico",
-    "name": "Possível infecção com repercussão sistêmica"
+    "name": "Possível infecção com repercussão sistêmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "spo2_5",
     "category": "spo2",
     "severity": "critico",
-    "name": "Possível hipoxemia importante"
+    "name": "Possível hipoxemia importante",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "spo2_6",
     "category": "spo2",
     "severity": "critico",
-    "name": "Possível comprometimento cardiorrespiratório agudo"
+    "name": "Possível comprometimento cardiorrespiratório agudo",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "spo2_7",
     "category": "spo2",
     "severity": "critico",
-    "name": "Possível infecção aguda com hipoxemia"
+    "name": "Possível infecção aguda com hipoxemia",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "spo2_8",
+    "category": "spo2",
+    "severity": "leve",
+    "name": "Possível estresse cardiorrespiratório leve",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "spo2_9",
+    "category": "spo2",
+    "severity": "leve",
+    "name": "Possível tendência de queda da oxigenação",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "spo2_10",
+    "category": "spo2",
+    "severity": "moderado",
+    "name": "Possível infecção respiratória com dessaturação moderada",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "spo2_11",
+    "category": "spo2",
+    "severity": "moderado",
+    "name": "Possível limitação respiratória com impacto funcional",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "spo2_12",
+    "category": "spo2",
+    "severity": "moderado",
+    "name": "Possível deterioração da oxigenação",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "spo2_13",
+    "category": "spo2",
+    "severity": "moderado",
+    "name": "Possível dessaturação relevante em medida isolada",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "spo2_14",
+    "category": "spo2",
+    "severity": "moderado",
+    "name": "Possível dessaturação leve persistente",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "spo2_15",
+    "category": "spo2",
+    "severity": "moderado",
+    "name": "Possível queda aguda da oxigenação",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "temp_1",
     "category": "temperatura",
     "severity": "leve",
-    "name": "Possível estado febril com resposta cardíaca leve"
+    "name": "Possível estado febril com resposta cardíaca leve",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
   },
   {
     "rule_id": "temp_2",
     "category": "temperatura",
     "severity": "moderado",
-    "name": "Possível estado febril associado a taquicardia"
+    "name": "Possível estado febril associado a taquicardia",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "temp_3",
     "category": "temperatura",
     "severity": "critico",
-    "name": "Possível infecção com deterioração clínica"
+    "name": "Possível infecção com deterioração clínica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "temp_4",
     "category": "temperatura",
     "severity": "critico",
-    "name": "Possível infecção com instabilidade hemodinâmica"
+    "name": "Possível infecção com instabilidade hemodinâmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "temp_5",
     "category": "temperatura",
     "severity": "critico",
-    "name": "Possível febre alta com repercussão cardiovascular"
+    "name": "Possível febre alta com repercussão cardiovascular",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "temp_6",
     "category": "temperatura",
     "severity": "critico",
-    "name": "Possível infecção grave ou desidratação com instabilidade clínica"
+    "name": "Possível infecção grave ou desidratação com instabilidade clínica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "temp_7",
     "category": "temperatura",
     "severity": "critico",
-    "name": "Possível hipotermia com instabilidade fisiológica"
+    "name": "Possível hipotermia com instabilidade fisiológica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "temp_8",
+    "category": "temperatura",
+    "severity": "leve",
+    "name": "Possível estado febril",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "temp_9",
+    "category": "temperatura",
+    "severity": "leve",
+    "name": "Possível redução leve da temperatura corporal",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "temp_10",
+    "category": "temperatura",
+    "severity": "moderado",
+    "name": "Possível hipotermia leve com repercussão fisiológica",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "temp_11",
+    "category": "temperatura",
+    "severity": "moderado",
+    "name": "Possível infecção respiratória em fase inicial",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "temp_12",
+    "category": "temperatura",
+    "severity": "moderado",
+    "name": "Possível processo febril ou inflamatório agudo",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "temp_13",
+    "category": "temperatura",
+    "severity": "moderado",
+    "name": "Possível febre alta em medida isolada",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "temp_14",
+    "category": "temperatura",
+    "severity": "moderado",
+    "name": "Possível redução térmica aguda",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hypo_1",
     "category": "hipoglicemia",
     "severity": "moderado",
-    "name": "Possível hipoglicemia"
+    "name": "Possível hipoglicemia",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hypo_2",
     "category": "hipoglicemia",
     "severity": "moderado",
-    "name": "Possível hipoglicemia com resposta adrenérgica"
+    "name": "Possível hipoglicemia com resposta adrenérgica",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hypo_3",
     "category": "hipoglicemia",
     "severity": "critico",
-    "name": "Possível hipoglicemia associada a instabilidade hemodinâmica"
+    "name": "Possível hipoglicemia associada a instabilidade hemodinâmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hypo_4",
     "category": "hipoglicemia",
     "severity": "critico",
-    "name": "Possível hipoglicemia clinicamente significativa"
+    "name": "Possível hipoglicemia clinicamente significativa",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hypo_5",
     "category": "hipoglicemia",
     "severity": "critico",
-    "name": "Possível hipoglicemia grave"
+    "name": "Possível hipoglicemia grave",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hypo_6",
+    "category": "hipoglicemia",
+    "severity": "leve",
+    "name": "Possível tendência à hipoglicemia",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hypo_7",
+    "category": "hipoglicemia",
+    "severity": "moderado",
+    "name": "Possível queda glicêmica com resposta adrenérgica inicial",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hypo_8",
+    "category": "hipoglicemia",
+    "severity": "moderado",
+    "name": "Possível queda glicêmica rápida",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hypo_9",
+    "category": "hipoglicemia",
+    "severity": "moderado",
+    "name": "Possível hipoglicemia persistente",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hypo_10",
+    "category": "hipoglicemia",
+    "severity": "leve",
+    "name": "Possível glicemia abaixo da faixa habitual",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hypo_11",
+    "category": "hipoglicemia",
+    "severity": "moderado",
+    "name": "Possível glicemia baixa persistente",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hypo_12",
+    "category": "hipoglicemia",
+    "severity": "leve",
+    "name": "Possível tendência de queda glicêmica",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
   },
   {
     "rule_id": "hyper_1",
     "category": "hiperglicemia",
     "severity": "leve",
-    "name": "Possível hiperglicemia acima da meta"
+    "name": "Possível hiperglicemia acima da meta",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
   },
   {
     "rule_id": "hyper_2",
     "category": "hiperglicemia",
     "severity": "moderado",
-    "name": "Possível hiperglicemia importante"
+    "name": "Possível hiperglicemia importante",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hyper_3",
     "category": "hiperglicemia",
     "severity": "moderado",
-    "name": "Possível hiperglicemia associada a quadro infeccioso"
+    "name": "Possível hiperglicemia associada a quadro infeccioso",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hyper_4",
     "category": "hiperglicemia",
     "severity": "critico",
-    "name": "Possível descompensação metabólica associada a infecção"
+    "name": "Possível descompensação metabólica associada a infecção",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hyper_5",
     "category": "hiperglicemia",
     "severity": "critico",
-    "name": "Possível crise hiperglicêmica com desidratação ou instabilidade circulatória"
+    "name": "Possível crise hiperglicêmica com desidratação ou instabilidade circulatória",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hyper_6",
     "category": "hiperglicemia",
     "severity": "critico",
-    "name": "Possível hiperglicemia severa"
+    "name": "Possível hiperglicemia",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "hyper_7",
     "category": "hiperglicemia",
     "severity": "critico",
-    "name": "Possível estado hiperglicêmico hiperosmolar"
+    "name": "Possível estado hiperglicêmico hiperosmolar",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hyper_8",
+    "category": "hiperglicemia",
+    "severity": "leve",
+    "name": "Possível elevação glicêmica aguda",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hyper_9",
+    "category": "hiperglicemia",
+    "severity": "moderado",
+    "name": "Possível hiperglicemia persistente",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hyper_10",
+    "category": "hiperglicemia",
+    "severity": "moderado",
+    "name": "Possível estresse metabólico associado a taquicardia leve",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hyper_11",
+    "category": "hiperglicemia",
+    "severity": "moderado",
+    "name": "Possível hiperglicemia associada a estado febril",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hyper_12",
+    "category": "hiperglicemia",
+    "severity": "moderado",
+    "name": "Possível alteração metabólica com repercussão funcional",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hyper_13",
+    "category": "hiperglicemia",
+    "severity": "leve",
+    "name": "Possível elevação glicêmica leve",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "hyper_14",
+    "category": "hiperglicemia",
+    "severity": "leve",
+    "name": "Possível tendência de elevação glicêmica",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
   },
   {
     "rule_id": "fc_1",
     "category": "fc",
     "severity": "moderado",
-    "name": "Possível bradicardia relativa"
+    "name": "Possível bradicardia relativa",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "fc_2",
     "category": "fc",
     "severity": "critico",
-    "name": "Possível bradicardia com repercussão hemodinâmica"
+    "name": "Possível bradicardia com repercussão hemodinâmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "fc_3",
     "category": "fc",
     "severity": "critico",
-    "name": "Possível bradicardia associada a dessaturação"
+    "name": "Possível bradicardia associada a dessaturação",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "fc_4",
     "category": "fc",
     "severity": "critico",
-    "name": "Possível bradicardia importante"
+    "name": "Possível bradicardia importante",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "fc_5",
     "category": "fc",
     "severity": "leve",
-    "name": "Possível taquicardia persistente"
+    "name": "Possível taquicardia persistente",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
   },
   {
     "rule_id": "fc_6",
     "category": "fc",
     "severity": "critico",
-    "name": "Possível taquicardia importante"
+    "name": "Possível taquicardia importante",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "fc_7",
     "category": "fc",
     "severity": "critico",
-    "name": "Possível deterioração sistêmica ou cardiovascular"
+    "name": "Possível deterioração sistêmica ou cardiovascular",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "fc_8",
+    "category": "fc",
+    "severity": "leve",
+    "name": "Possível taquicardia leve",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "fc_9",
+    "category": "fc",
+    "severity": "leve",
+    "name": "Possível estresse fisiológico inicial",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "fc_10",
+    "category": "fc",
+    "severity": "moderado",
+    "name": "Possível taquicardia persistente com necessidade de avaliação",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "fc_11",
+    "category": "fc",
+    "severity": "moderado",
+    "name": "Possível resposta cardíaca a estado febril",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "fc_12",
+    "category": "fc",
+    "severity": "moderado",
+    "name": "Possível estresse cardiorrespiratório",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "fc_13",
+    "category": "fc",
+    "severity": "leve",
+    "name": "Possível redução leve da frequência cardíaca",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "fc_14",
+    "category": "fc",
+    "severity": "moderado",
+    "name": "Possível taquicardia leve persistente",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "fc_15",
+    "category": "fc",
+    "severity": "leve",
+    "name": "Possível resposta fisiológica aguda",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "fc_16",
+    "category": "fc",
+    "severity": "moderado",
+    "name": "Possível taquicardia aguda relativa ao basal",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "func_1",
     "category": "funcional",
     "severity": "leve",
-    "name": "Possível redução funcional associada à piora do sono"
+    "name": "Possível redução funcional associada à piora do sono",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
   },
   {
     "rule_id": "func_2",
     "category": "funcional",
     "severity": "moderado",
-    "name": "Possível estresse fisiológico com redução funcional"
+    "name": "Possível estresse fisiológico com redução funcional",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "func_3",
     "category": "funcional",
     "severity": "moderado",
-    "name": "Possível comprometimento respiratório associado à redução funcional"
+    "name": "Possível comprometimento respiratório associado à redução funcional",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "func_4",
     "category": "funcional",
     "severity": "critico",
-    "name": "Possível deterioração clínica aguda"
+    "name": "Possível deterioração clínica aguda",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": null
   },
   {
     "rule_id": "func_5",
     "category": "funcional",
     "severity": "moderado",
-    "name": "Possível estresse cardiovascular associado à piora do sono"
+    "name": "Possível estresse cardiovascular associado à piora do sono",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
   },
   {
     "rule_id": "func_6",
     "category": "funcional",
     "severity": "moderado",
-    "name": "Possível descompensação cardiovascular associada à piora do sono"
+    "name": "Possível descompensação cardiovascular associada à piora do sono",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "func_7",
+    "category": "funcional",
+    "severity": "leve",
+    "name": "Possível alteração funcional inicial",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "func_8",
+    "category": "funcional",
+    "severity": "leve",
+    "name": "Possível redução funcional persistente",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "func_9",
+    "category": "funcional",
+    "severity": "leve",
+    "name": "Possível sono insuficiente ou não reparador",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "func_10",
+    "category": "funcional",
+    "severity": "leve",
+    "name": "Possível estresse fisiológico associado à piora do sono",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "func_11",
+    "category": "funcional",
+    "severity": "moderado",
+    "name": "Possível privação de sono com repercussão fisiológica",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "func_12",
+    "category": "funcional",
+    "severity": "moderado",
+    "name": "Possível alteração respiratória associada ao sono",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "func_13",
+    "category": "funcional",
+    "severity": "moderado",
+    "name": "Possível redução funcional associada a hipotensão",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "func_14",
+    "category": "funcional",
+    "severity": "moderado",
+    "name": "Possível doença aguda com repercussão funcional",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": null
+  },
+  {
+    "rule_id": "inf_1",
+    "category": "infeccao",
+    "severity": "leve",
+    "name": "Possível infecção sem repercussão respiratória, incluindo ITU",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_2",
+    "category": "infeccao",
+    "severity": "leve",
+    "name": "Possível processo infeccioso com alteração funcional inicial",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_3",
+    "category": "infeccao",
+    "severity": "moderado",
+    "name": "Possível processo infeccioso ou inflamatório agudo",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_4",
+    "category": "infeccao",
+    "severity": "moderado",
+    "name": "Possível infecção, incluindo ITU, com resposta sistêmica",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_5",
+    "category": "infeccao",
+    "severity": "moderado",
+    "name": "Possível infecção respiratória ou pneumonia com dessaturação moderada",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_6",
+    "category": "infeccao",
+    "severity": "moderado",
+    "name": "Possível pneumonia com repercussão respiratória e funcional",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_7",
+    "category": "infeccao",
+    "severity": "moderado",
+    "name": "Possível infecção associada a descompensação metabólica",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_8",
+    "category": "infeccao",
+    "severity": "moderado",
+    "name": "Possível infecção com resposta sistêmica importante",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_9",
+    "category": "infeccao",
+    "severity": "moderado",
+    "name": "Possível apresentação atípica de infecção com deterioração funcional",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_10",
+    "category": "infeccao",
+    "severity": "critico",
+    "name": "Possível sepse com repercussão hemodinâmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_11",
+    "category": "infeccao",
+    "severity": "critico",
+    "name": "Possível pneumonia grave ou infecção com hipoxemia",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_12",
+    "category": "infeccao",
+    "severity": "critico",
+    "name": "Possível sepse com hipotermia e instabilidade fisiológica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_13",
+    "category": "infeccao",
+    "severity": "critico",
+    "name": "Possível sepse ou choque associado a infecção",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "inf_14",
+    "category": "infeccao",
+    "severity": "critico",
+    "name": "Possível infecção grave com deterioração cardiorrespiratória e hemodinâmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Os dados do device sinalizam possível deterioração, mas não confirmam nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, avaliação clínica e exames quando indicados."
+  },
+  {
+    "rule_id": "desid_1",
+    "category": "desidratacao",
+    "severity": "leve",
+    "name": "Possível desidratação leve ou estresse fisiológico inicial",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_2",
+    "category": "desidratacao",
+    "severity": "leve",
+    "name": "Possível redução leve do volume circulante",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_3",
+    "category": "desidratacao",
+    "severity": "leve",
+    "name": "Possível hipovolemia inicial em relação ao basal",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_4",
+    "category": "desidratacao",
+    "severity": "leve",
+    "name": "Possível tendência persistente compatível com desidratação leve",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_5",
+    "category": "desidratacao",
+    "severity": "moderado",
+    "name": "Possível desidratação ou hipovolemia",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_6",
+    "category": "desidratacao",
+    "severity": "moderado",
+    "name": "Possível desidratação com taquicardia compensatória",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_7",
+    "category": "desidratacao",
+    "severity": "moderado",
+    "name": "Possível redução importante do volume circulante",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_8",
+    "category": "desidratacao",
+    "severity": "moderado",
+    "name": "Possível desidratação com repercussão funcional",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_9",
+    "category": "desidratacao",
+    "severity": "moderado",
+    "name": "Possível desidratação osmótica associada à hiperglicemia",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_10",
+    "category": "desidratacao",
+    "severity": "moderado",
+    "name": "Possível desidratação associada a febre alta",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_11",
+    "category": "desidratacao",
+    "severity": "critico",
+    "name": "Possível desidratação grave ou hipovolemia com instabilidade hemodinâmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_12",
+    "category": "desidratacao",
+    "severity": "critico",
+    "name": "Possível desidratação grave com repercussão circulatória e funcional",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_13",
+    "category": "desidratacao",
+    "severity": "critico",
+    "name": "Possível desidratação grave em descompensação hiperglicêmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "desid_14",
+    "category": "desidratacao",
+    "severity": "critico",
+    "name": "Possível desidratação grave ou infecção com instabilidade clínica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "O device não mede hidratação diretamente; os cruzamentos indicam possível desidratação ou hipovolemia e exigem confirmação clínica."
+  },
+  {
+    "rule_id": "queda_1",
+    "category": "queda",
+    "severity": "leve",
+    "name": "Possível alteração funcional ou evento com redução da mobilidade",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_2",
+    "category": "queda",
+    "severity": "leve",
+    "name": "Possível evento de inatividade com necessidade de checagem",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_3",
+    "category": "queda",
+    "severity": "leve",
+    "name": "Possível alteração funcional após evento não relatado",
+    "priority_stars": 1,
+    "priority_label": "★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_4",
+    "category": "queda",
+    "severity": "moderado",
+    "name": "Possível queda ou evento agudo com resposta fisiológica",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_5",
+    "category": "queda",
+    "severity": "moderado",
+    "name": "Possível queda ou pré-síncope associada a redução pressórica",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_6",
+    "category": "queda",
+    "severity": "moderado",
+    "name": "Possível queda ou incapacidade funcional associada à hipotensão",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_7",
+    "category": "queda",
+    "severity": "moderado",
+    "name": "Possível dor ou estresse fisiológico após queda",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_8",
+    "category": "queda",
+    "severity": "moderado",
+    "name": "Possível evento cardiorrespiratório associado a queda",
+    "priority_stars": 2,
+    "priority_label": "★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_9",
+    "category": "queda",
+    "severity": "critico",
+    "name": "Possível queda com imobilidade ou deterioração clínica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_10",
+    "category": "queda",
+    "severity": "critico",
+    "name": "Possível síncope ou queda com instabilidade hemodinâmica",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_11",
+    "category": "queda",
+    "severity": "critico",
+    "name": "Possível evento agudo ou queda com taquicardia importante",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_12",
+    "category": "queda",
+    "severity": "critico",
+    "name": "Possível evento cardiorrespiratório com queda ou imobilidade",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_13",
+    "category": "queda",
+    "severity": "critico",
+    "name": "Possível síncope ou queda associada a bradicardia",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
+  },
+  {
+    "rule_id": "queda_14",
+    "category": "queda",
+    "severity": "critico",
+    "name": "Possível queda associada a hipoglicemia clinicamente significativa",
+    "priority_stars": 3,
+    "priority_label": "★★★",
+    "clinical_note": "Sem detecção validada de impacto, a matriz indica possível queda ou evento agudo pela mudança de atividade e dos sinais fisiológicos; confirmar com o paciente, cuidador ou ACS. Regras com interrupção abrupta aplicam-se quando houver dado horário de passos."
   }
 ]

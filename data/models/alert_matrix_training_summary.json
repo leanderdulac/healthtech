@@ -1,14 +1,14 @@
 {
-  "n_rules": 51,
-  "n_samples": 8580,
+  "n_rules": 154,
+  "n_samples": 20700,
   "metrics": {
-    "severity_f1_macro": 0.9957447880733119,
-    "false_positive_precision": 0.9951612903225806,
-    "false_positive_recall": 0.9983818770226537,
-    "false_positive_f1": 0.9967689822294022,
+    "severity_f1_macro": 0.9539668465071691,
+    "false_positive_precision": 0.9224137931034483,
+    "false_positive_recall": 1.0,
+    "false_positive_f1": 0.9596412556053812,
     "true_alert_precision": 1.0,
-    "true_alert_recall": 0.9950980392156863,
-    "true_alert_f1": 0.9975429975429976
+    "true_alert_recall": 1.0,
+    "true_alert_f1": 1.0
   },
   "model_path": "data/models/alert_matrix_classifier.pkl",
   "dataset": "data/clinical_intelligence/alert_matrix_training.csv"

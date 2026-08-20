@@ -27,6 +27,45 @@ class WearableTelemetryRequest(BaseModel):
     body_temp_c: Optional[float] = Field(None, ge=30.0, le=45.0)
     steps_drop_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
     sleep_worsen_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
+    hr_baseline_rise: Optional[float] = Field(None, ge=-80.0, le=120.0)
+    spo2_drop_points: Optional[float] = Field(None, ge=0.0, le=50.0)
+    pas_rise_mmhg: Optional[float] = Field(None, ge=0.0, le=150.0)
+    pad_rise_mmhg: Optional[float] = Field(None, ge=0.0, le=100.0)
+    pas_drop_mmhg: Optional[float] = Field(None, ge=0.0, le=150.0)
+    glucose_rise_mgdl: Optional[float] = Field(None, ge=0.0, le=800.0)
+    glucose_drop_mgdl: Optional[float] = Field(None, ge=0.0, le=800.0)
+    temp_rise_c: Optional[float] = Field(None, ge=0.0, le=8.0)
+    temp_drop_c: Optional[float] = Field(None, ge=0.0, le=8.0)
+    at_rest: Optional[bool] = None
+    fasting_or_preprandial: Optional[bool] = None
+    consecutive_count: Optional[int] = Field(None, ge=1, le=48)
+    sleep_hours: Optional[float] = Field(None, ge=0.0, le=24.0)
+    steps_drop_consecutive_days: Optional[int] = Field(None, ge=0, le=30)
+    poor_sleep_nights: Optional[int] = Field(None, ge=0, le=30)
+    hourly_steps_available: Optional[bool] = None
+    abrupt_steps_stop: Optional[bool] = None
+    inactivity_rest_of_active_period: Optional[bool] = None
+    consciousness_altered: Optional[bool] = None
+    # Origem do ingest: HTTP manual, simulador BLE ou HBand SDK
+    ingest_source: Optional[str] = Field("companion_manual", max_length=32)
+
+    @field_validator("ingest_source")
+    @classmethod
+    def validate_ingest_source(cls, v: Optional[str]) -> Optional[str]:
+        allowed = {
+            "companion_manual",
+            "ble_sim",
+            "ble_hband",
+            "http",
+        }
+        if v is None or v == "":
+            return "companion_manual"
+        if v not in allowed:
+            raise ValueError(
+                "ingest_source inválido. Valores aceitos: "
+                + ", ".join(sorted(allowed))
+            )
+        return v
 
     @field_validator("filter_type")
     @classmethod

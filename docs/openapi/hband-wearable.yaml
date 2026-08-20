@@ -16,12 +16,10 @@ info:
     name: Healthtech Platform
 
 servers:
-  - url: https://healthtech-responsive-xb6tlskpoq-uc.a.run.app
-    description: Cloud Run full (APP_MODE=full)
-  - url: https://healthtech-secure-api-xb6tlskpoq-uc.a.run.app
-    description: Cloud Run secure (APP_MODE=secure)
   - url: http://localhost:8080
-    description: Local
+    description: Local / emulador Android use http://10.0.2.2:8080
+  - url: https://YOUR_SECURE_API.run.app
+    description: Cloud Run secure (substitua pela URL do seu deploy)
 
 tags:
   - name: companion-ingest
@@ -55,6 +53,7 @@ paths:
                   heart_rate: 78.0
                   hrv_rmssd: 42.0
                   filter_type: BMO
+                  ingest_source: ble_hband
                   timestamp: "2026-08-06T12:00:00Z"
               multiVital:
                 summary: HR + SpO2 + temp + PPG
@@ -153,6 +152,47 @@ paths:
         "200":
           description: healthy
 
+  /api/v1/wearables/patient/{patient_id}/latest:
+    get:
+      tags: [companion-ingest]
+      summary: Última telemetria do paciente
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Último frame processado
+        "404":
+          description: Sem dados para o paciente
+
+  /api/v1/wearables/patient/{patient_id}/history:
+    get:
+      tags: [companion-ingest]
+      summary: Histórico recente do paciente
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Lista de frames
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -237,6 +277,13 @@ components:
           type: string
           enum: [BMO, Wavelet, Butterworth, Raw, Adaptive]
           default: BMO
+        ingest_source:
+          type: string
+          enum: [companion_manual, ble_sim, ble_hband, http]
+          default: companion_manual
+          description: >
+            Origem honesta do frame. ble_sim = simulador no app (não é pulseira).
+            ble_hband = SDK Veepoo. companion_manual = botão/smoke HTTP.
 
     WearableBatchIngest:
       type: object

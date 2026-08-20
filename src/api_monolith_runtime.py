@@ -16,8 +16,9 @@ from typing import Dict, Any, Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi import Depends, FastAPI, Security, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -328,6 +329,39 @@ class WearableTelemetryRequest(BaseModel):
     body_temp_c: Optional[float] = Field(None, ge=30.0, le=45.0)
     steps_drop_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
     sleep_worsen_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
+    hr_baseline_rise: Optional[float] = Field(None, ge=-80.0, le=120.0)
+    spo2_drop_points: Optional[float] = Field(None, ge=0.0, le=50.0)
+    pas_rise_mmhg: Optional[float] = Field(None, ge=0.0, le=150.0)
+    pad_rise_mmhg: Optional[float] = Field(None, ge=0.0, le=100.0)
+    pas_drop_mmhg: Optional[float] = Field(None, ge=0.0, le=150.0)
+    glucose_rise_mgdl: Optional[float] = Field(None, ge=0.0, le=800.0)
+    glucose_drop_mgdl: Optional[float] = Field(None, ge=0.0, le=800.0)
+    temp_rise_c: Optional[float] = Field(None, ge=0.0, le=8.0)
+    temp_drop_c: Optional[float] = Field(None, ge=0.0, le=8.0)
+    at_rest: Optional[bool] = None
+    fasting_or_preprandial: Optional[bool] = None
+    consecutive_count: Optional[int] = Field(None, ge=1, le=48)
+    sleep_hours: Optional[float] = Field(None, ge=0.0, le=24.0)
+    steps_drop_consecutive_days: Optional[int] = Field(None, ge=0, le=30)
+    poor_sleep_nights: Optional[int] = Field(None, ge=0, le=30)
+    hourly_steps_available: Optional[bool] = None
+    abrupt_steps_stop: Optional[bool] = None
+    inactivity_rest_of_active_period: Optional[bool] = None
+    consciousness_altered: Optional[bool] = None
+    ingest_source: Optional[str] = Field("companion_manual", max_length=32)
+
+    @field_validator("ingest_source")
+    @classmethod
+    def validate_ingest_source(cls, v: Optional[str]) -> Optional[str]:
+        allowed = {"companion_manual", "ble_sim", "ble_hband", "http"}
+        if v is None or v == "":
+            return "companion_manual"
+        if v not in allowed:
+            raise ValueError(
+                "ingest_source inválido. Valores aceitos: "
+                + ", ".join(sorted(allowed))
+            )
+        return v
 
     @field_validator("filter_type")
     @classmethod
@@ -442,6 +476,26 @@ def ingest_wearable_reading(
         "body_temp_c",
         "steps_drop_pct",
         "sleep_worsen_pct",
+        "hr_baseline_rise",
+        "spo2_drop_points",
+        "pas_rise_mmhg",
+        "pad_rise_mmhg",
+        "pas_drop_mmhg",
+        "glucose_rise_mgdl",
+        "glucose_drop_mgdl",
+        "temp_rise_c",
+        "temp_drop_c",
+        "at_rest",
+        "fasting_or_preprandial",
+        "consecutive_count",
+        "sleep_hours",
+        "steps_drop_consecutive_days",
+        "poor_sleep_nights",
+        "hourly_steps_available",
+        "abrupt_steps_stop",
+        "inactivity_rest_of_active_period",
+        "consciousness_altered",
+        "ingest_source",
     ):
         val = getattr(req, key, None)
         if val is not None:
@@ -480,16 +534,19 @@ def ingest_wearable_reading(
             "error": str(alert_err),
         }
 
+    ingest_source = req.ingest_source or "companion_manual"
     processed_frame = {
         "patient_id": req.patient_id,
         "device_id": req.device_id,
         "timestamp": ts,
+        "ingest_source": ingest_source,
         "raw_telemetry": {
             "heart_rate_bpm": req.heart_rate,
             "hrv_rmssd_ms": req.hrv_rmssd,
             "skin_temp_celsius": req.skin_temp,
             "spo2_percent": req.spo2,
-            "activity_level": req.activity_level
+            "activity_level": req.activity_level,
+            "ingest_source": ingest_source,
         },
         "cleaned_telemetry": {
             "heart_rate_clean": round(bpm_clean, 2),
@@ -599,6 +656,169 @@ def get_patient_telemetry_history(
     if not history:
         raise HTTPException(status_code=404, detail=f"Nenhum histórico encontrado para o paciente '{patient_id}'.")
     return {"patient_id": patient_id, "total_records": len(history), "records": history[-limit:]}
+
+
+_optional_api_key = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def _connections_public_view(full: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        from app.services.connection_status import public_connection_view
+    except ImportError:
+        from saude_responsiva_secure.app.services.connection_status import (  # type: ignore
+            public_connection_view,
+        )
+    return public_connection_view(full)
+
+
+def _build_connections_payload(
+    online_threshold_sec: int,
+    stale_threshold_sec: int,
+) -> Dict[str, Any]:
+    try:
+        from app.services.connection_status import build_connection_status
+    except ImportError:
+        from saude_responsiva_secure.app.services.connection_status import (  # type: ignore
+            build_connection_status,
+        )
+    return build_connection_status(
+        patient_history,
+        online_threshold_sec=online_threshold_sec,
+        stale_threshold_sec=stale_threshold_sec,
+    )
+
+
+@app.get("/api/v1/connections/status")
+def get_mobile_device_connection_status(
+    online_threshold_sec: int = Query(default=30, ge=5, le=600),
+    stale_threshold_sec: int = Query(default=300, ge=30, le=3600),
+    x_api_key: Optional[str] = Security(_optional_api_key),
+):
+    """
+    Status das conexões: app companion Android e device (via app / BLE futuro).
+    Sem chave → visão pública; com wearables:read → sessões completas.
+    """
+    full = _build_connections_payload(online_threshold_sec, stale_threshold_sec)
+    try:
+        from app.security.auth import get_key_scopes
+        from app.config import get_settings as _gs
+    except ImportError:
+        from saude_responsiva_secure.app.security.auth import get_key_scopes  # type: ignore
+        from saude_responsiva_secure.app.config import get_settings as _gs  # type: ignore
+
+    settings = _gs()
+    scopes = get_key_scopes(x_api_key, settings)
+    if "wearables:read" in scopes or "admin" in scopes or settings.is_auth_disabled:
+        full["public"] = False
+        return full
+    return _connections_public_view(full)
+
+
+@app.get("/api/v1/connections/public")
+def get_mobile_device_connection_status_public(
+    online_threshold_sec: int = Query(default=30, ge=5, le=600),
+    stale_threshold_sec: int = Query(default=300, ge=30, le=3600),
+):
+    """Visão pública das conexões mobile/device (sem API key)."""
+    full = _build_connections_payload(online_threshold_sec, stale_threshold_sec)
+    return _connections_public_view(full)
+
+
+# ---------------------------------------------------------------------------
+# Bridge: monólito full (dashboard) → secure-api (ingest real do app mobile)
+# O companion grava na secure-api; o full tem memória separada. Este proxy
+# same-origin evita CORS e permite o dashboard mostrar telemetria real.
+# ---------------------------------------------------------------------------
+# Vazio = só memória local. Produção injeta via deploy_to_gcp.sh.
+SECURE_API_BASE_URL = os.getenv("SECURE_API_BASE_URL", "").rstrip("/")
+
+
+def _secure_read_headers() -> Dict[str, str]:
+    key = (
+        os.getenv("READ_API_KEY")
+        or os.getenv("API_KEY")
+        or os.getenv("ADMIN_API_KEY")
+        or ""
+    ).strip()
+    headers = {"Accept": "application/json"}
+    if key:
+        headers["X-API-Key"] = key
+    return headers
+
+
+@app.get("/api/v1/mobile/bridge/snapshot")
+def mobile_bridge_snapshot(
+    patient_id: str = Query(default="PAT-HBAND-001", min_length=3, max_length=64),
+    online_threshold_sec: int = Query(default=30, ge=5, le=600),
+):
+    """
+    Snapshot unificado para o dashboard: status de conexão + latest do app mobile.
+
+    Busca na secure-api (onde o companion faz ingest). Sem autenticação no
+    dashboard (visão operacional); a secure-api é autenticada server-side.
+    """
+    import urllib.error
+    import urllib.request
+
+    out: Dict[str, Any] = {
+        "bridge": True,
+        "secure_base_url": SECURE_API_BASE_URL or None,
+        "patient_id": patient_id,
+        "connections": None,
+        "latest": None,
+        "errors": [],
+    }
+    headers = _secure_read_headers()
+
+    def _get_json(path: str, with_auth: bool = False) -> Any:
+        req = urllib.request.Request(
+            f"{SECURE_API_BASE_URL}{path}",
+            headers=headers if with_auth else {"Accept": "application/json"},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    if not SECURE_API_BASE_URL:
+        out["errors"].append("SECURE_API_BASE_URL unset — using local memory")
+        full = _build_connections_payload(online_threshold_sec, 300)
+        out["connections"] = _connections_public_view(full)
+        out["connections"]["bridge_fallback"] = "local_memory"
+    else:
+        try:
+            out["connections"] = _get_json(
+                f"/api/v1/connections/public?online_threshold_sec={online_threshold_sec}",
+                with_auth=False,
+            )
+        except Exception as exc:
+            out["errors"].append(f"connections: {exc}")
+            full = _build_connections_payload(online_threshold_sec, 300)
+            out["connections"] = _connections_public_view(full)
+            out["connections"]["bridge_fallback"] = "local_memory"
+
+    if SECURE_API_BASE_URL:
+        try:
+            out["latest"] = _get_json(
+                f"/api/v1/wearables/patient/{patient_id}/latest",
+                with_auth=True,
+            )
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")[:200]
+            out["errors"].append(f"latest HTTP {exc.code}: {body}")
+        except Exception as exc:
+            out["errors"].append(f"latest: {exc}")
+
+        if out.get("connections") and isinstance(out["connections"], dict):
+            out["connections"]["source"] = "secure-cloud-bridge"
+            for sess in out["connections"].get("sessions") or []:
+                sess["source"] = sess.get("source") or "secure-cloud-bridge"
+    else:
+        local = patient_history.get(patient_id) or []
+        out["latest"] = local[-1] if local else None
+        if out.get("connections") and isinstance(out["connections"], dict):
+            out["connections"]["source"] = "local-memory"
+
+    return out
 
 
 @app.delete("/api/v1/patient/{patient_id}/anonymize")
@@ -869,10 +1089,19 @@ async def websocket_endpoint(
     websocket: WebSocket,
     api_key: Optional[str] = Query(default=None),
 ):
-    """Canal WebSocket. Auth via query ?api_key=... (browsers não enviam X-API-Key em WS)."""
+    """
+    Canal WebSocket de telemetria do dashboard.
+
+    - Sem chave: modo *viewer* (recebe stream/config; não controla simulação).
+      Necessário para o dashboard web em produção (browser não envia X-API-Key no WS).
+    - Com chave válida: controle completo (start/stop/filtros).
+    - Chave inválida (não vazia): 4401.
+    """
     header_key = websocket.headers.get("x-api-key")
-    if not verify_api_key(api_key or header_key):
-        await websocket.close(code=4401, reason="API key inválida ou ausente")
+    provided = (api_key or header_key or "").strip()
+    can_control = verify_api_key(provided) if provided else False
+    if provided and not can_control:
+        await websocket.close(code=4401, reason="API key inválida")
         return
 
     await manager.connect(websocket)
@@ -882,15 +1111,27 @@ async def websocket_endpoint(
             "type": "config",
             "filter_type": sim_config.filter_type,
             "use_ukf": sim_config.use_ukf,
-            "is_running": sim_config.is_running
+            "is_running": sim_config.is_running,
+            "auth_mode": "control" if can_control else "viewer",
         })
-        
+
         while True:
             # Aguarda comandos do cliente
             data_str = await websocket.receive_text()
             data = json.loads(data_str)
             action = data.get("action")
-            
+
+            if not can_control and action in {"start", "stop", "set_filter", "set_kalman"}:
+                await websocket.send_json({
+                    "type": "error",
+                    "error_code": "WS_AUTH_REQUIRED",
+                    "detail": (
+                        "Modo viewer: informe ?api_key= na URL do dashboard "
+                        "para controlar a simulação."
+                    ),
+                })
+                continue
+
             if action == "start":
                 sim_config.is_running = True
                 logger.info("Simulação iniciada via comando WebSocket.")
@@ -907,7 +1148,7 @@ async def websocket_endpoint(
                 kalman_val = data.get("value")
                 sim_config.use_ukf = (kalman_val == "UKF")
                 logger.info(f"Filtro de Kalman alterado. Use UKF: {sim_config.use_ukf}")
-                
+
             # Retornar confirmação de configuração
             await manager.broadcast_json({
                 "type": "config",
@@ -915,7 +1156,7 @@ async def websocket_endpoint(
                 "use_ukf": sim_config.use_ukf,
                 "is_running": sim_config.is_running
             })
-            
+
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:

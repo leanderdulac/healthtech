@@ -141,6 +141,161 @@
                         </div>
                     </section>
 
+                    <!-- CONEXÕES: APP MOBILE + DEVICE -->
+                    <section class="connections-section" id="connections-section" aria-label="Conexões app e device">
+                        <div class="card card-connections">
+                            <div class="connections-header">
+                                <h2>
+                                    <span class="material-icons-round">devices</span>
+                                    Conexões — App Mobile &amp; Device
+                                </h2>
+                                <div class="connections-header-actions">
+                                    <span class="connections-poll-hint" id="conn-poll-hint">Atualiza a cada 5s</span>
+                                    <button type="button" id="btn-refresh-connections" class="btn btn-secondary btn-sm">
+                                        <span class="material-icons-round">refresh</span> Atualizar
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="section-desc connections-desc">
+                                Monitora o companion Android (ingest HTTPS). O nó Device fica
+                                <strong>simulado</strong>, <strong>via HTTP</strong> ou
+                                <strong>HBand BLE</strong> conforme o campo <code>ingest_source</code>
+                                — nunca assume pairing físico se o app só enviou smoke.
+                            </p>
+                            <p class="clinical-disclaimer" id="clinical-disclaimer">
+                                Alertas da matriz clínica são apoio à decisão. Não confirmam diagnóstico
+                                (infecção, desidratação, queda) e as linhas de enfermeira/ACS não são
+                                protocolo institucional mandatório.
+                            </p>
+
+                            <div class="connection-pipeline" id="connection-pipeline">
+                                <div class="conn-node" data-node="device" id="conn-node-device">
+                                    <div class="conn-node-icon">
+                                        <span class="material-icons-round">watch</span>
+                                        <span class="conn-dot" id="conn-dot-device"></span>
+                                    </div>
+                                    <div class="conn-node-body">
+                                        <strong>Device (HBand)</strong>
+                                        <span class="conn-status-label" id="conn-device-label">Aguardando simulador ou HBand</span>
+                                        <span class="conn-meta" id="conn-device-meta">ble_sim · via_app · ble_hband</span>
+                                    </div>
+                                </div>
+                                <div class="conn-link" id="conn-link-device-app" title="Device → App">
+                                    <span class="conn-link-line"></span>
+                                    <span class="material-icons-round conn-link-arrow">arrow_forward</span>
+                                    <span class="conn-link-caption" id="conn-link-device-caption">device → app</span>
+                                </div>
+                                <div class="conn-node" data-node="app" id="conn-node-app">
+                                    <div class="conn-node-icon">
+                                        <span class="material-icons-round">phone_android</span>
+                                        <span class="conn-dot" id="conn-dot-app"></span>
+                                    </div>
+                                    <div class="conn-node-body">
+                                        <strong>App companion</strong>
+                                        <span class="conn-status-label" id="conn-app-label">Aguardando ingest…</span>
+                                        <span class="conn-meta" id="conn-app-meta">OkHttp → POST /wearables/ingest</span>
+                                    </div>
+                                </div>
+                                <div class="conn-link" id="conn-link-app-api" title="App → API">
+                                    <span class="conn-link-line"></span>
+                                    <span class="material-icons-round conn-link-arrow">arrow_forward</span>
+                                    <span class="conn-link-caption" id="conn-link-app-caption">HTTPS</span>
+                                </div>
+                                <div class="conn-node" data-node="api" id="conn-node-api">
+                                    <div class="conn-node-icon">
+                                        <span class="material-icons-round">cloud</span>
+                                        <span class="conn-dot green" id="conn-dot-api"></span>
+                                    </div>
+                                    <div class="conn-node-body">
+                                        <strong>API Healthtech</strong>
+                                        <span class="conn-status-label" id="conn-api-label">Local / Cloud</span>
+                                        <span class="conn-meta" id="conn-api-meta">—</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="connections-controls">
+                                <div class="control-group compact">
+                                    <label for="conn-patient-id">Patient ID</label>
+                                    <input type="text" id="conn-patient-id" class="form-input" value="PAT-HBAND-001" autocomplete="off">
+                                </div>
+                                <div class="control-group compact">
+                                    <label for="conn-source">Fonte de telemetria</label>
+                                    <select id="conn-source" class="form-select">
+                                        <option value="local">API local (esta página)</option>
+                                        <option value="secure" selected>Cloud secure-api (app prod)</option>
+                                        <option value="both">Ambas</option>
+                                    </select>
+                                </div>
+                                <div class="control-group compact grow">
+                                    <label for="conn-secure-url">URL secure (cloud)</label>
+                                    <input type="text" id="conn-secure-url" class="form-input"
+                                           value="https://healthtech-secure-api-5794833455.us-central1.run.app"
+                                           autocomplete="off">
+                                </div>
+                            </div>
+
+                            <div class="connections-stats" id="connections-stats">
+                                <div class="conn-stat">
+                                    <span class="conn-stat-label">Sessões online</span>
+                                    <span class="conn-stat-value" id="conn-stat-online">0</span>
+                                </div>
+                                <div class="conn-stat">
+                                    <span class="conn-stat-label">Pacientes rastreados</span>
+                                    <span class="conn-stat-value" id="conn-stat-patients">0</span>
+                                </div>
+                                <div class="conn-stat">
+                                    <span class="conn-stat-label">Último HR</span>
+                                    <span class="conn-stat-value" id="conn-stat-hr">—</span>
+                                </div>
+                                <div class="conn-stat">
+                                    <span class="conn-stat-label">Device ID</span>
+                                    <span class="conn-stat-value mono" id="conn-stat-device">—</span>
+                                </div>
+                                <div class="conn-stat">
+                                    <span class="conn-stat-label">Última amostra</span>
+                                    <span class="conn-stat-value mono" id="conn-stat-ts">—</span>
+                                </div>
+                                <div class="conn-stat">
+                                    <span class="conn-stat-label">Latência (idade)</span>
+                                    <span class="conn-stat-value" id="conn-stat-age">—</span>
+                                </div>
+                            </div>
+
+                            <div class="connections-roadmap">
+                                <h3><span class="material-icons-round">map</span> Roadmap do device</h3>
+                                <ol id="conn-roadmap-list">
+                                    <li class="done">App envia telemetria via HTTPS (ingest)</li>
+                                    <li class="done">Dashboard mostra status do app</li>
+                                    <li class="todo">Scan BLE e pairing no companion</li>
+                                    <li class="todo">Stream nativo do HBand → app → API</li>
+                                </ol>
+                            </div>
+
+                            <div class="connections-sessions">
+                                <h3><span class="material-icons-round">list_alt</span> Sessões recentes</h3>
+                                <div class="sessions-table-wrap">
+                                    <table class="sessions-table" id="conn-sessions-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Patient</th>
+                                                <th>Device</th>
+                                                <th>App</th>
+                                                <th>Device link</th>
+                                                <th>HR</th>
+                                                <th>Idade</th>
+                                                <th>Fonte</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="conn-sessions-body">
+                                            <tr class="empty-row"><td colspan="7">Nenhuma sessão de ingest ainda.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
                     <!-- CHARTS PANEL -->
                     <section class="charts-section">
                         <div class="card chart-card">

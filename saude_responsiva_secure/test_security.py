@@ -61,6 +61,13 @@ def test_health_is_public():
     assert "version" in body
 
 
+def test_root_landing_is_public():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
+    assert "API no ar" in response.text
+
+
 def test_unauthenticated_request_returns_401():
     response = client.post(
         "/api/v1/wearables/ingest",
@@ -275,3 +282,47 @@ def test_prefix_matching_not_accepted():
         headers={"X-API-Key": "ht_admin_forged_prefix_only_not_real"},
     )
     assert response.status_code == 401
+
+
+def test_connections_public_is_unauthenticated():
+    client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json={
+            "patient_id": "PAT-CONN-001",
+            "device_id": "HBAND-SIM-1",
+            "heart_rate": 78.0,
+            "ingest_source": "ble_sim",
+        },
+    )
+    response = client.get("/api/v1/connections/public")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["public"] is True
+    assert body["sessions"] == []
+    latest = (body.get("mobile_app") or {}).get("latest") or {}
+    assert "patient_id" not in latest
+    assert body["device"]["status"] in {"ble_sim", "via_app", "planned"}
+
+
+def test_connections_status_with_read_key_includes_sessions():
+    client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json={
+            "patient_id": "PAT-CONN-002",
+            "device_id": "HBAND-SIM-2",
+            "heart_rate": 80.0,
+            "ingest_source": "ble_sim",
+        },
+    )
+    response = client.get(
+        "/api/v1/connections/status",
+        headers={"X-API-Key": READ_KEY},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body.get("public") is False
+    assert any(s.get("patient_id") == "PAT-CONN-002" for s in body.get("sessions") or [])
+    assert body["device"]["status"] == "ble_sim"
+    assert body["device"]["ble_physical"] is False

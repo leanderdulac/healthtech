@@ -17,11 +17,14 @@ import sys
 from pathlib import Path
 
 # Project root + pacote secure no PYTHONPATH
+# Ordem: monorepo primeiro (evita que saude_responsiva_secure sombreie `src/`).
 _ROOT = Path(__file__).resolve().parents[1]
 _SECURE = _ROOT / "saude_responsiva_secure"
-for _p in (str(_ROOT), str(_SECURE)):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+for _p in (str(_SECURE), str(_ROOT)):
+    if _p in sys.path:
+        sys.path.remove(_p)
+sys.path.insert(0, str(_SECURE))
+sys.path.insert(0, str(_ROOT))
 
 # Monólito completo por padrão neste entry point
 os.environ.setdefault("APP_MODE", "full")

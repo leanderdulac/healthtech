@@ -40,7 +40,8 @@ saude_responsiva_secure/
 | Autenticação | Header `X-API-Key` com `hmac.compare_digest` (sem prefix matching) |
 | Autorização | Escopos `wearables:write`, `wearables:read`, `admin` |
 | Anti-IDOR | `ALLOWED_PATIENT_IDS` + `require_patient_access` |
-| Rate limit | [slowapi](https://github.com/laurentS/slowapi) por chave/IP |
+| Rate limit | janela deslizante por path/chave (`RATE_LIMIT_INGEST` default 300/min) |
+| Clinical alerts | subset gerado por `scripts/sync_secure_vendor.py` (`_vendor_src/`) |
 | Headers | HSTS, CSP, nosniff, X-Frame-Options, Referrer-Policy |
 | Auditoria | Middleware JSON com `X-Request-ID` e chave mascarada |
 | Validação | Pydantic v2 (limites fisiológicos, patient_id sanitizado) |

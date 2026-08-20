@@ -27,6 +27,9 @@ ENV PYTHONPATH=/app
 
 COPY --chown=appuser:appuser app/ /app/app/
 COPY --chown=appuser:appuser requirements.txt /app/
+# Matriz de alertas clínicos (regras) — necessário para clinical_alerts no ingest
+# Fonte local: _vendor_src/ (evita sombrear monorepo `src/` no PYTHONPATH do host)
+COPY --chown=appuser:appuser _vendor_src/ /app/src/
 
 USER appuser
 

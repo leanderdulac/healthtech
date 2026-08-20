@@ -20,3 +20,26 @@ def _dev_env(monkeypatch):
     monkeypatch.setenv("AUTH_DISABLED", "false")
     monkeypatch.delenv("API_KEY", raising=False)
     monkeypatch.setenv("SECRET_SALT", "test-salt-not-for-production-use-32b")
+
+
+_CRITICAL_HINTS = (
+    "alert",
+    "ingest",
+    "security",
+    "connection",
+    "hband",
+    "wearable",
+    "anonymization",
+    "vendor",
+)
+_RESEARCH_HINTS = ("tcn", "bmo", "hemodynamic", "chaos")
+
+
+def pytest_collection_modifyitems(items):
+    """Marca testes de produto vs laboratório sem anotar cada função."""
+    for item in items:
+        node = item.nodeid.lower()
+        if any(h in node for h in _RESEARCH_HINTS):
+            item.add_marker(pytest.mark.research)
+        if any(h in node for h in _CRITICAL_HINTS):
+            item.add_marker(pytest.mark.critical)

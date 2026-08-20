@@ -53,20 +53,37 @@ jobs:
             "pytest-cov>=5.0.0" \
             "ruff>=0.5.0"
 
-      - name: Ruff (lint crítico)
-        run: |
-          ruff check src/security src/datalake/quality src/hemodynamics/operators.py \
-            health-aggregator/main.py health-aggregator/database.py \
-            saude_responsiva_secure/app \
-            tests --select E,F,I --ignore E501 || true
+      - name: Vendor sync (secure image)
+        run: python scripts/sync_secure_vendor.py --check
 
-      - name: Pytest (monólito)
+      - name: Ruff (caminho crítico)
+        run: |
+          ruff check src/security src/clinical_intelligence/alert_ingest.py \
+            src/clinical_intelligence/alert_matrix_rules.py \
+            saude_responsiva_secure/app \
+            tests/test_alert_ingest.py tests/test_alert_matrix.py \
+            tests/test_connection_status.py tests/test_vendor_sync.py \
+            tests/test_security_auth.py tests/test_security_remediation.py \
+            --select E,F --ignore E501
+
+      - name: Pytest (caminho crítico)
         env:
           ENVIRONMENT: development
           SECRET_SALT: ci-test-salt-not-for-production-32b
           AUTH_DISABLED: "false"
           APP_MODE: full
-          # Garante que testes de API usem chaves de teste, não defaults de prod
+          API_KEY: ""
+          ADMIN_API_KEY: ht_admin_test_key_32chars_long_tokenxx
+          INGEST_API_KEY: ht_ingest_test_key_32chars_long_token
+          READ_API_KEY: ht_read_test_key_32chars_long_token
+        run: pytest tests/ -m critical -v --tb=short
+
+      - name: Pytest (monólito, suite leve)
+        env:
+          ENVIRONMENT: development
+          SECRET_SALT: ci-test-salt-not-for-production-32b
+          AUTH_DISABLED: "false"
+          APP_MODE: full
           API_KEY: ""
           ADMIN_API_KEY: ht_admin_test_key_32chars_long_tokenxx
           INGEST_API_KEY: ht_ingest_test_key_32chars_long_token
@@ -87,6 +104,20 @@ jobs:
         run: |
           cd saude_responsiva_secure && PYTHONPATH=. pytest test_security.py -v --tb=short
 
+      - name: Companion hygiene (sem secrets / sem net duplicado)
+        run: |
+          test -f companion-android/settings.gradle.kts
+          test -f companion-android/client/build.gradle.kts
+          test -f companion-android/app/build.gradle.kts
+          ! test -e companion-android/app/src/main/java/com/healthtech/companion/net/HealthtechApi.kt
+          if grep -RInE 'ht_ingest_test_key_|HEALTHTECH_INGEST_API_KEY=[^[:space:]#]+' \
+            companion-android/app companion-android/client companion-android/README.md \
+            --include='*.kt' --include='*.md' --include='*.kts' --include='*.example'; then
+            echo "segredo ou chave de teste versionada no companion" >&2
+            exit 1
+          fi
+          ! grep -RIn '10\.1\.87\.' companion-android/app/src companion-android/client --include='*.kt' --include='*.xml'
+
   docker-syntax:
     runs-on: ubuntu-latest
     steps:
@@ -102,3 +133,5 @@ jobs:
           test -f saude_responsiva_secure/Dockerfile
           grep -q 'USER appuser' saude_responsiva_secure/Dockerfile
           grep -q 'app.main:app' saude_responsiva_secure/Dockerfile
+          test -f saude_responsiva_secure/_vendor_src/clinical_intelligence/alert_ingest.py
+          test -f scripts/sync_secure_vendor.py

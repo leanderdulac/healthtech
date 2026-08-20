@@ -5,7 +5,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
-- **Companion Android Sprint A** — esboço Kotlin em `companion-android/` (API client, BLE facades, guia DoD); checklist HBand aponta o path
+- **Caminho crítico vs laboratório** — `docs/CRITICAL_PATH.md`, marker pytest `critical`/`research`, CI exige `pytest -m critical` + vendor sync
+- **Vendor sync** — `scripts/sync_secure_vendor.py` (imagem secure não fica com regras stale)
+- **Companion Android MVP** — módulo Gradle `:client` (única fonte Retrofit), app Compose, outbox, **simulador BLE** (`ingest_source=ble_sim`) e gancho HBand SDK que não finge pairing
+- **Conexões honestas** — `GET /api/v1/connections/{status,public}` distingue HTTP / simulado / BLE físico
+- **Apoio à decisão** — `decision_support` em alertas; linhas ACS/enfermeira marcadas `mandatory: false`
+
+### Changed
+- Pesos `.pkl`/`.pt`/`.joblib` e `data/chroma_db/` deixam de ser versionados
+- Companion não embute URL de produção nem chave de teste no APK (default debug `http://10.0.2.2:8080`)
+- CSP path-aware (API `default-src 'none'`; dashboard/docs permitem Chart.js/fonts)
+
+### Previously added
 - **Deploy Cloud Run** — `deploy_to_gcp.sh` preserva `SECRET_SALT` e injeta `VERTEX_*` de `deploy_state.json`; `SKIP_PREP=true` para redeploy rápido
 - **Smoke online** — `run_online_smoke.py` valida Cloud Run (`/api/health` + ingest) e Vertex (IsolationForest + TCN); relatório em `data/vertex_deploy/online_smoke_last.json`
 - **Vertex AI — IsolationForest online** — deploy do detector de anomalias no Endpoint Vertex + cliente `VertexOnlineDetector` no monólito; estado em `data/vertex_deploy/deploy_state.json`
@@ -21,7 +32,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 - **HBand / Veepoo companion** — contrato OpenAPI `docs/openapi/hband-wearable.yaml`
 - `HBandNormalizer` + `HBandCompanionAdapter` (`src/ingestion/real/hband_*`)
 - Métricas Bronze: `blood_pressure_sys/dia`, `calories`, `distance_km`
-- Checklist companion Android: `docs/HBAND_COMPANION_CHECKLIST.md` (backend ready / app pendente)
+- Checklist companion Android: `docs/HBAND_COMPANION_CHECKLIST.md` (backend ready / app MVP + simulador BLE)
 - Testes: `tests/test_hband_normalizer.py`; registry ingestão fonte `hband`
 - Pacote `saude_responsiva_secure/` — factory secure unificada, RBAC scopes, anti-IDOR, rate limit, audit log, LGPD; deploy dual `APP_MODE=full|secure`
 - **F20** — Teoria e Algoritmos do Espaço BMO (Bounded Mean Oscillation) e VMO (`src/signal_processing/bmo_analysis.py`)

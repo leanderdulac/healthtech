@@ -2,6 +2,8 @@
 
 Cada feature embutida no projeto está documentada abaixo com objetivo, componentes, entradas/saídas e como executar.
 
+O que o produto mobile realmente usa está em [`CRITICAL_PATH.md`](CRITICAL_PATH.md). O restante desta página inclui o laboratório (BMO, TCN, hemodinâmica, USP).
+
 ---
 
 ## F01 — Datalake Medallion (Bronze → Silver → Gold)

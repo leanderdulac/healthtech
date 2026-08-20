@@ -46,6 +46,11 @@ def stats() -> Dict[str, int]:
     }
 
 
+def iter_patients() -> Dict[str, List[Dict[str, Any]]]:
+    """Snapshot superficial do histórico em memória (somente leitura)."""
+    return _patient_history
+
+
 def clear_all() -> None:
     """Utilitário de teste."""
     _patient_history.clear()
