@@ -54,6 +54,15 @@ FEATURE_COLUMNS = [
     "disc_bp_phantom",
     "disc_glucose_phantom",
     "disc_ui_fp_pattern",
+    "consecutive_valid",
+    "rest",
+    "fasting",
+    "steps_interrupted",
+    "sleep_hours",
+    "steps_drop_days",
+    "pas_rise_vs_basal",
+    "pas_drop_vs_basal",
+    "glucose_delta",
     # Next2U — risco de internação + concordância + confirmação
     *NEXT2U_CONTEXT_FEATURES,
 ]
@@ -72,6 +81,13 @@ def _uniform(r: random.Random, lo: float, hi: float) -> float:
 
 def _sample_for_rule(rule_id: str, r: random.Random) -> VitalSnapshot:
     """Amostra vitais no interior das faixas da regra (com jitter seguro)."""
+    if str(rule_id).startswith("n2u_"):
+        from src.clinical_intelligence.next2u_bases import sample_for_base
+
+        try:
+            return sample_for_base(int(str(rule_id).split("_")[1]), r)
+        except Exception:
+            pass
     # Defaults normais; sobrescritos conforme regra
     v = VitalSnapshot(
         pas=120.0,

@@ -33,6 +33,53 @@ class VitalSnapshot:
     hr_baseline_rise: Optional[float] = None  # Δ bpm vs FC basal
     spo2_drop_points: Optional[float] = None  # queda absoluta de SpO2 vs baseline
     consciousness_altered: bool = False  # hipoglicemia grave
+    # Basal / persistência / contexto de medida (Next2U)
+    pas_basal: Optional[float] = None
+    pad_basal: Optional[float] = None
+    spo2_basal: Optional[float] = None
+    temp_basal: Optional[float] = None
+    glucose_basal: Optional[float] = None
+    glucose_prev: Optional[float] = None
+    consecutive_valid: int = 1
+    rest: bool = False
+    fasting: bool = False
+    sleep_hours: Optional[float] = None
+    steps_drop_days: int = 0
+    steps_interrupted: bool = False
+    no_steps_rest_of_active: bool = False
+
+    def pas_rise(self) -> Optional[float]:
+        if self.pas is None or self.pas_basal is None:
+            return None
+        return self.pas - self.pas_basal
+
+    def pad_rise(self) -> Optional[float]:
+        if self.pad is None or self.pad_basal is None:
+            return None
+        return self.pad - self.pad_basal
+
+    def pas_drop(self) -> Optional[float]:
+        r = self.pas_rise()
+        return None if r is None else -r
+
+    def temp_rise(self) -> Optional[float]:
+        if self.temp_c is None or self.temp_basal is None:
+            return None
+        return self.temp_c - self.temp_basal
+
+    def temp_drop(self) -> Optional[float]:
+        r = self.temp_rise()
+        return None if r is None else -r
+
+    def glucose_delta(self) -> Optional[float]:
+        if self.glucose_mgdl is None or self.glucose_prev is None:
+            return None
+        return self.glucose_mgdl - self.glucose_prev
+
+    def glucose_vs_basal(self) -> Optional[float]:
+        if self.glucose_mgdl is None or self.glucose_basal is None:
+            return None
+        return self.glucose_mgdl - self.glucose_basal
 
     def to_feature_dict(self) -> Dict[str, float]:
         def f(v: Optional[float], default: float = 0.0) -> float:
@@ -50,9 +97,17 @@ class VitalSnapshot:
             "hr_baseline_rise": f(self.hr_baseline_rise, 0.0),
             "spo2_drop_points": f(self.spo2_drop_points, 0.0),
             "consciousness_altered": 1.0 if self.consciousness_altered else 0.0,
-            # Derived
             "map_approx": (f(self.pas, 120) + 2 * f(self.pad, 80)) / 3.0,
             "pulse_pressure": f(self.pas, 120) - f(self.pad, 80),
+            "consecutive_valid": float(self.consecutive_valid or 1),
+            "rest": 1.0 if self.rest else 0.0,
+            "fasting": 1.0 if self.fasting else 0.0,
+            "steps_interrupted": 1.0 if self.steps_interrupted else 0.0,
+            "sleep_hours": f(self.sleep_hours, 8.0),
+            "steps_drop_days": float(self.steps_drop_days or 0),
+            "pas_rise_vs_basal": f(self.pas_rise(), 0.0),
+            "pas_drop_vs_basal": f(self.pas_drop(), 0.0),
+            "glucose_delta": f(self.glucose_delta(), 0.0),
         }
 
 
@@ -140,422 +195,12 @@ def _pa_or_spo2_or_temp_abnormal(v: VitalSnapshot) -> bool:
 # ---------------------------------------------------------------------------
 
 def _build_rules() -> List[Dict[str, Any]]:
-    """Retorna lista ordenada de regras (críticas primeiro por prioridade de match)."""
-    R: List[Dict[str, Any]] = []
+    """158 alertas-base Next2U (predicados fisiológicos)."""
+    from src.clinical_intelligence.next2u_bases import build_rules as _next2u_rules
 
-    def add(rid, cat, sev, name, pred):
-        R.append(
-            {
-                "rule_id": rid,
-                "category": cat,
-                "severity": sev,
-                "name": name,
-                "predicate": pred,
-            }
-        )
+    return _next2u_rules()
 
-    # --- 1. PA elevada ---
-    add(
-        "pa_elev_1",
-        "pa_alta",
-        "leve",
-        "Possível elevação pressórica associada a taquicardia leve",
-        lambda v: _in(v.pas, 140, 159) and _in(v.pad, 90, 99) and _in(v.hr, 91, 110),
-    )
-    add(
-        "pa_elev_2",
-        "pa_alta",
-        "moderado",
-        "Possível descompensação hipertensiva com taquicardia",
-        lambda v: _in(v.pas, 160, 179) and _in(v.pad, 100, 109) and _in(v.hr, 111, 130),
-    )
-    add(
-        "pa_elev_3",
-        "pa_alta",
-        "critico",
-        "Possível crise hipertensiva associada a taquicardia",
-        lambda v: _ge(v.pas, 180) and _ge(v.pad, 110) and _ge(v.hr, 111),
-    )
-    add(
-        "pa_elev_4",
-        "pa_alta",
-        "critico",
-        "Possível crise hipertensiva com comprometimento cardiorrespiratório",
-        lambda v: _ge(v.pas, 180) and _ge(v.pad, 110) and _le(v.spo2, 93),
-    )
-    add(
-        "pa_elev_5",
-        "pa_alta",
-        "critico",
-        "Possível descompensação hipertensiva associada a quadro febril agudo",
-        lambda v: _ge(v.pas, 180) and _ge(v.pad, 110) and _ge(v.temp_c, 38.1),
-    )
-    add(
-        "pa_elev_6",
-        "pa_alta",
-        "critico",
-        "Possível descompensação cardiovascular e metabólica",
-        lambda v: _ge(v.pas, 180) and _ge(v.pad, 110) and _ge(v.glucose_mgdl, 250),
-    )
 
-    # --- 2. PA baixa ---
-    add(
-        "pa_baixa_1",
-        "pa_baixa",
-        "leve",
-        "Possível hipotensão associada a taquicardia leve",
-        lambda v: _in(v.pas, 101, 110) and _in(v.hr, 91, 110),
-    )
-    add(
-        "pa_baixa_2",
-        "pa_baixa",
-        "moderado",
-        "Possível hipovolemia ou instabilidade circulatória",
-        lambda v: _in(v.pas, 91, 100) and _in(v.hr, 111, 130),
-    )
-    add(
-        "pa_baixa_3",
-        "pa_baixa",
-        "critico",
-        "Possível infecção com repercussão hemodinâmica",
-        lambda v: _in(v.pas, 91, 100) and _ge(v.hr, 111) and _ge(v.temp_c, 38.1),
-    )
-    add(
-        "pa_baixa_4",
-        "pa_baixa",
-        "critico",
-        "Possível deterioração cardiorrespiratória",
-        lambda v: _in(v.pas, 91, 100) and _ge(v.hr, 111) and _le(v.spo2, 93),
-    )
-    add(
-        "pa_baixa_5",
-        "pa_baixa",
-        "critico",
-        "Possível instabilidade hemodinâmica",
-        lambda v: _le(v.pas, 90) and _ge(v.hr, 111),
-    )
-    add(
-        "pa_baixa_6",
-        "pa_baixa",
-        "critico",
-        "Possível hipotensão associada a hipoxemia",
-        lambda v: _le(v.pas, 90) and _le(v.spo2, 91),
-    )
-
-    # --- 3. SpO2 ---
-    add(
-        "spo2_1",
-        "spo2",
-        "leve",
-        "Possível dessaturação leve",
-        lambda v: _in(v.spo2, 95, 96),
-    )
-    add(
-        "spo2_2",
-        "spo2",
-        "moderado",
-        "Possível dessaturação moderada",
-        lambda v: _in(v.spo2, 93, 94),
-    )
-    add(
-        "spo2_3",
-        "spo2",
-        "moderado",
-        "Possível comprometimento respiratório com resposta cardíaca compensatória",
-        lambda v: _in(v.spo2, 93, 94) and _in(v.hr, 111, 130),
-    )
-    add(
-        "spo2_4",
-        "spo2",
-        "critico",
-        "Possível infecção com repercussão sistêmica",
-        lambda v: _in(v.spo2, 92, 93) and _ge(v.hr, 111) and _ge(v.temp_c, 38.1),
-    )
-    add(
-        "spo2_5",
-        "spo2",
-        "critico",
-        "Possível hipoxemia importante",
-        lambda v: _le(v.spo2, 91),
-    )
-    add(
-        "spo2_6",
-        "spo2",
-        "critico",
-        "Possível comprometimento cardiorrespiratório agudo",
-        lambda v: _le(v.spo2, 91) and _ge(v.hr, 111),
-    )
-    add(
-        "spo2_7",
-        "spo2",
-        "critico",
-        "Possível infecção aguda com hipoxemia",
-        lambda v: _le(v.spo2, 91) and _ge(v.temp_c, 38.1),
-    )
-
-    # --- 4. Temperatura ---
-    add(
-        "temp_1",
-        "temperatura",
-        "leve",
-        "Possível estado febril com resposta cardíaca leve",
-        lambda v: _in(v.temp_c, 38.1, 39.0) and _in(v.hr, 91, 110),
-    )
-    add(
-        "temp_2",
-        "temperatura",
-        "moderado",
-        "Possível estado febril associado a taquicardia",
-        lambda v: _in(v.temp_c, 38.1, 39.0) and _in(v.hr, 111, 130),
-    )
-    add(
-        "temp_3",
-        "temperatura",
-        "critico",
-        "Possível infecção com deterioração clínica",
-        lambda v: _in(v.temp_c, 38.1, 39.0) and _ge(v.hr, 111) and _le(v.spo2, 93),
-    )
-    add(
-        "temp_4",
-        "temperatura",
-        "critico",
-        "Possível infecção com instabilidade hemodinâmica",
-        lambda v: _in(v.temp_c, 38.1, 39.0) and _ge(v.hr, 111) and _le(v.pas, 100),
-    )
-    add(
-        "temp_5",
-        "temperatura",
-        "critico",
-        "Possível febre alta com repercussão cardiovascular",
-        lambda v: _ge(v.temp_c, 39.1) and _ge(v.hr, 111),
-    )
-    add(
-        "temp_6",
-        "temperatura",
-        "critico",
-        "Possível infecção grave ou desidratação com instabilidade clínica",
-        lambda v: _ge(v.temp_c, 39.1)
-        and _ge(v.hr, 111)
-        and (_le(v.pas, 100) or _le(v.spo2, 93)),
-    )
-    add(
-        "temp_7",
-        "temperatura",
-        "critico",
-        "Possível hipotermia com instabilidade fisiológica",
-        lambda v: _le(v.temp_c, 35.0) and (_le(v.hr, 50) or _le(v.pas, 100)),
-    )
-
-    # --- 5. Hipoglicemia ---
-    add(
-        "hypo_1",
-        "hipoglicemia",
-        "moderado",
-        "Possível hipoglicemia",
-        lambda v: _in(v.glucose_mgdl, 54, 69),
-    )
-    add(
-        "hypo_2",
-        "hipoglicemia",
-        "moderado",
-        "Possível hipoglicemia com resposta adrenérgica",
-        lambda v: _in(v.glucose_mgdl, 54, 69) and _ge(v.hr, 111),
-    )
-    add(
-        "hypo_3",
-        "hipoglicemia",
-        "critico",
-        "Possível hipoglicemia associada a instabilidade hemodinâmica",
-        lambda v: _in(v.glucose_mgdl, 54, 69) and _le(v.pas, 100),
-    )
-    add(
-        "hypo_4",
-        "hipoglicemia",
-        "critico",
-        "Possível hipoglicemia clinicamente significativa",
-        lambda v: _le(v.glucose_mgdl, 53.999) if v.glucose_mgdl is not None else False,
-    )
-    add(
-        "hypo_5",
-        "hipoglicemia",
-        "critico",
-        "Possível hipoglicemia grave",
-        lambda v: (v.glucose_mgdl is not None and v.glucose_mgdl < 54)
-        and (
-            v.consciousness_altered
-            or _hr_elevated_any(v)
-            or _le(v.hr, 50)
-            or _le(v.pas, 100)
-            or _ge(v.pas, 140)
-        ),
-    )
-
-    # --- 6. Hiperglicemia ---
-    add(
-        "hyper_1",
-        "hiperglicemia",
-        "leve",
-        "Possível hiperglicemia acima da meta",
-        lambda v: _in(v.glucose_mgdl, 181, 249),
-    )
-    add(
-        "hyper_2",
-        "hiperglicemia",
-        "moderado",
-        "Possível hiperglicemia importante",
-        lambda v: _in(v.glucose_mgdl, 250, 399),
-    )
-    add(
-        "hyper_3",
-        "hiperglicemia",
-        "moderado",
-        "Possível hiperglicemia associada a quadro infeccioso",
-        lambda v: _in(v.glucose_mgdl, 250, 399) and _ge(v.temp_c, 38.1),
-    )
-    add(
-        "hyper_4",
-        "hiperglicemia",
-        "critico",
-        "Possível descompensação metabólica associada a infecção",
-        lambda v: _in(v.glucose_mgdl, 250, 399)
-        and _ge(v.temp_c, 38.1)
-        and _ge(v.hr, 111),
-    )
-    add(
-        "hyper_5",
-        "hiperglicemia",
-        "critico",
-        "Possível crise hiperglicêmica com desidratação ou instabilidade circulatória",
-        lambda v: _in(v.glucose_mgdl, 250, 399) and _ge(v.hr, 111) and _le(v.pas, 100),
-    )
-    add(
-        "hyper_6",
-        "hiperglicemia",
-        "critico",
-        "Possível hiperglicemia severa",
-        lambda v: _ge(v.glucose_mgdl, 400) and (v.glucose_mgdl is not None and v.glucose_mgdl < 600),
-    )
-    add(
-        "hyper_7",
-        "hiperglicemia",
-        "critico",
-        "Possível estado hiperglicêmico hiperosmolar",
-        lambda v: _ge(v.glucose_mgdl, 600),
-    )
-
-    # --- 7. FC ---
-    add(
-        "fc_1",
-        "fc",
-        "moderado",
-        "Possível bradicardia relativa",
-        lambda v: _in(v.hr, 41, 50),
-    )
-    add(
-        "fc_2",
-        "fc",
-        "critico",
-        "Possível bradicardia com repercussão hemodinâmica",
-        lambda v: _in(v.hr, 41, 50) and _le(v.pas, 100),
-    )
-    add(
-        "fc_3",
-        "fc",
-        "critico",
-        "Possível bradicardia associada a dessaturação",
-        lambda v: _in(v.hr, 41, 50) and _le(v.spo2, 93),
-    )
-    add(
-        "fc_4",
-        "fc",
-        "critico",
-        "Possível bradicardia importante",
-        lambda v: _le(v.hr, 40),
-    )
-    add(
-        "fc_5",
-        "fc",
-        "leve",
-        "Possível taquicardia persistente",
-        lambda v: _in(v.hr, 111, 130),
-    )
-    add(
-        "fc_6",
-        "fc",
-        "critico",
-        "Possível taquicardia importante",
-        lambda v: _ge(v.hr, 131),
-    )
-    add(
-        "fc_7",
-        "fc",
-        "critico",
-        "Possível deterioração sistêmica ou cardiovascular",
-        lambda v: _ge(v.hr, 131) and _pa_or_spo2_or_temp_abnormal(v),
-    )
-
-    # --- 8. Passos / sono ---
-    add(
-        "func_1",
-        "funcional",
-        "leve",
-        "Possível redução funcional associada à piora do sono",
-        lambda v: _ge(v.steps_drop_pct, 40) and _ge(v.sleep_worsen_pct, 30),
-    )
-    add(
-        "func_2",
-        "funcional",
-        "moderado",
-        "Possível estresse fisiológico com redução funcional",
-        lambda v: _ge(v.steps_drop_pct, 40)
-        and _ge(v.sleep_worsen_pct, 30)
-        and _ge(v.hr_baseline_rise, 15),
-    )
-    add(
-        "func_3",
-        "funcional",
-        "moderado",
-        "Possível comprometimento respiratório associado à redução funcional",
-        lambda v: _ge(v.steps_drop_pct, 50) and _ge(v.spo2_drop_points, 3),
-    )
-    add(
-        "func_4",
-        "funcional",
-        "critico",
-        "Possível deterioração clínica aguda",
-        lambda v: (
-            _ge(v.steps_drop_pct, 40) or _ge(v.sleep_worsen_pct, 30)
-        )
-        and (
-            _ge(v.temp_c, 38.1)
-            or _le(v.spo2, 93)
-            or _le(v.pas, 100)
-            or _ge(v.hr, 111)
-        ),
-    )
-    add(
-        "func_5",
-        "funcional",
-        "moderado",
-        "Possível estresse cardiovascular associado à piora do sono",
-        lambda v: _ge(v.sleep_worsen_pct, 30)
-        and _in(v.pas, 140, 159)
-        and _in(v.pad, 90, 99)
-        and _in(v.hr, 91, 110),
-    )
-    add(
-        "func_6",
-        "funcional",
-        "moderado",
-        "Possível descompensação cardiovascular associada à piora do sono",
-        lambda v: _ge(v.sleep_worsen_pct, 30)
-        and (
-            (_in(v.pas, 160, 179) and _in(v.pad, 100, 109))
-            or _in(v.hr, 111, 130)
-        ),
-    )
-
-    return R
 
 
 ALERT_RULES: List[Dict[str, Any]] = _build_rules()

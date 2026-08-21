@@ -19,6 +19,15 @@
     "disc_bp_phantom",
     "disc_glucose_phantom",
     "disc_ui_fp_pattern",
+    "consecutive_valid",
+    "rest",
+    "fasting",
+    "steps_interrupted",
+    "sleep_hours",
+    "steps_drop_days",
+    "pas_rise_vs_basal",
+    "pas_drop_vs_basal",
+    "glucose_delta",
     "hosp_score",
     "risk_band_code",
     "disease_concordant",
@@ -37,74 +46,74 @@
     "moderado",
     "critico"
   ],
-  "n_rules": 51,
+  "n_rules": 158,
   "metrics": {
-    "n_test": 1696,
-    "severity_f1_macro": 0.9783719972896026,
-    "severity_f1_weighted": 0.9875447619241663,
+    "n_test": 1530,
+    "severity_f1_macro": 0.9537617000460727,
+    "severity_f1_weighted": 0.9904065147370225,
     "severity_report": {
       "critico": {
-        "precision": 0.976271186440678,
-        "recall": 0.9879931389365352,
-        "f1-score": 0.9820971867007673,
-        "support": 583.0
+        "precision": 0.9897959183673469,
+        "recall": 0.9961489088575096,
+        "f1-score": 0.9929622520793346,
+        "support": 779.0
       },
       "leve": {
         "precision": 1.0,
-        "recall": 0.9848484848484849,
-        "f1-score": 0.9923664122137404,
-        "support": 66.0
-      },
-      "moderado": {
-        "precision": 0.9565217391304348,
-        "recall": 0.9221556886227545,
-        "f1-score": 0.9390243902439024,
-        "support": 167.0
-      },
-      "none": {
-        "precision": 1.0,
         "recall": 1.0,
         "f1-score": 1.0,
-        "support": 880.0
+        "support": 194.0
       },
-      "accuracy": 0.9876179245283019,
+      "moderado": {
+        "precision": 0.9166666666666666,
+        "recall": 0.75,
+        "f1-score": 0.825,
+        "support": 44.0
+      },
+      "none": {
+        "precision": 0.9941860465116279,
+        "recall": 1.0,
+        "f1-score": 0.9970845481049563,
+        "support": 513.0
+      },
+      "accuracy": 0.9908496732026144,
       "macro avg": {
-        "precision": 0.9831982313927783,
-        "recall": 0.9737493281019436,
-        "f1-score": 0.9783719972896026,
-        "support": 1696.0
+        "precision": 0.9751621578864104,
+        "recall": 0.9365372272143774,
+        "f1-score": 0.9537617000460727,
+        "support": 1530.0
       },
       "weighted avg": {
-        "precision": 0.9875620472462842,
-        "recall": 0.9876179245283019,
-        "f1-score": 0.9875447619241663,
-        "support": 1696.0
+        "precision": 0.9904586899359228,
+        "recall": 0.9908496732026144,
+        "f1-score": 0.9904065147370225,
+        "support": 1530.0
       }
     },
     "severity_confusion": [
       [
-        576,
+        776,
         0,
-        7,
-        0
-      ],
-      [
-        1,
-        65,
-        0,
-        0
-      ],
-      [
-        13,
-        0,
-        154,
+        3,
         0
       ],
       [
         0,
+        194,
+        0,
+        0
+      ],
+      [
+        8,
+        0,
+        33,
+        3
+      ],
+      [
         0,
         0,
-        880
+        0,
+        513
       ]
     ],
     "severity_labels": [
@@ -113,21 +122,21 @@
       "moderado",
       "none"
     ],
-    "false_positive_precision": 0.9927272727272727,
-    "false_positive_recall": 1.0,
-    "false_positive_f1": 0.9963503649635036,
+    "false_positive_precision": 0.9316239316239316,
+    "false_positive_recall": 0.993920972644377,
+    "false_positive_f1": 0.961764705882353,
     "false_positive_confusion": [
       [
-        1146,
-        4
+        1177,
+        24
       ],
       [
-        0,
-        546
+        2,
+        327
       ]
     ],
     "true_alert_precision": 1.0,
-    "true_alert_recall": 1.0,
-    "true_alert_f1": 1.0
+    "true_alert_recall": 0.9931170108161259,
+    "true_alert_f1": 0.9965466206216083
   }
 }

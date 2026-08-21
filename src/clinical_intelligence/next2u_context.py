@@ -209,60 +209,44 @@ PROFILE_CONCORDANCE: Dict[int, Dict[str, Set[str]]] = {
     },
 }
 
-# Família da regra do motor atual → perfil Next2U e alerta-base aproximado
-RULE_TO_NEXT2U: Dict[str, Tuple[int, int]] = {
-    "pa_elev_1": (1, 1),
-    "pa_elev_2": (1, 2),
-    "pa_elev_3": (1, 3),
-    "pa_elev_4": (1, 4),
-    "pa_elev_5": (1, 5),
-    "pa_elev_6": (1, 6),
-    "pa_baixa_1": (2, 16),
-    "pa_baixa_2": (2, 17),
-    "pa_baixa_3": (2, 18),
-    "pa_baixa_4": (2, 19),
-    "pa_baixa_5": (2, 20),
-    "pa_baixa_6": (2, 21),
-    "spo2_1": (3, 30),
-    "spo2_2": (3, 31),
-    "spo2_3": (3, 32),
-    "spo2_4": (3, 33),
-    "spo2_5": (3, 34),
-    "spo2_6": (3, 35),
-    "spo2_7": (3, 36),
-    "temp_1": (4, 45),
-    "temp_2": (4, 46),
-    "temp_3": (4, 47),
-    "temp_4": (4, 48),
-    "temp_5": (4, 49),
-    "temp_6": (4, 50),
-    "temp_7": (4, 51),
-    "hypo_1": (5, 61),
-    "hypo_2": (5, 62),
-    "hypo_3": (5, 63),
-    "hypo_4": (5, 64),
-    "hypo_5": (5, 65),
-    "hyper_1": (6, 73),
-    "hyper_2": (6, 74),
-    "hyper_3": (6, 75),
-    "hyper_4": (6, 76),
-    "hyper_5": (6, 77),
-    "hyper_6": (6, 78),
-    "hyper_7": (6, 79),
-    "fc_1": (7, 87),
-    "fc_2": (7, 88),
-    "fc_3": (7, 89),
-    "fc_4": (7, 90),
-    "fc_5": (8, 91),
-    "fc_6": (8, 92),
-    "fc_7": (8, 93),
-    "func_1": (9, 103),
-    "func_2": (9, 104),
-    "func_3": (9, 105),
-    "func_4": (9, 106),
-    "func_5": (9, 107),
-    "func_6": (9, 108),
-}
+def _profile_for_base(base_id: int) -> int:
+    ranges = (
+        (15, 1), (29, 2), (44, 3), (60, 4), (72, 5), (86, 6),
+        (90, 7), (102, 8), (116, 9), (130, 10), (144, 11), (158, 12),
+    )
+    for hi, prof in ranges:
+        if base_id <= hi:
+            return prof
+    return 1
+
+
+def _build_rule_map() -> Dict[str, Tuple[int, int]]:
+    out: Dict[str, Tuple[int, int]] = {}
+    for i in range(1, 159):
+        out[f"n2u_{i:03d}"] = (_profile_for_base(i), i)
+    legacy = {
+        "pa_elev_1": 1, "pa_elev_2": 2, "pa_elev_3": 3, "pa_elev_4": 4,
+        "pa_elev_5": 5, "pa_elev_6": 6,
+        "pa_baixa_1": 16, "pa_baixa_2": 17, "pa_baixa_3": 18, "pa_baixa_4": 19,
+        "pa_baixa_5": 20, "pa_baixa_6": 21,
+        "spo2_1": 30, "spo2_2": 31, "spo2_3": 32, "spo2_4": 33, "spo2_5": 34,
+        "spo2_6": 35, "spo2_7": 36,
+        "temp_1": 45, "temp_2": 46, "temp_3": 47, "temp_4": 48, "temp_5": 49,
+        "temp_6": 50, "temp_7": 51,
+        "hypo_1": 61, "hypo_2": 62, "hypo_3": 63, "hypo_4": 64, "hypo_5": 65,
+        "hyper_1": 73, "hyper_2": 74, "hyper_3": 75, "hyper_4": 76,
+        "hyper_5": 77, "hyper_6": 78, "hyper_7": 79,
+        "fc_1": 87, "fc_2": 88, "fc_3": 89, "fc_4": 90, "fc_5": 91,
+        "fc_6": 92, "fc_7": 93,
+        "func_1": 103, "func_2": 104, "func_3": 105, "func_4": 106,
+        "func_5": 107, "func_6": 108,
+    }
+    for rid, base in legacy.items():
+        out[rid] = out[f"n2u_{base:03d}"]
+    return out
+
+
+RULE_TO_NEXT2U: Dict[str, Tuple[int, int]] = _build_rule_map()
 
 
 @dataclass
@@ -305,6 +289,40 @@ class PatientContext:
     @property
     def n_active_diseases(self) -> int:
         return len(self.disease_set)
+
+    @classmethod
+    def from_payload(cls, raw: Optional[Dict] = None) -> "PatientContext":
+        data = raw or {}
+        ctx = data.get("clinical_context") or data.get("patient_context") or data
+        if not isinstance(ctx, dict):
+            ctx = {}
+        diseases = ctx.get("diseases") or ctx.get("conditions") or []
+        meds = ctx.get("medications") or ctx.get("meds") or []
+        if isinstance(diseases, str):
+            diseases = [diseases]
+        if isinstance(meds, str):
+            meds = [meds]
+        n_meds = ctx.get("n_continuous_meds")
+        if n_meds is None:
+            n_meds = len(meds)
+        return cls(
+            diseases=list(diseases),
+            medications=list(meds),
+            n_continuous_meds=int(n_meds or 0),
+            reduced_mobility=bool(ctx.get("reduced_mobility")),
+            hospitalized_last_6_months=bool(
+                ctx.get("hospitalized_last_6_months") or ctx.get("recent_admission")
+            ),
+            lives_alone=bool(ctx.get("lives_alone") or ctx.get("social_isolation")),
+            no_capable_caregiver=bool(ctx.get("no_capable_caregiver")),
+            data_valid=ctx.get("data_valid", True) is not False,
+            confirmation_or_persistence=bool(
+                ctx.get("confirmation_or_persistence") or ctx.get("confirmed")
+            ),
+            clinical_progression=bool(
+                ctx.get("clinical_progression") or ctx.get("progression")
+            ),
+        )
 
 
 def hospitalization_score(ctx: PatientContext) -> int:

@@ -97,3 +97,60 @@ def test_mild_pressure_promotes_with_confirmation():
     assert res.is_true_alert
     assert res.stars >= 2
     assert res.next2u_id is not None
+
+
+def test_engine_has_158_base_rules():
+    from src.clinical_intelligence.alert_matrix_rules import rules_catalog
+
+    cat = rules_catalog()
+    ids = {r["rule_id"] for r in cat}
+    assert len(cat) >= 158
+    assert "n2u_001" in ids
+    assert "n2u_158" in ids
+    cats = {r["category"] for r in cat}
+    assert "infeccao" in cats
+    assert "desidratacao" in cats
+    assert "queda" in cats
+
+
+def test_infection_and_fall_predicates():
+    eng = AlertMatrixEngine()
+    infec = eng.evaluate(
+        VitalSnapshot(pas=120, pad=80, hr=100, spo2=97, temp_c=38.4, glucose_mgdl=110)
+    )
+    assert infec.is_true_alert
+
+    fall = eng.evaluate(
+        VitalSnapshot(
+            pas=85, pad=55, hr=140, spo2=88, temp_c=36.6, glucose_mgdl=45,
+            steps_interrupted=True,
+        )
+    )
+    assert fall.is_true_alert
+    assert fall.max_severity == "critico"
+
+
+def test_ingest_uses_clinical_context():
+    from src.clinical_intelligence.alert_ingest import assess_ingest_alerts
+
+    out = assess_ingest_alerts(
+        heart_rate=100,
+        spo2=98,
+        skin_temp=36.6,
+        raw_telemetry={
+            "blood_pressure_sys": 150,
+            "blood_pressure_dia": 95,
+            "clinical_context": {
+                "diseases": ["hipertensão", "icc", "drc"],
+                "medications": ["aine"],
+                "n_continuous_meds": 8,
+                "hospitalized_last_6_months": True,
+                "confirmation_or_persistence": True,
+                "clinical_progression": True,
+            },
+        },
+    )
+    assert out["is_true_alert"]
+    staff = out.get("staff_only") or {}
+    assert staff.get("stars", 0) >= 2
+    assert "staff_only" in out

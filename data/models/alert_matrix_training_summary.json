@@ -1,14 +1,14 @@
 {
-  "n_rules": 51,
-  "n_samples": 8480,
+  "n_rules": 158,
+  "n_samples": 7650,
   "metrics": {
-    "severity_f1_macro": 0.9783719972896026,
-    "false_positive_precision": 0.9927272727272727,
-    "false_positive_recall": 1.0,
-    "false_positive_f1": 0.9963503649635036,
+    "severity_f1_macro": 0.9537617000460727,
+    "false_positive_precision": 0.9316239316239316,
+    "false_positive_recall": 0.993920972644377,
+    "false_positive_f1": 0.961764705882353,
     "true_alert_precision": 1.0,
-    "true_alert_recall": 1.0,
-    "true_alert_f1": 1.0
+    "true_alert_recall": 0.9931170108161259,
+    "true_alert_f1": 0.9965466206216083
   },
   "model_path": "data/models/alert_matrix_classifier.pkl",
   "dataset": "data/clinical_intelligence/alert_matrix_training.csv",
@@ -16,20 +16,7 @@
     "n_base_alerts": 158,
     "n_expanded_patterns": 971,
     "n_profiles": 12,
-    "document": "DOCUMENTO TÉCNICO · NEXT2U SAÚDE — Matriz Expandida dos 158 Alertas",
-    "safety_lock": "Escore, doença ou medicamento isolados não criam alerta.",
-    "features_added": [
-      "hosp_score",
-      "risk_band_code",
-      "disease_concordant",
-      "med_concordant",
-      "confirmation",
-      "clinical_progression",
-      "social_isolation",
-      "polypharmacy",
-      "n_active_diseases",
-      "n_continuous_meds",
-      "data_valid"
-    ]
+    "predicates_implemented": 158,
+    "safety_lock": "Escore, doença ou medicamento isolados não criam alerta."
   }
 }
