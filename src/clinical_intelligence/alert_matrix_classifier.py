@@ -38,6 +38,11 @@ from src.clinical_intelligence.alert_matrix_rules import (
     VitalSnapshot,
     rules_catalog,
 )
+from src.clinical_intelligence.next2u_context import (
+    RULE_TO_NEXT2U,
+    PatientContext,
+    context_features,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +192,7 @@ class AlertMatrixClassifier:
         fp_suppress_threshold: float = 0.55,
         alert_threshold: float = 0.80,
         source_meta: Optional[Dict[str, Any]] = None,
+        context: Optional[PatientContext] = None,
     ) -> Dict[str, Any]:
         """
         Inferência combinada regras + ML + discrepância amostra↔alerta.
@@ -196,7 +202,7 @@ class AlertMatrixClassifier:
         - Discrepância (ex. crise hipertensiva com FC 78–90 estável) → suprimir FP
         """
         meta = source_meta or {}
-        rule_result: AlertMatrixResult = self.engine.evaluate(vitals)
+        rule_result: AlertMatrixResult = self.engine.evaluate(vitals, context=context)
         feats = vitals.to_feature_dict()
         # features de discrepância para ML (se modelo treinado com elas)
         from src.clinical_intelligence.alert_discrepancy import discrepancy_feature_flags
@@ -206,7 +212,12 @@ class AlertMatrixClassifier:
             bp_source=str(meta.get("bp_source", "unknown")),
             glucose_source=str(meta.get("glucose_source", "unknown")),
         )
-        feats_ml = {**feats, **disc_flags}
+        profile_id = RULE_TO_NEXT2U.get(rule_result.primary_rule_id or "", (1, 1))[0]
+        feats_ml = {
+            **feats,
+            **disc_flags,
+            **context_features(context, profile_id=profile_id),
+        }
         # predizer só com colunas conhecidas do modelo
         ml_input = {c: feats_ml.get(c, feats.get(c, 0.0)) for c in self.feature_columns}
         ml = self.predict_features(ml_input) if self.severity_clf else {
@@ -290,6 +301,13 @@ class AlertMatrixClassifier:
             "ml": ml,
             "vitals": feats,
             "source_meta": meta,
+            "next2u_id": rule_result.next2u_id,
+            "stars": rule_result.stars,
+            "risk_band": rule_result.risk_band,
+            "hospitalization_score": rule_result.hospitalization_score,
+            "care_pathway": rule_result.care_pathway,
+            "disease_concordant": rule_result.disease_concordant,
+            "med_concordant": rule_result.med_concordant,
         }
 
         # Gate de discrepância amostra ↔ alerta (caso UI: crise + FC estável)

@@ -79,6 +79,13 @@ class AlertMatrixResult:
     primary_alert_name: Optional[str] = None
     primary_rule_id: Optional[str] = None
     explanation: str = ""
+    hospitalization_score: int = 0
+    risk_band: str = "baixo"
+    stars: int = 0
+    next2u_id: Optional[str] = None
+    care_pathway: Optional[Dict[str, Any]] = None
+    disease_concordant: bool = False
+    med_concordant: bool = False
 
     SEVERITY_RANK = {"none": 0, "leve": 1, "moderado": 2, "critico": 3}
 
@@ -91,6 +98,13 @@ class AlertMatrixResult:
             "primary_alert_name": self.primary_alert_name,
             "primary_rule_id": self.primary_rule_id,
             "explanation": self.explanation,
+            "hospitalization_score": self.hospitalization_score,
+            "risk_band": self.risk_band,
+            "stars": self.stars,
+            "next2u_id": self.next2u_id,
+            "care_pathway": self.care_pathway,
+            "disease_concordant": self.disease_concordant,
+            "med_concordant": self.med_concordant,
         }
 
 
@@ -563,7 +577,7 @@ def rules_catalog() -> List[Dict[str, str]]:
 class AlertMatrixEngine:
     """Avalia um VitalSnapshot contra toda a matriz de cruzamentos."""
 
-    def evaluate(self, vitals: VitalSnapshot) -> AlertMatrixResult:
+    def evaluate(self, vitals: VitalSnapshot, context: Any = None) -> AlertMatrixResult:
         hits: List[AlertHit] = []
         for rule in ALERT_RULES:
             try:
@@ -581,7 +595,7 @@ class AlertMatrixEngine:
 
         if not hits:
             fp_candidate = self._looks_anomalous_but_unmatched(vitals)
-            return AlertMatrixResult(
+            empty = AlertMatrixResult(
                 hits=[],
                 max_severity="none",
                 is_true_alert=False,
@@ -593,12 +607,22 @@ class AlertMatrixEngine:
                         if fp_candidate
                         else "; vitais dentro de faixa de estabilidade"
                     )
+                    + (
+                        "; escore/doença/medicamento isolados não geram alerta"
+                        if context is not None
+                        else ""
+                    )
                 ),
             )
+            if context is not None:
+                from src.clinical_intelligence.next2u_promotion import apply_next2u
+
+                apply_next2u(empty, context, primary_rule_id=None)
+            return empty
 
         rank = AlertMatrixResult.SEVERITY_RANK
         best = max(hits, key=lambda h: rank.get(h.severity, 0))
-        return AlertMatrixResult(
+        result = AlertMatrixResult(
             hits=hits,
             max_severity=best.severity,
             is_true_alert=True,
@@ -606,7 +630,13 @@ class AlertMatrixEngine:
             primary_alert_name=best.name,
             primary_rule_id=best.rule_id,
             explanation=f"{len(hits)} regra(s); principal={best.rule_id} ({best.severity})",
+            stars=rank.get(best.severity, 0),
         )
+        if context is not None:
+            from src.clinical_intelligence.next2u_promotion import apply_next2u
+
+            apply_next2u(result, context, primary_rule_id=best.rule_id)
+        return result
 
     @staticmethod
     def _looks_anomalous_but_unmatched(v: VitalSnapshot) -> bool:

@@ -27,6 +27,12 @@ from src.clinical_intelligence.alert_matrix_rules import (
     AlertMatrixEngine,
     VitalSnapshot,
 )
+from src.clinical_intelligence.next2u_context import (
+    NEXT2U_CONTEXT_FEATURES,
+    PatientContext,
+    RULE_TO_NEXT2U,
+    context_features,
+)
 
 FEATURE_COLUMNS = [
     "pas",
@@ -48,6 +54,8 @@ FEATURE_COLUMNS = [
     "disc_bp_phantom",
     "disc_glucose_phantom",
     "disc_ui_fp_pattern",
+    # Next2U — risco de internação + concordância + confirmação
+    *NEXT2U_CONTEXT_FEATURES,
 ]
 
 SEVERITY_LABELS = ["none", "leve", "moderado", "critico"]
@@ -485,11 +493,79 @@ def _sample_false_positive(r: random.Random) -> VitalSnapshot:
     return base
 
 
+def _sample_patient_context(
+    r: random.Random,
+    rule_id: str = "",
+    *,
+    force_normal: bool = False,
+) -> PatientContext:
+    """Amostra de prontuário alinhada à tabela de promoção Next2U."""
+    if force_normal:
+        return PatientContext(data_valid=True)
+    profile_id, _ = RULE_TO_NEXT2U.get(rule_id, (1, 1))
+    from src.clinical_intelligence.next2u_context import PROFILE_CONCORDANCE
+
+    spec = PROFILE_CONCORDANCE.get(profile_id, {"diseases": set(), "meds": set()})
+    roll = r.random()
+    diseases: List[str] = []
+    meds: List[str] = []
+    confirm = False
+    progress = False
+    n_meds = r.randint(1, 4)
+    hosp = False
+    alone = False
+    mobility = False
+    if roll < 0.35:
+        # baixo risco, sem promoção
+        diseases = r.sample(list(spec["diseases"]), k=min(1, len(spec["diseases"]))) if spec["diseases"] and r.random() < 0.4 else []
+    elif roll < 0.65:
+        # moderado com concordância ± confirmação
+        diseases = r.sample(list(spec["diseases"]), k=min(2, len(spec["diseases"]))) if spec["diseases"] else []
+        if spec["meds"] and r.random() < 0.6:
+            meds = r.sample(list(spec["meds"]), k=1)
+        n_meds = r.randint(3, 7)
+        confirm = r.random() < 0.5
+        hosp = r.random() < 0.3
+    elif roll < 0.85:
+        # alto risco
+        diseases = r.sample(list(spec["diseases"]), k=min(3, len(spec["diseases"]))) if spec["diseases"] else ["hf", "ckd"]
+        if spec["meds"]:
+            meds = r.sample(list(spec["meds"]), k=min(2, len(spec["meds"])))
+        n_meds = r.randint(6, 10)
+        confirm = r.random() < 0.7
+        progress = r.random() < 0.35
+        hosp = True
+        mobility = r.random() < 0.4
+    else:
+        # crítico
+        diseases = list(spec["diseases"])[:4] or ["hf", "neoplasm", "ckd"]
+        meds = list(spec["meds"])[:2]
+        n_meds = r.randint(7, 12)
+        confirm = True
+        progress = r.random() < 0.7
+        hosp = True
+        alone = r.random() < 0.5
+        mobility = True
+    return PatientContext(
+        diseases=diseases,
+        medications=meds,
+        n_continuous_meds=n_meds,
+        reduced_mobility=mobility,
+        hospitalized_last_6_months=hosp,
+        lives_alone=alone,
+        confirmation_or_persistence=confirm,
+        clinical_progression=progress,
+        data_valid=True,
+    )
+
+
 def _feats_for(
     vitals: VitalSnapshot,
     *,
     bp_source: str = "measured",
     glucose_source: str = "measured",
+    context: Optional[PatientContext] = None,
+    rule_id: str = "",
 ) -> Dict[str, float]:
     feats = vitals.to_feature_dict()
     feats.update(
@@ -497,6 +573,8 @@ def _feats_for(
             vitals, bp_source=bp_source, glucose_source=glucose_source
         )
     )
+    profile_id = RULE_TO_NEXT2U.get(rule_id, (1, 1))[0]
+    feats.update(context_features(context, profile_id=profile_id))
     return feats
 
 
@@ -520,16 +598,18 @@ def generate_dataset(
     engine = AlertMatrixEngine()
     rows: List[Dict[str, Any]] = []
 
-    # True positives por regra (BP/glicose "medidos")
+    # True positives por regra (BP/glicose "medidos") + contexto Next2U
     for rule in ALERT_RULES:
         rid = rule["rule_id"]
         for _ in range(n_per_rule):
             vitals = _fill_baseline_context(_sample_for_rule(rid, r), r)
-            result = engine.evaluate(vitals)
+            ctx = _sample_patient_context(r, rid)
+            result = engine.evaluate(vitals, context=ctx)
             attempts = 0
             while not result.is_true_alert and attempts < 8:
                 vitals = _fill_baseline_context(_sample_for_rule(rid, r), r)
-                result = engine.evaluate(vitals)
+                ctx = _sample_patient_context(r, rid)
+                result = engine.evaluate(vitals, context=ctx)
                 attempts += 1
             if not result.is_true_alert:
                 continue
@@ -546,7 +626,13 @@ def generate_dataset(
             )
             if disc.should_suppress_alert:
                 continue
-            feats = _feats_for(vitals, bp_source="measured", glucose_source="measured")
+            feats = _feats_for(
+                vitals,
+                bp_source="measured",
+                glucose_source="measured",
+                context=ctx,
+                rule_id=rid,
+            )
             rows.append(
                 {
                     **feats,
@@ -556,14 +642,26 @@ def generate_dataset(
                     "rule_id": result.primary_rule_id or rid,
                     "alert_name": result.primary_alert_name or "",
                     "sample_type": "true_alert",
+                    "next2u_id": result.next2u_id or "",
+                    "stars": result.stars,
                 }
             )
 
-    # Normais
+    # Normais — inclusive escore alto SEM padrão fisiológico (trava de segurança)
     for _ in range(n_normal):
         vitals = _sample_normal(r)
-        result = engine.evaluate(vitals)
-        feats = _feats_for(vitals, bp_source="measured", glucose_source="measured")
+        ctx = (
+            _sample_patient_context(r, force_normal=False)
+            if r.random() < 0.25
+            else _sample_patient_context(r, force_normal=True)
+        )
+        result = engine.evaluate(vitals, context=ctx)
+        feats = _feats_for(
+            vitals,
+            bp_source="measured",
+            glucose_source="measured",
+            context=ctx,
+        )
         rows.append(
             {
                 **feats,
@@ -573,13 +671,16 @@ def generate_dataset(
                 "rule_id": result.primary_rule_id or "",
                 "alert_name": result.primary_alert_name or "",
                 "sample_type": "normal",
+                "next2u_id": result.next2u_id or "",
+                "stars": result.stars,
             }
         )
 
     # Falsos positivos genéricos
     for _ in range(n_false_positive):
         vitals = _fill_baseline_context(_sample_false_positive(r), r)
-        result = engine.evaluate(vitals)
+        ctx = _sample_patient_context(r, force_normal=r.random() < 0.5)
+        result = engine.evaluate(vitals, context=ctx)
         # UI/phantom pattern: marcar fontes phantom
         is_ui = (
             vitals.hr is not None
@@ -599,7 +700,9 @@ def generate_dataset(
             bp_reliable=bp_src != "phantom",
             glucose_reliable=glu_src != "phantom",
         )
-        feats = _feats_for(vitals, bp_source=bp_src, glucose_source=glu_src)
+        feats = _feats_for(
+            vitals, bp_source=bp_src, glucose_source=glu_src, context=ctx
+        )
         if result.is_true_alert and not disc.should_suppress_alert:
             rows.append(
                 {
@@ -610,6 +713,8 @@ def generate_dataset(
                     "rule_id": result.primary_rule_id or "",
                     "alert_name": result.primary_alert_name or "",
                     "sample_type": "true_alert_from_fp_sampler",
+                    "next2u_id": result.next2u_id or "",
+                    "stars": result.stars,
                 }
             )
         else:
@@ -622,13 +727,16 @@ def generate_dataset(
                     "rule_id": "",
                     "alert_name": "",
                     "sample_type": "false_positive",
+                    "next2u_id": "",
+                    "stars": 0,
                 }
             )
 
     # Extra: padrões explícitos do screenshot (crise + hiperglicemia fantasma + estável)
     for _ in range(n_ui_fp):
         vitals, meta = _sample_ui_screenshot_fp(r)
-        result = engine.evaluate(vitals)
+        ctx = _sample_patient_context(r, force_normal=True)
+        result = engine.evaluate(vitals, context=ctx)
         disc = evaluate_discrepancy(
             vitals,
             [h.to_dict() for h in result.hits],
@@ -643,6 +751,7 @@ def generate_dataset(
             vitals,
             bp_source=meta["bp_source"],
             glucose_source=meta["glucose_source"],
+            context=ctx,
         )
         # Sempre FP rotulado — mesmo se regras phantom batessem
         rows.append(
@@ -654,6 +763,8 @@ def generate_dataset(
                 "rule_id": "",
                 "alert_name": "",
                 "sample_type": "ui_screenshot_fp",
+                "next2u_id": "",
+                "stars": 0,
             }
         )
 

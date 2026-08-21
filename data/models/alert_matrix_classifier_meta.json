@@ -18,7 +18,18 @@
     "disc_hr_mid_stable",
     "disc_bp_phantom",
     "disc_glucose_phantom",
-    "disc_ui_fp_pattern"
+    "disc_ui_fp_pattern",
+    "hosp_score",
+    "risk_band_code",
+    "disease_concordant",
+    "med_concordant",
+    "confirmation",
+    "clinical_progression",
+    "social_isolation",
+    "polypharmacy",
+    "n_active_diseases",
+    "n_continuous_meds",
+    "data_valid"
   ],
   "severity_labels": [
     "none",
@@ -28,72 +39,72 @@
   ],
   "n_rules": 51,
   "metrics": {
-    "n_test": 1716,
-    "severity_f1_macro": 0.9957447880733119,
-    "severity_f1_weighted": 0.9976660855650866,
+    "n_test": 1696,
+    "severity_f1_macro": 0.9783719972896026,
+    "severity_f1_weighted": 0.9875447619241663,
     "severity_report": {
       "critico": {
-        "precision": 1.0,
-        "recall": 0.9960079840319361,
-        "f1-score": 0.998,
-        "support": 501.0
+        "precision": 0.976271186440678,
+        "recall": 0.9879931389365352,
+        "f1-score": 0.9820971867007673,
+        "support": 583.0
       },
       "leve": {
         "precision": 1.0,
-        "recall": 0.9821428571428571,
-        "f1-score": 0.990990990990991,
-        "support": 112.0
+        "recall": 0.9848484848484849,
+        "f1-score": 0.9923664122137404,
+        "support": 66.0
       },
       "moderado": {
-        "precision": 0.9902439024390244,
-        "recall": 1.0,
-        "f1-score": 0.9950980392156863,
-        "support": 203.0
+        "precision": 0.9565217391304348,
+        "recall": 0.9221556886227545,
+        "f1-score": 0.9390243902439024,
+        "support": 167.0
       },
       "none": {
-        "precision": 0.9977827050997783,
+        "precision": 1.0,
         "recall": 1.0,
-        "f1-score": 0.9988901220865705,
-        "support": 900.0
+        "f1-score": 1.0,
+        "support": 880.0
       },
-      "accuracy": 0.9976689976689976,
+      "accuracy": 0.9876179245283019,
       "macro avg": {
-        "precision": 0.9970066518847007,
-        "recall": 0.9945377102936983,
-        "f1-score": 0.9957447880733119,
-        "support": 1716.0
+        "precision": 0.9831982313927783,
+        "recall": 0.9737493281019436,
+        "f1-score": 0.9783719972896026,
+        "support": 1696.0
       },
       "weighted avg": {
-        "precision": 0.9976829526718661,
-        "recall": 0.9976689976689976,
-        "f1-score": 0.9976660855650866,
-        "support": 1716.0
+        "precision": 0.9875620472462842,
+        "recall": 0.9876179245283019,
+        "f1-score": 0.9875447619241663,
+        "support": 1696.0
       }
     },
     "severity_confusion": [
       [
-        499,
+        576,
         0,
-        2,
+        7,
+        0
+      ],
+      [
+        1,
+        65,
+        0,
+        0
+      ],
+      [
+        13,
+        0,
+        154,
         0
       ],
       [
         0,
-        110,
-        0,
-        2
-      ],
-      [
         0,
         0,
-        203,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        900
+        880
       ]
     ],
     "severity_labels": [
@@ -102,21 +113,21 @@
       "moderado",
       "none"
     ],
-    "false_positive_precision": 0.9951612903225806,
-    "false_positive_recall": 0.9983818770226537,
-    "false_positive_f1": 0.9967689822294022,
+    "false_positive_precision": 0.9927272727272727,
+    "false_positive_recall": 1.0,
+    "false_positive_f1": 0.9963503649635036,
     "false_positive_confusion": [
       [
-        1095,
-        3
+        1146,
+        4
       ],
       [
-        1,
-        617
+        0,
+        546
       ]
     ],
     "true_alert_precision": 1.0,
-    "true_alert_recall": 0.9950980392156863,
-    "true_alert_f1": 0.9975429975429976
+    "true_alert_recall": 1.0,
+    "true_alert_f1": 1.0
   }
 }
