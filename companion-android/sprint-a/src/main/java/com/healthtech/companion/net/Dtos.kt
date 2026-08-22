@@ -27,7 +27,29 @@ data class WearableDeviceInfo(
         origin_protocol_version?.let { put("origin_protocol_version", it) }
         watchday?.let { put("watchday", it) }
     }
+
+    companion object {
+        fun fromJsonObject(json: JSONObject): WearableDeviceInfo = WearableDeviceInfo(
+            device_id = json.getString("device_id"),
+            vendor = json.optString("vendor", "hband"),
+            model = json.optStringOrNull("model"),
+            firmware_version = json.optStringOrNull("firmware_version"),
+            mac_address = json.optStringOrNull("mac_address"),
+            battery_level = json.optNullableDouble("battery_level"),
+            origin_protocol_version = json.optNullableInt("origin_protocol_version"),
+            watchday = json.optNullableInt("watchday"),
+        )
+    }
 }
+
+internal fun JSONObject.optStringOrNull(key: String): String? =
+    if (has(key) && !isNull(key)) getString(key) else null
+
+internal fun JSONObject.optNullableDouble(key: String): Double? =
+    if (has(key) && !isNull(key)) optDouble(key) else null
+
+internal fun JSONObject.optNullableInt(key: String): Int? =
+    if (has(key) && !isNull(key)) optInt(key) else null
 
 /**
  * Envelope em Tempo Real completo enviado pelo VE30 para a IA HealthTech.
@@ -71,6 +93,32 @@ data class WearableIngestRequest(
             put("ppg_signal", arr)
         }
         device_info?.let { put("device", it.toJsonObject()) }
+    }
+
+    companion object {
+        fun fromJsonObject(json: JSONObject): WearableIngestRequest {
+            val ppg = json.optJSONArray("ppg_signal")?.let { arr ->
+                (0 until arr.length()).map { arr.getDouble(it) }
+            }
+            return WearableIngestRequest(
+                patient_id = json.getString("patient_id"),
+                device_id = json.getString("device_id"),
+                heart_rate = json.optNullableDouble("heart_rate"),
+                spo2 = json.optNullableDouble("spo2"),
+                skin_temp = json.optNullableDouble("skin_temp"),
+                blood_pressure_sys = json.optNullableDouble("blood_pressure_sys"),
+                blood_pressure_dia = json.optNullableDouble("blood_pressure_dia"),
+                hrv_rmssd = json.optNullableDouble("hrv_rmssd"),
+                activity_level = json.optNullableDouble("activity_level"),
+                steps = json.optNullableInt("steps"),
+                calories = json.optNullableDouble("calories"),
+                wear_status = json.optBoolean("wear_status", true),
+                ppg_signal = ppg,
+                filter_type = json.optString("filter_type", "BMO"),
+                timestamp = json.optString("timestamp", Instant.now().toString()),
+                device_info = json.optJSONObject("device")?.let { WearableDeviceInfo.fromJsonObject(it) },
+            )
+        }
     }
 }
 

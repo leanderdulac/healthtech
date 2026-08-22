@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.healthtech.companion.BuildConfig
 import com.healthtech.companion.ble.HbandConnectionManager
 import com.healthtech.companion.ble.HbandRealtimeCollector
 import com.healthtech.companion.net.HealthtechApiClient
@@ -38,13 +39,13 @@ class Ve30TelemetryService : Service() {
         Log.i(TAG, "Criando Ve30TelemetryService...")
         createNotificationChannel()
 
-        val baseUrl = "https://healthtech-responsive-5794833455.us-central1.run.app"
-        val apiKey = "" // Injetado dinamicamente via Intent ou SharedPreferences
-        val patientId = "PAT-VE30-001"
-
         connectionManager = HbandConnectionManager(applicationContext)
-        apiClient = HealthtechApiClient(baseUrl, apiKey)
-        collector = HbandRealtimeCollector(connectionManager, apiClient, patientId)
+        apiClient = HealthtechApiClient(
+            appContext = applicationContext,
+            baseUrl = BuildConfig.HEALTHTECH_BASE_URL,
+            apiKey = BuildConfig.HEALTHTECH_INGEST_API_KEY,
+        )
+        collector = HbandRealtimeCollector(connectionManager, apiClient, BuildConfig.HEALTHTECH_PATIENT_ID)
 
         connectionManager.initSdk()
     }

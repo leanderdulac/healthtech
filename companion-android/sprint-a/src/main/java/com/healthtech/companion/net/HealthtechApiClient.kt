@@ -1,8 +1,11 @@
 package com.healthtech.companion.net
 
+import android.content.Context
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.File
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -13,21 +16,28 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Cliente HTTP Resiliente para Comunicação com a Plataforma de IA HealthTech.
- * 
+ *
  * Funcionalidades:
  *  - Ingestão em Tempo Real (/api/v1/wearables/ingest)
  *  - Ingestão de Histórico em Lote (/api/v1/wearables/ingest/batch)
  *  - Deliberação do Conselho Multi-Agente (/api/clinical/multi_agent_consensus)
- *  - Fila Outbox Offline Persistente em memória com Retry Automático
+ *  - Fila Outbox Offline Persistente em Disco com Retry Automático (sobrevive a kill de processo)
  *  - Autenticação Segura via header X-API-Key
  */
 class HealthtechApiClient(
+    appContext: Context,
     private val baseUrl: String,
     private val apiKey: String,
     private val executor: ExecutorService = Executors.newFixedThreadPool(2),
 ) {
     private val outboxQueue = ConcurrentLinkedQueue<WearableIngestRequest>()
     private val isFlushing = AtomicBoolean(false)
+    private val outboxLock = Any()
+    private val outboxFile = File(appContext.applicationContext.filesDir, OUTBOX_FILE_NAME)
+
+    init {
+        loadPersistedOutbox()
+    }
 
     fun ingestRealtime(
         request: WearableIngestRequest,
@@ -37,10 +47,7 @@ class HealthtechApiClient(
             val result = ingestRealtimeSync(request)
             if (!result.ok && !result.isUnauthorized && result.httpCode != 400) {
                 // Erro de rede ou indisponibilidade temporária -> enfileirar no outbox
-                if (outboxQueue.size < 500) {
-                    outboxQueue.offer(request)
-                    Log.w(TAG, "Falha de rede (${result.httpCode}). Pacote enfileirado no Outbox. Total pendente: ${outboxQueue.size}")
-                }
+                enqueueOutbox(request)
             } else if (result.ok && outboxQueue.isNotEmpty()) {
                 // Conexão restabelecida -> descarregar fila outbox
                 flushOutboxAsync()
@@ -98,6 +105,16 @@ class HealthtechApiClient(
         }
     }
 
+    private fun enqueueOutbox(request: WearableIngestRequest) {
+        synchronized(outboxLock) {
+            if (outboxQueue.size < MAX_OUTBOX_SIZE) {
+                outboxQueue.offer(request)
+                persistOutboxLocked()
+                Log.w(TAG, "Falha de rede. Pacote enfileirado no Outbox. Total pendente: ${outboxQueue.size}")
+            }
+        }
+    }
+
     private fun flushOutboxAsync() {
         if (!isFlushing.compareAndSet(false, true)) return
         executor.execute {
@@ -107,7 +124,10 @@ class HealthtechApiClient(
                     val req = outboxQueue.peek() ?: break
                     val res = ingestRealtimeSync(req)
                     if (res.ok) {
-                        outboxQueue.poll()
+                        synchronized(outboxLock) {
+                            outboxQueue.poll()
+                            persistOutboxLocked()
+                        }
                     } else {
                         Log.w(TAG, "Pausa no flush do Outbox: servidor respondeu com código ${res.httpCode}")
                         break
@@ -116,6 +136,35 @@ class HealthtechApiClient(
             } finally {
                 isFlushing.set(false)
             }
+        }
+    }
+
+    /** Deve ser chamado apenas dentro de um bloco `synchronized(outboxLock)`. */
+    private fun persistOutboxLocked() {
+        try {
+            val arr = JSONArray()
+            outboxQueue.forEach { arr.put(it.toJsonObject()) }
+            outboxFile.writeText(arr.toString())
+        } catch (e: Exception) {
+            Log.e(TAG, "Falha ao persistir Outbox em disco: ${e.message}")
+        }
+    }
+
+    private fun loadPersistedOutbox() {
+        try {
+            if (!outboxFile.exists()) return
+            val text = outboxFile.readText()
+            if (text.isBlank()) return
+            val arr = JSONArray(text)
+            for (i in 0 until arr.length()) {
+                outboxQueue.offer(WearableIngestRequest.fromJsonObject(arr.getJSONObject(i)))
+            }
+            if (outboxQueue.isNotEmpty()) {
+                Log.i(TAG, "Outbox restaurado do disco: ${outboxQueue.size} pacotes pendentes.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Falha ao restaurar Outbox do disco (arquivo será descartado): ${e.message}")
+            outboxFile.delete()
         }
     }
 
@@ -206,5 +255,7 @@ class HealthtechApiClient(
 
     companion object {
         private const val TAG = "HealthtechApiClient"
+        private const val OUTBOX_FILE_NAME = "ve30_outbox_queue.json"
+        private const val MAX_OUTBOX_SIZE = 500
     }
 }

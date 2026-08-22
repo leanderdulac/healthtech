@@ -4,17 +4,28 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.healthtech.companion.net.HealthtechApiClient
+import com.inuker.bluetooth.library.Constants
+import com.inuker.bluetooth.library.connect.response.BleWriteResponse
+import com.veepoo.protocol.listener.base.IBleWriteResponse
+import com.veepoo.protocol.listener.data.IBPDetectDataListener
+import com.veepoo.protocol.listener.data.IHeartDataListener
+import com.veepoo.protocol.listener.data.IHrvDetectListener
+import com.veepoo.protocol.listener.data.ILightDataCallBack
+import com.veepoo.protocol.listener.data.ISpo2hDataListener
+import com.veepoo.protocol.listener.data.ITemptureDetectDataListener
+import com.veepoo.protocol.model.enums.EBPDetectModel
+import com.veepoo.protocol.model.enums.HrvDetectState
 import java.util.Random
 
 /**
- * Coletor de Sensores Físicos em Tempo Real do Relógio VE30.
- * 
- * Gerencia a ativação e leitura contínua de:
+ * Coletor de Sensores Físicos em Tempo Real do Relógio VE30, sobre o SDK oficial `VPOperateManager`.
+ *
+ * Ativa e escuta continuamente:
  *  1. Frequência Cardíaca (startDetectHeart)
- *  2. Oximetria de Pulso SpO2 (startDetectSpo2h)
+ *  2. Oximetria de Pulso SpO2 + sinal óptico PPG verde (startDetectSPO2H com ILightDataCallBack)
  *  3. Temperatura Cutânea / Corporal (startDetectTempture)
  *  4. Pressão Arterial (startDetectBP)
- *  5. Sinal Óptico PPG Verde (startDetectGreenLight)
+ *  5. Variabilidade da Frequência Cardíaca (startDetectHrv)
  */
 class HbandRealtimeCollector(
     private val connection: HbandConnectionManager,
@@ -48,7 +59,7 @@ class HbandRealtimeCollector(
             }
 
             override fun onAiResponseReceived(heartRate: Double?, spo2: Double?, alerts: List<String>?, phantomBp: String?) {
-                val summary = "IA OK | HR: ${heartRate?.toInt()} bpm | SpO2: ${spo2?.toInt()}%" + 
+                val summary = "IA OK | HR: ${heartRate?.toInt()} bpm | SpO2: ${spo2?.toInt()}%" +
                     if (phantomBp != null) " | Est. $phantomBp" else ""
                 uiCallback?.onIngestSuccess(200, summary)
             }
@@ -64,7 +75,7 @@ class HbandRealtimeCollector(
     }
 
     /**
-     * Inicia a coleta contínua de todos os sensores do VE30.
+     * Inicia a coleta contínua de todos os sensores reais do VE30 via VPOperateManager.
      */
     fun startAllSensors() {
         if (!connection.isReady) {
@@ -72,21 +83,45 @@ class HbandRealtimeCollector(
             return
         }
 
-        Log.i(TAG, "Ativando todos os sensores vitais do VE30 (HR, SpO2, Temp, BP)...")
-        val vpInstance = connection.getSdkInstance()
+        Log.i(TAG, "Ativando todos os sensores vitais do VE30 (HR, SpO2, Temp, BP, HRV)...")
+        val manager = connection.operateManager()
 
-        if (vpInstance != null) {
-            try {
-                // Invoca listeners nativos do SDK
-                Log.i(TAG, "Conectando listeners aos métodos nativos do VPOperateManager...")
-                // startDetectHeart, startDetectSpo2h, startDetectTempture, startDetectBP
-            } catch (e: Exception) {
-                Log.e(TAG, "Erro ao registrar listeners de sensores no SDK: ${e.message}")
-            }
-        } else {
-            // Emulador de fluxo fisiológico estocástico de alta fidelidade
-            startFidelitySimulator()
-        }
+        manager.startDetectHeart(
+            IBleWriteResponse { code -> logIfFailed("startDetectHeart", code) },
+            IHeartDataListener { heart -> aggregator.updateHeartRate(heart.data.toDouble(), true) },
+        )
+
+        manager.startDetectSPO2H(
+            IBleWriteResponse { code -> logIfFailed("startDetectSPO2H", code) },
+            ISpo2hDataListener { data -> aggregator.updateSpo2(data.value.toDouble()) },
+            ILightDataCallBack { samples -> samples.forEach { aggregator.appendPpgSample(it.toDouble()) } },
+        )
+
+        manager.startDetectTempture(
+            IBleWriteResponse { code -> logIfFailed("startDetectTempture", code) },
+            ITemptureDetectDataListener { data -> aggregator.updateTemperature(data.tempture.toDouble()) },
+        )
+
+        manager.startDetectBP(
+            IBleWriteResponse { code -> logIfFailed("startDetectBP", code) },
+            IBPDetectDataListener { data -> aggregator.updateBloodPressure(data.highPressure.toDouble(), data.lowPressure.toDouble()) },
+            EBPDetectModel.DETECT_MODEL_PUBLIC,
+        )
+
+        manager.startDetectHrv(
+            BleWriteResponse { code -> logIfFailed("startDetectHrv", code) },
+            object : IHrvDetectListener {
+                override fun onHrvDetect(hrv: Int) {
+                    aggregator.updateHrv(hrv.toDouble())
+                }
+
+                override fun onDetectFailed(detectState: HrvDetectState) {
+                    Log.w(TAG, "Falha na detecção de HRV: $detectState")
+                }
+
+                override fun onDetectStop() {}
+            },
+        )
 
         aggregator.start()
     }
@@ -94,37 +129,22 @@ class HbandRealtimeCollector(
     fun stopAllSensors() {
         Log.i(TAG, "Parando sensores do VE30...")
         isSimulatingRealtime = false
+        connection.operateManager().stopDetectHeart(IBleWriteResponse { })
         aggregator.stop()
     }
 
+    private fun logIfFailed(operation: String, code: Int) {
+        if (code != Constants.REQUEST_SUCCESS) {
+            Log.w(TAG, "$operation retornou code=$code (esperado ${Constants.REQUEST_SUCCESS})")
+        }
+    }
+
     /**
-     * Injetores de dados para os listeners nativos do SDK Veepoo chamarem:
+     * Modo de desenvolvimento sem relógio físico: gera um fluxo fisiológico estocástico
+     * de alta fidelidade para validar a esteira de agregação/ingestão. Não é chamado
+     * automaticamente — use apenas em builds de debug sem hardware disponível.
      */
-    fun onHeartRateFromSdk(bpm: Double, wearStatus: Boolean) {
-        aggregator.updateHeartRate(bpm, wearStatus)
-    }
-
-    fun onSpo2FromSdk(spo2: Double) {
-        aggregator.updateSpo2(spo2)
-    }
-
-    fun onTemperatureFromSdk(tempC: Double) {
-        aggregator.updateTemperature(tempC)
-    }
-
-    fun onBloodPressureFromSdk(sys: Double, dia: Double) {
-        aggregator.updateBloodPressure(sys, dia)
-    }
-
-    fun onHrvFromSdk(rmssd: Double) {
-        aggregator.updateHrv(rmssd)
-    }
-
-    fun onPpgRawSampleFromSdk(sample: Double) {
-        aggregator.appendPpgSample(sample)
-    }
-
-    private fun startFidelitySimulator() {
+    fun startSimulatedSensors() {
         isSimulatingRealtime = true
         var currentHr = 72.0
         var currentSpo2 = 98.0
@@ -134,7 +154,6 @@ class HbandRealtimeCollector(
             override fun run() {
                 if (!isSimulatingRealtime) return
 
-                // Ornstein-Uhlenbeck drift
                 currentHr += 0.2 * (74.0 - currentHr) + (random.nextDouble() - 0.5) * 2.0
                 currentSpo2 = (currentSpo2 + (random.nextDouble() - 0.5) * 0.4).coerceIn(95.0, 99.5)
                 currentTemp = (currentTemp + (random.nextDouble() - 0.5) * 0.05).coerceIn(32.8, 34.5)
@@ -145,7 +164,6 @@ class HbandRealtimeCollector(
                 aggregator.updateBloodPressure(120.0 + (currentHr - 70) * 0.3, 80.0 + (currentHr - 70) * 0.15)
                 aggregator.updateHrv(42.0 + (random.nextDouble() - 0.5) * 4.0)
 
-                // Gera 10 amostras de PPG simuladas
                 for (i in 0 until 10) {
                     val ppgVal = 500.0 + 120.0 * Math.sin(2.0 * Math.PI * (i / 10.0)) + random.nextGaussian() * 5.0
                     aggregator.appendPpgSample(ppgVal)
@@ -155,6 +173,12 @@ class HbandRealtimeCollector(
             }
         }
         mainHandler.post(runnable)
+        aggregator.start()
+    }
+
+    fun stopSimulatedSensors() {
+        isSimulatingRealtime = false
+        aggregator.stop()
     }
 
     companion object {

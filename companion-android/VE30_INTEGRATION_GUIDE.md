@@ -119,12 +119,17 @@ graph TD
 
 ## 4. Instruções para Compilação e Instalação do APK
 
-1. **Obter os Arquivos AAR do Fabricante Veepoo / HBand**:
-   - `vpprotocol-x.x.x.aar`
-   - `vpbluetooth-x.x.x.aar`
-   - `abpartool-x.x.x.aar`
-2. **Posicionar os AARs no Diretório**:
-   - Copiar os arquivos para `companion-android/sprint-a/libs/`.
+1. **AARs do SDK oficial Veepoo / HBand**: já estão vendorizados em
+   `companion-android/sprint-a/libs/` (vindos de https://github.com/HBandSDK/Android_Ble_SDK,
+   Apache 2.0 — ver [`libs/THIRD_PARTY_NOTICE.md`](sprint-a/libs/THIRD_PARTY_NOTICE.md) para a
+   proveniência de cada arquivo). Não é necessário baixar nada manualmente.
+2. **Configurar a `X-API-Key` de ingestão** (nunca commitar a chave):
+   - Criar `companion-android/local.properties` (gitignored) com:
+     ```properties
+     HEALTHTECH_INGEST_API_KEY=sua-chave-aqui
+     ```
+   - Ou exportar a variável de ambiente `HEALTHTECH_INGEST_API_KEY` antes do build.
+   - O valor é injetado em `BuildConfig.HEALTHTECH_INGEST_API_KEY` e lido por `MainActivity` e `Ve30TelemetryService` — sem chave, o app roda sem o header `X-API-Key`.
 3. **Compilar via Linha de Comando ou Android Studio**:
    ```bash
    cd companion-android
@@ -136,3 +141,7 @@ graph TD
    ```
 5. **Executar**:
    - Abrir o app **HealthTech VE30**, conceder as permissões de Bluetooth e Notificação, pressionar **Scan** e conectar ao relógio VE30!
+
+> **Modo sem relógio físico**: `HbandRealtimeCollector.startSimulatedSensors()` gera um fluxo
+> fisiológico estocástico sintético para validar a esteira de agregação/ingestão sem hardware —
+> não é chamado automaticamente; use-o manualmente em builds de debug quando não houver um VE30 por perto.

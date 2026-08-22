@@ -4,15 +4,19 @@ import android.util.Log
 import com.healthtech.companion.net.HealthtechApiClient
 import com.healthtech.companion.net.OriginDataSample
 import com.healthtech.companion.net.WearableBatchIngestRequest
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import com.veepoo.protocol.listener.base.IBleWriteResponse
+import com.veepoo.protocol.listener.data.IOriginData3Listener
+import com.veepoo.protocol.model.datas.HRVOriginData
+import com.veepoo.protocol.model.datas.OriginData3
+import com.veepoo.protocol.model.datas.OriginHalfHourData
+import com.veepoo.protocol.model.datas.Spo2hOriginData
 
 /**
- * Sincronizador de Dados Históricos Offline do VE30 (OriginData3, Sono e Passos).
- * 
+ * Sincronizador de Dados Históricos Offline do VE30 (protocolo OriginData3, versão 3).
+ *
  * Quando o paciente fica desconectado do smartphone, o VE30 armazena blocos de 5 minutos
- * de dados na memória flash interna. Este módulo lê o histórico e envia em lote para
- * o endpoint POST /api/v1/wearables/ingest/batch.
+ * de dados na memória flash interna. Este módulo lê o histórico via `readOriginData` do
+ * SDK oficial e envia em lote para o endpoint POST /api/v1/wearables/ingest/batch.
  */
 class HbandHistorySync(
     private val connection: HbandConnectionManager,
@@ -27,13 +31,16 @@ class HbandHistorySync(
 
     private var callback: SyncCallback? = null
     private val sampleBuffer = mutableListOf<OriginDataSample>()
+    private var latestHrvByDate = mutableMapOf<String, Double>()
 
     fun setCallback(cb: SyncCallback?) {
         this.callback = cb
     }
 
     /**
-     * Dispara leitura de dados históricos de até X dias atrás do VE30.
+     * Dispara a leitura do histórico OriginData3 (protocolo v3) armazenado na flash do VE30.
+     * O parâmetro `daysCount` é informativo para a UI/telemetria de progresso — o SDK oficial
+     * descarrega automaticamente todo o histórico disponível no dispositivo nesta chamada.
      */
     fun syncDays(daysCount: Int = 3) {
         if (!connection.isReady) {
@@ -41,46 +48,59 @@ class HbandHistorySync(
             return
         }
 
-        Log.i(TAG, "Iniciando leitura de $daysCount dias de histórico OriginData3 do VE30...")
+        Log.i(TAG, "Iniciando leitura do histórico OriginData3 (protocolo v3) do VE30...")
         sampleBuffer.clear()
+        latestHrvByDate.clear()
 
-        val vpInstance = connection.getSdkInstance()
-        if (vpInstance != null) {
-            try {
-                // Invocação nativa: readOriginData3(dayIndex, listener)
-                Log.i(TAG, "Chamando readOriginData3 no SDK...")
-            } catch (e: Exception) {
-                callback?.onSyncError("Erro ao invocar histórico no SDK: ${e.message}")
-            }
-        } else {
-            // Gera amostras históricas sintéticas para teste
-            val now = LocalDateTime.now()
-            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-            for (i in 0 until (daysCount * 288)) {
-                val dt = now.minusMinutes((i * 5).toLong())
-                sampleBuffer.add(
-                    OriginDataSample(
-                        timestamp = dt.format(formatter),
-                        heart_rate = 65.0 + Math.sin(i * 0.1) * 15.0,
-                        spo2 = 98.0 - (i % 3) * 0.5,
-                        blood_pressure_sys = 118.0 + (i % 5),
-                        blood_pressure_dia = 78.0 + (i % 4),
-                        hrv = 45.0,
-                        step_count = (Math.random() * 50).toInt(),
-                        cal_value = Math.random() * 2.5
-                    )
-                )
-            }
-            flushBatchToApi()
-        }
+        connection.operateManager().readOriginData(
+            IBleWriteResponse { code -> Log.i(TAG, "Comando de leitura de histórico enviado (code=$code).") },
+            object : IOriginData3Listener {
+                override fun onOriginFiveMinuteListDataChange(originDataList: List<OriginData3>) {
+                    val samples = originDataList.map { it.toSample() }
+                    sampleBuffer.addAll(samples)
+                    callback?.onSyncProgress(daysCount, daysCount, sampleBuffer.size)
+                }
+
+                override fun onOriginHalfHourDataChange(originHalfHourData: OriginHalfHourData) {}
+
+                override fun onOriginHRVOriginListDataChange(originHrvDataList: List<HRVOriginData>) {
+                    originHrvDataList.forEach { latestHrvByDate[it.date] = it.hrvValue.toDouble() }
+                }
+
+                override fun onOriginSpo2OriginListDataChange(originSpo2hDataList: List<Spo2hOriginData>) {}
+
+                override fun onReadOriginProgressDetail(day: Int, date: String, allPackage: Int, currentPackage: Int) {
+                    callback?.onSyncProgress(day, daysCount, sampleBuffer.size)
+                }
+
+                override fun onReadOriginProgress(progress: Float) {}
+
+                override fun onReadOriginComplete() {
+                    Log.i(TAG, "Leitura de histórico OriginData3 concluída (${sampleBuffer.size} blocos).")
+                    flushBatchToApi()
+                }
+
+                override fun onReadTimeout(day: Int) {
+                    callback?.onSyncError("Timeout ao ler histórico do dia $day.")
+                }
+            },
+            ORIGIN_DATA_PROTOCOL_VERSION,
+        )
     }
 
-    fun onOriginFiveMinuteListDataChange(samples: List<OriginDataSample>) {
-        sampleBuffer.addAll(samples)
-    }
-
-    fun onReadOriginDataCompleted() {
-        flushBatchToApi()
+    private fun OriginData3.toSample(): OriginDataSample {
+        val hrv = latestHrvByDate[date]
+        val spo2 = oxygens?.filter { it > 0 }?.takeIf { it.isNotEmpty() }?.average()
+        return OriginDataSample(
+            timestamp = date,
+            heart_rate = rateValue.takeIf { it > 0 }?.toDouble(),
+            spo2 = spo2,
+            blood_pressure_sys = highValue.takeIf { it > 0 }?.toDouble(),
+            blood_pressure_dia = lowValue.takeIf { it > 0 }?.toDouble(),
+            hrv = hrv,
+            step_count = stepValue.takeIf { it >= 0 },
+            cal_value = calValue.takeIf { it > 0 },
+        )
     }
 
     private fun flushBatchToApi() {
@@ -106,5 +126,6 @@ class HbandHistorySync(
 
     companion object {
         private const val TAG = "HbandHistorySync"
+        private const val ORIGIN_DATA_PROTOCOL_VERSION = 3
     }
 }

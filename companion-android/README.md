@@ -98,4 +98,4 @@ companion-android/
    - Conecte seu dispositivo Android via USB (com Depuração USB ativada) ou inicie um Emulador com suporte a Bluetooth.
    - Pressione **Run $	o$ Run 'sprint-a'** (Shift + F10).
 4. **Testar sem Relógio Físico (Modo Simulador)**:
-   - O app conta com gerador de sinais estocásticos de alta fidelidade integrado para validar toda a esteira mesmo sem o dispositivo físico presente!
+   - `HbandRealtimeCollector.startSimulatedSensors()` gera um fluxo fisiológico estocástico de alta fidelidade para validar toda a esteira de agregação/ingestão sem o dispositivo físico — chame-o manualmente em builds de debug (não é automático).

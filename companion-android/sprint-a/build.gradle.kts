@@ -1,7 +1,18 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) FileInputStream(file).use { load(it) }
+}
+
+fun secretProperty(name: String, default: String = ""): String =
+    System.getenv(name) ?: localProperties.getProperty(name) ?: default
 
 android {
     namespace = "com.healthtech.companion"
@@ -16,9 +27,13 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "HEALTHTECH_BASE_URL", "\"https://healthtech-responsive-5794833455.us-central1.run.app\"")
-        buildConfigField("String", "HEALTHTECH_PATIENT_ID", "\"PAT-VE30-001\"")
-        buildConfigField("String", "HEALTHTECH_INGEST_API_KEY", "\"\"")
+        buildConfigField("String", "HEALTHTECH_BASE_URL", "\"${secretProperty("HEALTHTECH_BASE_URL", "https://healthtech-responsive-5794833455.us-central1.run.app")}\"")
+        buildConfigField("String", "HEALTHTECH_PATIENT_ID", "\"${secretProperty("HEALTHTECH_PATIENT_ID", "PAT-VE30-001")}\"")
+        buildConfigField("String", "HEALTHTECH_INGEST_API_KEY", "\"${secretProperty("HEALTHTECH_INGEST_API_KEY")}\"")
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     buildTypes {
@@ -58,7 +73,16 @@ dependencies {
     // SDK Veepoo / HBand AARs (quando disponíveis em libs/)
     implementation(fileTree("libs") { include("*.aar", "*.jar") })
 
+    // McuMgr (Nordic) é exigido internamente pelo VPOperateManager para o fluxo de OTA
+    // (McuMgrOtaManager.init é chamado em todo onConnectStatusChanged). Sem esta dependência
+    // o app crasha com NoClassDefFoundError assim que o BLE conecta a um relógio real.
+    implementation("no.nordicsemi.android:mcumgr-core:2.7.4")
+    implementation("no.nordicsemi.android:mcumgr-ble:2.7.4")
+    implementation("no.nordicsemi.android.support.v18:scanner:1.4.2")
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
