@@ -7,7 +7,7 @@
     {"date": "2026-08-17", "amount_brl": 4000.00, "payer": "NEXT2U SAUDE LTDA", "on_statement": true},
     {"date": "2026-08-24", "amount_brl": 4800.00, "payer": "NEXT2U SAUDE LTDA", "on_statement": false, "note": "Informado pelo titular; não constava no export das 12:38. O valor mais próximo no extrato é R$ 4.780 em 03/08."}
   ],
-  "other_next2u_pix": [
+  "excluded_from_cloud_budget": [
     {"date": "2026-07-21", "amount_brl": 11500.00, "payer": "NEXT2U HEALTHCARE"},
     {"date": "2026-08-02", "amount_brl": 743.00, "payer": "NEXT2U HEALTHCARE"},
     {"date": "2026-08-11", "amount_brl": 180.00, "payer": "NEXT2U SAUDE LTDA"},

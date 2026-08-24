@@ -45,10 +45,17 @@ def test_skus_match_real_project_services():
 
 def test_other_next2u_pix_not_in_cloud_budget():
     ledger = build_ledger(as_of=date(2026, 8, 24))
-    others = {p["document"]: p["amount_brl"] for p in ledger["other_next2u_pix"]}
-    assert others["PIX-20260820-12000"] == 12000
-    assert others["PIX-20260721-11500"] == 11500
-    assert 12000 not in {c["amount_brl"] for c in ledger["credits"]}
+    amounts = {c["amount_brl"] for c in ledger["credits"]}
+    assert 4780 in amounts
+    assert 4000 in amounts
+    assert 4800 in amounts
+    assert 11500 not in amounts
+    assert 12000 not in amounts
+    assert 743 not in amounts
+    assert 180 not in amounts
+    assert 1135 not in amounts
+    assert 300 not in amounts
+    assert "other_next2u_pix" not in ledger
 
 
 def test_write_ledger_roundtrip():

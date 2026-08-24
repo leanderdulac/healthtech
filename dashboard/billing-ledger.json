@@ -1,7 +1,7 @@
 {
   "meta": {
     "simulation": true,
-    "disclaimer": "Créditos de nuvem batem com PIX NEXT2U SAUDE LTDA no extrato C6 (03/08 R$ 4.780, 10/08 R$ 2.000, 17/08 R$ 4.000). O PIX de R$ 4.800 em 24/08 foi informado pelo titular e não aparecia no export de 12:38. Aportes Next2U fora dessa faixa (~R$ 4 mil) ficam em other_next2u_pix e não queimam SKUs. Simulação operacional — não é fatura Google.",
+    "disclaimer": "Orçamento de nuvem/tokens: somente PIX Next2U Saúde de 03/08 R$ 4.780, 10/08 R$ 2.000, 17/08 R$ 4.000 e 24/08 R$ 4.800. Demais PIX Next2U não entram neste orçamento. Simulação operacional — não é fatura Google.",
     "as_of": "2026-08-24",
     "timezone": "America/Sao_Paulo",
     "currency": "BRL",
@@ -73,44 +73,6 @@
       "description": "PIX Next2U Saúde Ltda — processamento e tokens (R$ 4.800,00). Não constava no extrato C6 de 12:38.",
       "posted_at": "2026-08-24T10:15:00-03:00",
       "kind": "cloud_budget"
-    }
-  ],
-  "other_next2u_pix": [
-    {
-      "date": "2026-07-21",
-      "amount_brl": 11500.0,
-      "payer": "NEXT2U HEALTHCARE",
-      "document": "PIX-20260721-11500"
-    },
-    {
-      "date": "2026-08-02",
-      "amount_brl": 743.0,
-      "payer": "NEXT2U HEALTHCARE",
-      "document": "PIX-20260802-0743"
-    },
-    {
-      "date": "2026-08-11",
-      "amount_brl": 180.0,
-      "payer": "NEXT2U SAUDE LTDA",
-      "document": "PIX-20260811-0180"
-    },
-    {
-      "date": "2026-08-15",
-      "amount_brl": 1135.0,
-      "payer": "NEXT2U SAUDE LTDA",
-      "document": "PIX-20260815-1135"
-    },
-    {
-      "date": "2026-08-20",
-      "amount_brl": 300.0,
-      "payer": "NEXT2U SAUDE LTDA",
-      "document": "PIX-20260820-0300"
-    },
-    {
-      "date": "2026-08-20",
-      "amount_brl": 12000.0,
-      "payer": "NEXT2U SAUDE LTDA",
-      "document": "PIX-20260820-12000"
     }
   ],
   "daily": [

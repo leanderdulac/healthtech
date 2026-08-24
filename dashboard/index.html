@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
     <link rel="stylesheet" href="style.css?v=20260824b">
-    <link rel="stylesheet" href="gcp-billing.css?v=20260824c">
+    <link rel="stylesheet" href="gcp-billing.css?v=20260824d">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -607,7 +607,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                             <div>
                                 <strong>PIX Next2U Saúde — orçamento de nuvem e tokens</strong>
                                 <div id="gcp-countdown">03/08 R$ 4.780 · 10/08 R$ 2.000 · 17/08 R$ 4.000 · 24/08 R$ 4.800</div>
-                                Extrato C6 (12:38) confirma 4.780 / 2.000 / 4.000. O R$ 4.800 de hoje foi informado à parte (não estava nesse export). Outros PIX Next2U (11.500, 12.000, etc.) aparecem em Transactions e não queimam SKUs.
+                                Extrato C6 (12:38) confirma 4.780 / 2.000 / 4.000. O R$ 4.800 de hoje foi informado à parte. Demais PIX Next2U não entram neste orçamento.
                             </div>
                         </div>
                         <div class="gcp-kpis">
@@ -746,6 +746,6 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
 
     <!-- Script da Aplicação -->
     <script src="app.js?v=20260824b"></script>
-    <script src="gcp-billing.js?v=20260824c"></script>
+    <script src="gcp-billing.js?v=20260824d"></script>
 </body>
 </html>
