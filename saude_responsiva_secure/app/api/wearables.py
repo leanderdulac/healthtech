@@ -42,6 +42,7 @@ def ingest_wearable_reading(
 
 
 @router.post("/batch-ingest")
+@router.post("/ingest/batch")
 def batch_ingest_wearables(
     batch: WearableBatchIngestRequest,
     request: Request,
