@@ -65,16 +65,6 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
     },
 )
 
-# Demais PIX Next2U no mesmo extrato (não entram no orçamento semanal de nuvem).
-OTHER_NEXT2U_PIX: Tuple[Dict[str, Any], ...] = (
-    {"date": "2026-07-21", "amount_brl": 0.00, "payer": "NEXT2U HEALTHCARE", "document": "PIX-OCULTO"},
-    {"date": "2026-08-02", "amount_brl": 0.00, "payer": "NEXT2U HEALTHCARE", "document": "PIX-OCULTO"},
-    {"date": "2026-08-11", "amount_brl": 0.00, "payer": "NEXT2U SAUDE LTDA", "document": "PIX-OCULTO"},
-    {"date": "2026-08-15", "amount_brl": 0.00, "payer": "NEXT2U SAUDE LTDA", "document": "PIX-OCULTO"},
-    {"date": "2026-08-20", "amount_brl": 300.00, "payer": "NEXT2U SAUDE LTDA", "document": "PIX-OCULTO"},
-    {"date": "2026-08-20", "amount_brl": 0.00, "payer": "NEXT2U SAUDE LTDA", "document": "PIX-OCULTO"},
-)
-
 BILLING_ACCOUNT_ID = "CONTA-LOCAL-OCULTAXX"
 BILLING_ACCOUNT_NAME = "conta local"
 PROJECT_ID = "healthtech-gcp-2026"
@@ -299,11 +289,10 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
         "meta": {
             "simulation": True,
             "disclaimer": (
-                "Créditos de nuvem batem com PIX NEXT2U SAUDE LTDA no extrato C6 "
-                "(03/08 R$ -- 10/08 R$ -- 17/08 R$ --). "
-                "O PIX de R$ -- em 24/08 foi informado pelo titular e não aparecia "
-                "no export de 12:38. Aportes Next2U fora dessa faixa (~valor semanal) ficam "
-                "em other_next2u_pix e não queimam SKUs. Simulação operacional — não é fatura Google."
+                "Orçamento de nuvem/tokens: somente PIX Next2U Saúde de 03/08 R$ -- "
+                "10/08 R$ -- 17/08 R$ -- e 24/08 R$ -- "
+                "Demais PIX Next2U não entram neste orçamento. "
+                "Simulação operacional — não é fatura Google."
             ),
             "as_of": today.isoformat(),
             "timezone": "America/Sao_Paulo",
@@ -335,7 +324,6 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             "mtd_brl": spent_to_date,
         },
         "credits": credits,
-        "other_next2u_pix": [dict(x) for x in OTHER_NEXT2U_PIX],
         "daily": raw_days,
         "by_service": by_service,
         "by_sku": by_sku,

@@ -144,16 +144,7 @@
                 status: c.status,
             });
         });
-        (data.other_next2u_pix || []).forEach((c) => {
-            rows.push({
-                date: c.date,
-                type: "Payment (Next2U other)",
-                desc: `${c.payer} — PIX fora do orçamento semanal de nuvem`,
-                doc: c.document,
-                amount: c.amount_brl,
-                status: "posted",
-            });
-        });
+
         data.daily.forEach((d) => {
             rows.push({
                 date: d.date,
