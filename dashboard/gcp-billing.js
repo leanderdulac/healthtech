@@ -192,7 +192,7 @@
     }
 
     function renderBudget(data) {
-        const ultra = data.kpis.gemini_ultra_brl || 0;
+        const ultra = data.kpis.gemini_ultra_today_brl || 0;
         const weekSpend = Math.max(0, (data.kpis.spent_today_brl || 0) - ultra);
         const cap = data.kpis.cloud_from_today_credit_brl || data.meta.weekly_credit_brl;
         const pct = Math.min(100, (weekSpend / cap) * 100);
