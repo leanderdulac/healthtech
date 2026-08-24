@@ -11,19 +11,21 @@ from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
-_cache: List[Dict[str, Any]] = []
-_last_seen: Dict[str, str] = {}
+_state: Dict[str, Any] = {
+    "cache": [],
+    "last_seen": {},
+}
 
 
 def cached_devices() -> List[Dict[str, Any]]:
-    return list(_cache)
+    return list(_state["cache"])
 
 
 def fetch_secure_devices(timeout: float = 8.0) -> List[Dict[str, Any]]:
     base = (os.environ.get("SECURE_API_BASE_URL") or "").rstrip("/")
     key = (os.environ.get("SECURE_READ_API_KEY") or os.environ.get("SECURE_API_KEY") or "").strip()
     if not base or not key:
-        return list(_cache)
+        return list(_state["cache"])
     req = urllib.request.Request(
         f"{base}/api/v1/wearables/devices",
         headers={"X-API-Key": key, "Accept": "application/json"},
@@ -34,26 +36,26 @@ def fetch_secure_devices(timeout: float = 8.0) -> List[Dict[str, Any]]:
             payload = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         logger.warning("Falha ao listar relógios na API segura: %s", exc)
-        return list(_cache)
+        return list(_state["cache"])
     devices = payload.get("devices") if isinstance(payload, dict) else None
     if not isinstance(devices, list):
-        return list(_cache)
-    global _cache
-    _cache = devices
+        return list(_state["cache"])
+    _state["cache"] = devices
     return devices
 
 
 def new_ingest_frames(devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
+    last_seen: Dict[str, str] = _state["last_seen"]
     for row in devices:
         device_id = str(row.get("device_id") or "")
         ts = str(row.get("last_seen") or "")
         latest = row.get("latest")
         if not device_id or not isinstance(latest, dict):
             continue
-        if _last_seen.get(device_id) == ts:
+        if last_seen.get(device_id) == ts:
             continue
-        _last_seen[device_id] = ts
+        last_seen[device_id] = ts
         out.append(latest)
     return out
 
