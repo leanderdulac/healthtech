@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -67,11 +67,22 @@ def batch_ingest_wearables(
 @router.get("/devices")
 def list_wearable_devices(
     request: Request,
+    q: str = Query(default=""),
+    online: Optional[bool] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=10000),
+    include_latest: bool = Query(default=False),
     _api_key: str = Depends(require_scope("wearables:read")),
 ):
-    """Relógios/wearables com última leitura neste processo. Requer wearables:read."""
+    """Frota de relógios (payload compacto). Requer wearables:read."""
     _ = request
-    return {"devices": telemetry_store.list_devices()}
+    return telemetry_store.list_devices(
+        q=q,
+        online=online,
+        limit=limit,
+        offset=offset,
+        include_latest=include_latest,
+    )
 
 
 @router.get("/patient/{patient_id}/latest")
