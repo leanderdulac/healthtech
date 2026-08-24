@@ -63,6 +63,50 @@ def test_wearable_get_latest_and_history():
     assert len(hist_data["records"]) == 2
 
 
+def test_live_devices_summary_marks_recent_watch_online():
+    from datetime import datetime, timezone
+
+    from src.ops.live_devices import devices_from_patient_history
+
+    now = datetime(2026, 8, 24, 19, 40, tzinfo=timezone.utc)
+    history = {
+        "PAT-VE30-001": [
+            {
+                "patient_id": "PAT-VE30-001",
+                "device_id": "VE30-E4:65:08:AA:BB:CC",
+                "timestamp": "2026-08-24T19:39:50+00:00",
+                "raw_telemetry": {"heart_rate_bpm": 72.0, "spo2_percent": 98.0},
+                "cleaned_telemetry": {"heart_rate_clean": 71.4},
+            }
+        ]
+    }
+    rows = devices_from_patient_history(history, now=now)
+    assert len(rows) == 1
+    assert rows[0]["online"] is True
+    assert rows[0]["heart_rate"] == 71.4
+
+
+def test_wearable_devices_lists_ingested_watch():
+    payload = {
+        "patient_id": "TEST_PATIENT_VE30",
+        "device_id": "VE30-AA:BB:CC:DD:EE:FF",
+        "heart_rate": 74.0,
+        "hrv_rmssd": 38.0,
+        "spo2": 97.0,
+    }
+    ingested = client.post("/api/v1/wearables/ingest", headers=INGEST_HEADERS, json=payload)
+    assert ingested.status_code == 200
+    listed = client.get("/api/v1/wearables/devices", headers=READ_HEADERS)
+    assert listed.status_code == 200
+    devices = listed.json()["devices"]
+    match = next(d for d in devices if d["device_id"] == "VE30-AA:BB:CC:DD:EE:FF")
+    assert match["patient_id"] == "TEST_PATIENT_VE30"
+    assert match["heart_rate"] == 74.0
+    assert match["latest"]["raw_telemetry"]["spo2_percent"] == 97.0
+    denied = client.get("/api/v1/wearables/devices", headers=INGEST_HEADERS)
+    assert denied.status_code == 403
+
+
 def test_wearable_batch_ingest():
     batch_payload = {
         "patient_id": "TEST_PATIENT_BATCH",

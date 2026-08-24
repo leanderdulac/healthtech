@@ -577,6 +577,20 @@ def batch_ingest_wearables(
     }
 
 
+@app.get("/api/v1/wearables/devices")
+def list_wearable_devices(_api_key: str = Depends(require_scope("wearables:read"))):
+    """Relógios vistos neste processo e, se configurado, na API segura."""
+    from src.ops.live_devices import devices_from_patient_history, merge_device_lists
+    from src.ops.live_watch_bridge import cached_devices
+
+    return {
+        "devices": merge_device_lists(
+            devices_from_patient_history(patient_history),
+            cached_devices(),
+        )
+    }
+
+
 @app.get("/api/v1/wearables/patient/{patient_id}/latest")
 def get_latest_patient_telemetry(
     patient_id: str,
@@ -856,11 +870,30 @@ async def telemetry_stream_loop():
         await asyncio.sleep(0.4)
 
 
+async def secure_watch_bridge_loop():
+    """Copia telemetria do VE30 da API segura para o WebSocket do dashboard."""
+    from src.ops.live_watch_bridge import poll_once
+
+    if not (os.environ.get("SECURE_API_BASE_URL") or "").strip():
+        logger.info("SECURE_API_BASE_URL ausente — dashboard não espelha a API segura.")
+        return
+    logger.info("Bridge de relógios ativo para a API segura.")
+    while True:
+        try:
+            _devices, frames = await asyncio.to_thread(poll_once)
+            for frame in frames:
+                await manager.broadcast_json({"type": "patient_ingest", "data": frame})
+        except Exception as exc:
+            logger.warning("Bridge de relógios falhou: %s", exc)
+        await asyncio.sleep(2.0)
+
+
 @app.on_event("startup")
 async def startup_event():
     """Inicializa tarefas em segundo plano no arranque do app."""
     validate_secret_salt(raise_in_production=True)
     asyncio.create_task(telemetry_stream_loop())
+    asyncio.create_task(secure_watch_bridge_loop())
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, get_slm_engine)
     logger.info(

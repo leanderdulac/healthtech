@@ -514,6 +514,14 @@ def ingest_wearable_batch(
     }
 
 
+@app.get("/api/v1/wearables/devices")
+def list_wearable_devices(_api_key: str = Depends(require_scope("wearables:read"))):
+    """Relógios/wearables com última leitura neste processo."""
+    from src.ops.live_devices import devices_from_patient_history
+
+    return {"devices": devices_from_patient_history(patient_telemetry_history)}
+
+
 @app.get("/api/v1/wearables/patient/{patient_id}/latest")
 def get_patient_latest_telemetry(
     patient_id: str,

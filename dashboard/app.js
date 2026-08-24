@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const isHttps = protocol === "https:";
     const urlParams = new URLSearchParams(window.location.search);
     // Nunca embutir chave real no frontend versionado — use ?api_key= ou localStorage
-    const apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "";
+    let apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "";
     
     let API_URL = `${protocol}//${host}`;
     let WS_HOST = host;
@@ -51,9 +51,16 @@ document.addEventListener("DOMContentLoaded", () => {
         WS_HOST = CLOUD_RUN_HOST;
     }
 
-    const WS_URL = `${WS_HOST.includes(".run.app") || isHttps ? "wss:" : "ws:"}//${WS_HOST}/ws/telemetry${apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : ""}`;
+    function wsUrl() {
+        const scheme = WS_HOST.includes(".run.app") || isHttps ? "wss:" : "ws:";
+        const keyQs = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
+        return `${scheme}//${WS_HOST}/ws/telemetry${keyQs}`;
+    }
     let ws = null;
     let isConnected = false;
+    let reconnectTimer = null;
+    let devicePollTimer = null;
+    let lastIngestStamp = "";
 
     // Buffer de dados históricos para os gráficos (máximo 30 pontos)
     const MAX_POINTS = 30;
@@ -288,11 +295,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function connectWebSocket() {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        if (!apiKey) {
+            updateStatusIndicator("disconnected");
+            const hint = document.getElementById("watch-sub");
+            if (hint) hint.textContent = "Informe a API key no canto superior para ver o relógio.";
+            return;
+        }
         updateStatusIndicator("connecting");
-        ws = new WebSocket(WS_URL);
+        try {
+            if (ws) {
+                ws.onclose = null;
+                ws.close();
+            }
+        } catch (err) {
+            /* ignore */
+        }
+        ws = new WebSocket(wsUrl());
 
         ws.onopen = () => {
-            logger.info("Conectado ao WebSocket de Telemetria.");
             updateStatusIndicator("connected");
             btnStart.disabled = false;
         };
@@ -305,20 +329,23 @@ document.addEventListener("DOMContentLoaded", () => {
                 updateUIState(data.is_running, data.filter_type, data.use_ukf);
                 return;
             }
-            
-            // Tratar telemetria em tempo real
-            handleTelemetryFrame(data);
+            if (data.type === "patient_ingest") {
+                applyIngestFrame(data.data || data);
+                return;
+            }
+            if (data && data.sensor_readings) {
+                handleTelemetryFrame(data);
+            }
         };
 
         ws.onclose = () => {
-            logger.warning("Conexão WebSocket perdida. Tentando reconectar em 3s...");
             updateStatusIndicator("disconnected");
-            setTimeout(connectWebSocket, 3000);
+            if (!apiKey) return;
+            reconnectTimer = setTimeout(connectWebSocket, 3000);
         };
 
-        ws.onerror = (err) => {
-            logger.error("Erro na conexão WebSocket: " + err);
-            ws.close();
+        ws.onerror = () => {
+            if (ws) ws.close();
         };
     }
 
@@ -340,9 +367,115 @@ document.addEventListener("DOMContentLoaded", () => {
     // ========================================================================
     // 3. PROCESSAMENTO DE LEITURA E RENDERIZAÇÃO NO DOM/GRAFICOS
     // ========================================================================
+    function phantomOr(value, fallback) {
+        if (value && typeof value.estimate === "number") return value;
+        return {
+            estimate: fallback,
+            ci_lower: fallback,
+            ci_upper: fallback,
+            reliable: fallback != null
+        };
+    }
+
+    function applyIngestFrame(ing) {
+        if (!ing) return;
+        const stamp = `${ing.device_id || ""}|${ing.timestamp || ""}`;
+        renderWatchFromIngest(ing);
+        if (stamp && stamp === lastIngestStamp) return;
+        lastIngestStamp = stamp;
+        const raw = ing.raw_telemetry || {};
+        const cleaned = ing.cleaned_telemetry || {};
+        const ph = ing.phantom_data || {};
+        const hr = Number(cleaned.heart_rate_clean != null ? cleaned.heart_rate_clean : raw.heart_rate_bpm);
+        const spo2Val = raw.spo2_percent;
+        const frame = {
+            step: ing.timestamp || Date.now(),
+            sensor_readings: {
+                pixel_watch_raw: Number(raw.heart_rate_bpm != null ? raw.heart_rate_bpm : hr),
+                fitbit_band_raw: Number(raw.heart_rate_bpm != null ? raw.heart_rate_bpm : hr),
+                fused_estimate: hr,
+                clean_estimate: hr
+            },
+            sensor_weights: { pixel_watch: 1, fitbit_band: 0 },
+            phantom_data: {
+                systolic_bp: phantomOr(ph.systolic_bp, null),
+                diastolic_bp: phantomOr(ph.diastolic_bp, null),
+                spo2: phantomOr(ph.spo2, spo2Val == null ? null : Number(spo2Val)),
+                glucose: phantomOr(ph.glucose || ph.glucose_mgdl, null)
+            },
+            hypotheses: ing.hypotheses || ing.diagnostic_hypotheses || [],
+            clinical_codes: ing.clinical_codes || {}
+        };
+        if (!Number.isFinite(hr)) return;
+        handleTelemetryFrame(frame);
+    }
+
+    function renderWatchFromIngest(ing) {
+        const name = document.getElementById("watch-name");
+        const sub = document.getElementById("watch-sub");
+        const card = document.getElementById("card-watch");
+        if (!name || !sub) return;
+        const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? (ing.raw_telemetry || {}).heart_rate_bpm;
+        const spo2 = (ing.raw_telemetry || {}).spo2_percent;
+        name.textContent = ing.device_id || "VE30";
+        const bits = [];
+        if (hr != null) bits.push(`${Math.round(Number(hr))} BPM`);
+        if (spo2 != null) bits.push(`SpO₂ ${Number(spo2).toFixed(0)}%`);
+        if (ing.timestamp) bits.push(String(ing.timestamp).replace("T", " ").slice(0, 19));
+        if (ing.patient_id) bits.push(ing.patient_id);
+        sub.textContent = bits.join(" · ") || "Telemetria recebida";
+        if (card) card.classList.add("online");
+    }
+
+    function renderWatchStrip(devices) {
+        const live = (devices || []).find((d) => d.online) || (devices || [])[0];
+        if (live && live.latest) {
+            renderWatchFromIngest(live.latest);
+            return;
+        }
+        const name = document.getElementById("watch-name");
+        const sub = document.getElementById("watch-sub");
+        const card = document.getElementById("card-watch");
+        if (name) name.textContent = "Nenhum relógio no painel";
+        if (sub) sub.textContent = apiKey
+            ? "Aguardando ingestão do companion VE30…"
+            : "Informe a API key no canto superior para ver o relógio.";
+        if (card) card.classList.remove("online");
+    }
+
+    async function pollDevices() {
+        if (!apiKey) {
+            renderWatchStrip([]);
+            return;
+        }
+        try {
+            const res = await fetch(`${API_URL}/api/v1/wearables/devices`, {
+                headers: { "X-API-Key": apiKey },
+                cache: "no-store"
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const devices = data.devices || [];
+            renderWatchStrip(devices);
+            const live = devices.find((d) => d.online && d.latest) || devices.find((d) => d.latest);
+            if (live && live.latest) applyIngestFrame(live.latest);
+        } catch (err) {
+            /* o painel continua com o último estado conhecido */
+        }
+    }
+
+    function startDevicePoll() {
+        if (devicePollTimer) clearInterval(devicePollTimer);
+        pollDevices();
+        if (!apiKey) return;
+        devicePollTimer = setInterval(pollDevices, 3000);
+    }
+
     function handleTelemetryFrame(frame) {
+        if (!frame || !frame.sensor_readings) return;
+        const ph = frame.phantom_data || {};
         // A. Atualizar buffers de dados deslizantes (MAX_POINTS)
-        const label = frame.step.toString();
+        const label = String(frame.step ?? "");
         chartLabels.push(label);
         if (chartLabels.length > MAX_POINTS) chartLabels.shift();
 
@@ -355,8 +488,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // 2. Pressão Arterial
-        const s = frame.phantom_data.systolic_bp;
-        const d = frame.phantom_data.diastolic_bp;
+        const s = phantomOr(ph.systolic_bp, null);
+        const d = phantomOr(ph.diastolic_bp, null);
         bpData.sbp.push(s.estimate);
         bpData.sbp_low.push(s.ci_lower);
         bpData.sbp_up.push(s.ci_upper);
@@ -370,8 +503,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // 3. SpO2 & Glicose
-        const o = frame.phantom_data.spo2;
-        const g = frame.phantom_data.glucose;
+        const o = phantomOr(ph.spo2, null);
+        const g = phantomOr(ph.glucose || ph.glucose_mgdl, null);
         oxData.spo2.push(o.estimate);
         oxData.spo2_low.push(o.ci_lower);
         oxData.spo2_up.push(o.ci_upper);
@@ -392,25 +525,34 @@ document.addEventListener("DOMContentLoaded", () => {
         // C. Atualizar Métricas Textuais no DOM
         // BPM
         valBpm.textContent = Math.round(frame.sensor_readings.clean_estimate);
-        const pwWeight = Math.round(frame.sensor_weights.pixel_watch * 100);
-        const fbWeight = Math.round(frame.sensor_weights.fitbit_band * 100);
-        subBpm.textContent = `Pesos: Watch (${pwWeight}%) | Band (${fbWeight}%)`;
+        const weights = frame.sensor_weights || {};
+        const pwWeight = Math.round((weights.pixel_watch || 0) * 100);
+        const fbWeight = Math.round((weights.fitbit_band || 0) * 100);
+        subBpm.textContent = pwWeight || fbWeight
+            ? `Pesos: Watch (${pwWeight}%) | Band (${fbWeight}%)`
+            : "Relógio VE30";
 
         // Pressão Arterial
-        valBp.textContent = `${Math.round(s.estimate)} / ${Math.round(d.estimate)}`;
-        subBp.textContent = `Intervalo PAS: (${Math.round(s.ci_lower)} - ${Math.round(s.ci_upper)})`;
+        if (s.estimate != null) {
+            valBp.textContent = `${Math.round(s.estimate)} / ${Math.round(d.estimate || 0)}`;
+            subBp.textContent = `Intervalo PAS: (${Math.round(s.ci_lower)} - ${Math.round(s.ci_upper)})`;
+        }
 
         // SpO2
-        valSpo2.textContent = o.estimate.toFixed(1);
-        subSpo2.textContent = o.reliable ? "Sinal Válido ✓" : "Incerteza Alta ⚠️";
-        subSpo2.className = o.reliable ? "metric-sub text-green" : "metric-sub text-red";
+        if (o.estimate != null) {
+            valSpo2.textContent = Number(o.estimate).toFixed(1);
+            subSpo2.textContent = o.reliable ? "Sinal Válido ✓" : "Incerteza Alta ⚠️";
+            subSpo2.className = o.reliable ? "metric-sub text-green" : "metric-sub text-red";
+        }
 
         // Glicose
-        valGlucose.textContent = Math.round(g.estimate);
-        subGlucose.textContent = g.reliable ? "Sinal Válido ✓" : "Incerteza Alta ⚠️";
+        if (g.estimate != null) {
+            valGlucose.textContent = Math.round(g.estimate);
+            subGlucose.textContent = g.reliable ? "Sinal Válido ✓" : "Incerteza Alta ⚠️";
+        }
 
         // D. Atualizar Probabilidades da Rede Bayesiana (Barras)
-        frame.hypotheses.forEach(h => {
+        (frame.hypotheses || []).forEach(h => {
             const pct = (h.probability * 100).toFixed(1) + "%";
             const width = (h.probability * 100) + "%";
             
@@ -430,9 +572,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         // E. Atualizar Badges de Códigos Clínicos (Interoperabilidade)
-        updateBadges(badgesIcd10, frame.clinical_codes.icd10);
-        updateBadges(badgesSnomed, frame.clinical_codes.snomed);
-        updateBadges(badgesMesh, frame.clinical_codes.mesh);
+        const codes = frame.clinical_codes || {};
+        if (badgesIcd10) updateBadges(badgesIcd10, codes.icd10);
+        if (badgesSnomed) updateBadges(badgesSnomed, codes.snomed);
+        if (badgesMesh) updateBadges(badgesMesh, codes.mesh);
     }
 
     function updateBadges(container, codesArray) {
@@ -568,6 +711,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const apiKeyDisplay = document.getElementById("api-key-display");
     const copyFeedback = document.getElementById("copy-feedback");
     if (apiKeyDisplay && apiKey) apiKeyDisplay.value = apiKey;
+    const dashKeyInput = document.getElementById("dash-api-key");
+    const btnSaveKey = document.getElementById("btn-save-key");
+    if (dashKeyInput && apiKey) dashKeyInput.value = apiKey;
+    if (btnSaveKey && dashKeyInput) {
+        const persistKey = () => {
+            apiKey = (dashKeyInput.value || "").trim();
+            if (apiKey) localStorage.setItem("api_key", apiKey);
+            else localStorage.removeItem("api_key");
+            if (apiKeyDisplay) apiKeyDisplay.value = apiKey;
+            connectWebSocket();
+            startDevicePoll();
+        };
+        btnSaveKey.addEventListener("click", persistKey);
+        dashKeyInput.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter") persistKey();
+        });
+    }
 
     if (btnCopyKey && apiKeyDisplay) {
         btnCopyKey.addEventListener("click", () => {
@@ -903,5 +1063,6 @@ console.log(data);`
 
     // Conectar ao WebSocket na inicialização
     connectWebSocket();
+    startDevicePoll();
 });
 
