@@ -231,6 +231,9 @@ class MultiAgentConsensusRequest(BaseModel):
 # ENDPOINTS REST
 # =====================================================================
 
+
+
+
 @app.get("/api/health")
 def health_probe():
     """Probe público para orquestradores e healthchecks."""
