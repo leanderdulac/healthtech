@@ -15,6 +15,7 @@ from src.clinical_intelligence.alert_ingest import (
     assess_ingest_alerts,
     merge_anomaly_with_alerts,
 )
+from src.clinical_intelligence.care_flows import evaluate_care_flows
 
 __all__ = [
     "ClinicalIntelligencePipeline",
@@ -26,6 +27,7 @@ __all__ = [
     "AlertMatrixClassifier",
     "assess_ingest_alerts",
     "merge_anomaly_with_alerts",
+    "evaluate_care_flows",
 ]
 from src.clinical_intelligence.agents import (
     SpecialistOpinion,

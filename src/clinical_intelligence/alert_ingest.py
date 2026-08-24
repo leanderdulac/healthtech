@@ -333,6 +333,11 @@ def assess_ingest_alerts(
         }
         full = _apply_discrepancy(full, vitals, meta)
 
+    from src.clinical_intelligence.care_flows import apply_care_flow_overlay, evaluate_care_flows
+
+    flow = evaluate_care_flows(vitals, ctx)
+    full = apply_care_flow_overlay(full, flow)
+
     # Payload estável para API / WebSocket / dashboard.
     # Estrelas, escore e rota operacional ficam em staff_only (não expor ao paciente).
     public_name = full.get("primary_alert_name") if full.get("is_true_alert") else None
@@ -361,6 +366,7 @@ def assess_ingest_alerts(
             "care_pathway": full.get("care_pathway"),
             "disease_concordant": full.get("disease_concordant"),
             "med_concordant": full.get("med_concordant"),
+            "care_flow": full.get("care_flow"),
         },
     }
 

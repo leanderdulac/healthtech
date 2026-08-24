@@ -37,8 +37,16 @@ DISEASE_ALIASES: Dict[str, str] = {
     "doenca pulmonar obstrutiva cronica": "copd",
     "doença pulmonar obstrutiva crônica": "copd",
     "hepatopatia": "liver_failure",
+    "hepatopatias": "liver_failure",
+    "cirrose": "liver_failure",
     "insuficiencia hepatica": "liver_failure",
     "insuficiência hepática": "liver_failure",
+    "gestacao": "pregnancy",
+    "gestação": "pregnancy",
+    "gravidez": "pregnancy",
+    "obstetrica": "pregnancy",
+    "obstétrica": "pregnancy",
+    "prenhez": "pregnancy",
     "neoplasia": "neoplasm",
     "cancer": "neoplasm",
     "demencia": "dementia",
@@ -263,6 +271,7 @@ class PatientContext:
     data_valid: bool = True
     confirmation_or_persistence: bool = False
     clinical_progression: bool = False
+    symptoms: bool = False
 
     def __post_init__(self) -> None:
         self.diseases = [canonicalize_disease(d) for d in self.diseases]
@@ -321,6 +330,12 @@ class PatientContext:
             ),
             clinical_progression=bool(
                 ctx.get("clinical_progression") or ctx.get("progression")
+            ),
+            symptoms=bool(
+                ctx.get("symptoms")
+                or ctx.get("sintomatico")
+                or ctx.get("sintomas")
+                or ctx.get("symptomatic")
             ),
         )
 
