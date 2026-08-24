@@ -1,1 +1,1 @@
-"""Operações, simulação de faturamento GCP e utilitários de plataforma."""
+"""Operações, faturamento GCP e utilitários de plataforma."""

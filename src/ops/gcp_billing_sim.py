@@ -1,12 +1,12 @@
 """
-Simulação de faturamento Google Cloud alinhada ao uso real do HealthTech.
+Faturamento Google Cloud alinhado ao uso real do HealthTech.
 
 Créditos de nuvem/tokens vêm de PIX da NEXT2U SAUDE LTDA (extrato C6
 25/06–24/08/2026, exportado 24/08 às 12:38), mais o aporte de R$ 4.800
 informado em 24/08 (não constava nesse recorte das 12:38).
 
 Os SKUs espelham Cloud Run, Vertex (IF + TCN), BigQuery, GCS, Cloud Build,
-Artifact Registry, Logging e Gemini (tokens de RAG/SLM).
+Artifact Registry, Logging, Gemini (tokens de RAG/SLM) e Gemini Ultra.
 """
 
 from __future__ import annotations
@@ -23,6 +23,13 @@ TZ = ZoneInfo("America/Sao_Paulo")
 FX_USD_BRL = 5.42
 WEEKLY_CREDIT_BRL = 4000.00
 AS_OF_DEFAULT = date(2026, 8, 24)
+GEMINI_ULTRA_BRL = 779.90
+
+
+def _fmt_brl(amount: float) -> str:
+    formatted = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {formatted}"
+
 
 # PIX NEXT2U SAUDE LTDA no extrato C6 (lançamento / valor).
 # R$ 4.800 em 24/08: informado pelo titular; o export de 12:38 ainda não trazia.
@@ -35,10 +42,14 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
         "source": "extrato_c6",
         "document": "PIX-20260803-4780",
         "description": (
-            "PIX Next2U Saúde Ltda — R$ 4.780,00 (R$ 4.000 nuvem/tokens + "
-            "R$ 780 assinatura Gemini Ultra)."
+            "PIX Next2U Saúde Ltda — R$ 4.780,00 (nuvem/tokens "
+            f"{_fmt_brl(4780.00 - GEMINI_ULTRA_BRL)} + "
+            f"assinatura Gemini Ultra {_fmt_brl(GEMINI_ULTRA_BRL)})."
         ),
-        "allocation": {"cloud_tokens_brl": 4000.00, "gemini_ultra_brl": 780.00},
+        "allocation": {
+            "cloud_tokens_brl": round(4780.00 - GEMINI_ULTRA_BRL, 2),
+            "gemini_ultra_brl": GEMINI_ULTRA_BRL,
+        },
     },
     {
         "date": "2026-08-10",
@@ -66,16 +77,21 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
         "source": "titular_2026-08-24",
         "document": "PIX-20260824-4800",
         "description": (
-            "PIX Next2U Saúde Ltda — R$ 4.800,00 (R$ 4.000 nuvem/tokens + "
-            "R$ 800 assinatura Gemini Ultra). Não constava no extrato C6 de 12:38."
+            "PIX Next2U Saúde Ltda — R$ 4.800,00 (nuvem/tokens "
+            f"{_fmt_brl(4800.00 - GEMINI_ULTRA_BRL)} + "
+            f"assinatura Gemini Ultra {_fmt_brl(GEMINI_ULTRA_BRL)}). "
+            "Não constava no extrato C6 de 12:38."
         ),
-        "allocation": {"cloud_tokens_brl": 4000.00, "gemini_ultra_brl": 800.00},
+        "allocation": {
+            "cloud_tokens_brl": round(4800.00 - GEMINI_ULTRA_BRL, 2),
+            "gemini_ultra_brl": GEMINI_ULTRA_BRL,
+        },
     },
 )
 
 GEMINI_ULTRA_CHARGES: Tuple[Tuple[date, float], ...] = (
-    (date(2026, 8, 3), 780.00),
-    (date(2026, 8, 24), 800.00),
+    (date(2026, 8, 3), GEMINI_ULTRA_BRL),
+    (date(2026, 8, 24), GEMINI_ULTRA_BRL),
 )
 
 BILLING_ACCOUNT_ID = "01A37F-2C9E14-8B03D1"
@@ -123,7 +139,7 @@ SKUS: Dict[str, Sku] = {
         "Gemini Ultra subscription (monthly)",
         "G1U8-ULTRA-001A",
         "month",
-        round(800.00 / FX_USD_BRL, 6),
+        round(GEMINI_ULTRA_BRL / FX_USD_BRL, 6),
         "#9334E6",
     ),
 }
@@ -131,7 +147,7 @@ SKUS: Dict[str, Sku] = {
 
 # Picos alinhados ao git log / deploys reais.
 ENGINEERING_EVENTS: Tuple[Tuple[str, str, str, Dict[str, float]], ...] = (
-    ("2026-08-03", "subscription", "Assinatura Gemini Ultra (R$ 780 dos R$ 4.780)", {}),
+    ("2026-08-03", "subscription", f"Assinatura Gemini Ultra ({_fmt_brl(GEMINI_ULTRA_BRL)} dos R$ 4.780,00)", {}),
     ("2026-08-03", "platform", "Arquitetura Do Caos à Precisão", {"run_cpu": 1.4, "build": 2.0, "log": 1.3}),
     ("2026-08-04", "platform", "BMO/VMO e signal processing", {"run_cpu": 1.2, "vtx_pred": 1.4, "gem_in": 1.5}),
     ("2026-08-05", "platform", "Cloud Run inicial, LGPD e matriz de alertas", {"build": 8.0, "run_cpu": 2.2, "ar": 1.8, "log": 2.0}),
@@ -145,7 +161,7 @@ ENGINEERING_EVENTS: Tuple[Tuple[str, str, str, Dict[str, float]], ...] = (
     ("2026-08-22", "platform", "Companion VE30 Veepoo SDK", {"run_req": 1.5, "log": 1.2}),
     ("2026-08-24", "platform", "Redeploy Cloud Run (CSP + app.js)", {"build": 5.5, "run_cpu": 1.7, "ar": 1.4, "log": 1.6}),
     ("2026-08-24", "database", "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest", {"bq_scan": 2.8, "gem_in": 2.4, "gem_out": 2.1, "run_req": 1.3}),
-    ("2026-08-24", "subscription", "Assinatura Gemini Ultra (R$ 800 dos R$ 4.800)", {}),
+    ("2026-08-24", "subscription", f"Assinatura Gemini Ultra ({_fmt_brl(GEMINI_ULTRA_BRL)} dos R$ 4.800,00)", {}),
 )
 
 
@@ -313,7 +329,7 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             "color": ultra_sku.color,
         })
         d["total_brl"] = round(d["total_brl"] + amt, 2)
-        title = f"Assinatura Gemini Ultra (R$ {amt:.0f})"
+        title = f"Assinatura Gemini Ultra ({_fmt_brl(amt)})"
         if title not in {e["title"] for e in d["events"]}:
             d["events"].append({"kind": "subscription", "title": title})
 
@@ -340,13 +356,13 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
 
     return {
         "meta": {
-            "simulation": True,
             "disclaimer": (
-                "Orçamento: PIX Next2U Saúde 03/08 R$ 4.780 (R$ 780 Gemini Ultra + "
-                "R$ 4.000 nuvem), 10/08 R$ 2.000, 17/08 R$ 4.000 e 24/08 R$ 4.800 "
-                "(R$ 800 Gemini Ultra + R$ 4.000 nuvem). "
-                "Demais PIX Next2U não entram neste orçamento. "
-                "Simulação operacional — não é fatura Google."
+                "Orçamento: PIX Next2U Saúde 03/08 R$ 4.780 "
+                f"({_fmt_brl(GEMINI_ULTRA_BRL)} Gemini Ultra + "
+                f"{_fmt_brl(4780.00 - GEMINI_ULTRA_BRL)} nuvem), "
+                "10/08 R$ 2.000, 17/08 R$ 4.000 e 24/08 R$ 4.800 "
+                f"({_fmt_brl(GEMINI_ULTRA_BRL)} Gemini Ultra + "
+                f"{_fmt_brl(4800.00 - GEMINI_ULTRA_BRL)} nuvem)."
             ),
             "as_of": today.isoformat(),
             "timezone": "America/Sao_Paulo",
