@@ -423,7 +423,10 @@ def ingest_wearable_reading(
         anomaly_score=anomaly_res
     )
 
-    ts = req.timestamp or datetime.datetime.now(datetime.timezone.utc).isoformat()
+    from src.ops.timestamps import stamp_ingest
+
+    stamps = stamp_ingest(req.timestamp)
+    ts = stamps["timestamp"]
 
     # 5. Matriz de alertas clínicos (regras + ML de falsos positivos)
     phantom_for_alerts = {
@@ -489,6 +492,9 @@ def ingest_wearable_reading(
         "patient_id": req.patient_id,
         "device_id": req.device_id,
         "timestamp": ts,
+        "received_at": stamps["received_at"],
+        "last_seen_local": stamps["last_seen_local"],
+        "device_time_local": stamps["device_time_local"],
         "raw_telemetry": {
             "heart_rate_bpm": req.heart_rate,
             "hrv_rmssd_ms": req.hrv_rmssd,

@@ -362,7 +362,10 @@ def ingest_wearable_reading(
         hrv_metrics=hrv_metrics
     )
 
-    ts = req.timestamp or datetime.datetime.now(datetime.timezone.utc).isoformat()
+    from src.ops.timestamps import stamp_ingest
+
+    stamps = stamp_ingest(req.timestamp)
+    ts = stamps["timestamp"]
 
     try:
         from src.clinical_intelligence.alert_ingest import assess_ingest_alerts, merge_anomaly_with_alerts
@@ -421,6 +424,9 @@ def ingest_wearable_reading(
         "patient_id": req.patient_id,
         "device_id": req.device_id,
         "timestamp": ts,
+        "received_at": stamps["received_at"],
+        "last_seen_local": stamps["last_seen_local"],
+        "device_time_local": stamps["device_time_local"],
         "raw_telemetry": {
             "heart_rate_bpm": req.heart_rate,
             "spo2_percent": req.spo2,

@@ -65,6 +65,57 @@ document.addEventListener("DOMContentLoaded", () => {
     let selectedDeviceId = "";
     let fleetPage = 0;
     const FLEET_PAGE_SIZE = 50;
+    const DISPLAY_TZ = "America/Sao_Paulo";
+    const localDateFmt = new Intl.DateTimeFormat("pt-BR", {
+        timeZone: DISPLAY_TZ,
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+    });
+    const localClockFmt = new Intl.DateTimeFormat("pt-BR", {
+        timeZone: DISPLAY_TZ,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+    });
+
+    function parseStamp(value) {
+        if (!value) return null;
+        if (/^\d{2}\/\d{2}\/\d{4}/.test(String(value))) return null;
+        const d = new Date(value);
+        return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    function formatLocal(value) {
+        if (!value) return "—";
+        if (/^\d{2}\/\d{2}\/\d{4}/.test(String(value))) return String(value);
+        const d = parseStamp(value);
+        return d ? localDateFmt.format(d) : "—";
+    }
+
+    function formatClock(value) {
+        const d = parseStamp(value) || new Date();
+        return localClockFmt.format(d);
+    }
+
+    function formatAge(value) {
+        const d = parseStamp(value);
+        if (!d) return "";
+        const sec = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
+        if (sec < 4) return "agora";
+        if (sec < 60) return `há ${sec}s`;
+        if (sec < 3600) return `há ${Math.floor(sec / 60)} min`;
+        return `há ${Math.floor(sec / 3600)} h`;
+    }
+
+    function liveStamp(rowOrFrame) {
+        return rowOrFrame.received_at || rowOrFrame.last_seen || rowOrFrame.timestamp || "";
+    }
 
     // Buffer de dados históricos para os gráficos (máximo 30 pontos)
     const MAX_POINTS = 30;
@@ -389,7 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
             upsertFleetFromIngest(ing);
             return;
         }
-        const stamp = `${deviceId}|${ing.timestamp || ""}`;
+        const stamp = `${deviceId}|${liveStamp(ing)}`;
         renderWatchFromIngest(ing);
         upsertFleetFromIngest(ing);
         if (stamp && stamp === lastIngestStamp) return;
@@ -400,7 +451,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const hr = Number(cleaned.heart_rate_clean != null ? cleaned.heart_rate_clean : raw.heart_rate_bpm);
         const spo2Val = raw.spo2_percent;
         const frame = {
-            step: ing.timestamp || Date.now(),
+            step: formatClock(liveStamp(ing)),
             sensor_readings: {
                 pixel_watch_raw: Number(raw.heart_rate_bpm != null ? raw.heart_rate_bpm : hr),
                 fitbit_band_raw: Number(raw.heart_rate_bpm != null ? raw.heart_rate_bpm : hr),
@@ -432,7 +483,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const bits = [];
         if (hr != null) bits.push(`${Math.round(Number(hr))} BPM`);
         if (spo2 != null) bits.push(`SpO₂ ${Number(spo2).toFixed(0)}%`);
-        if (ing.timestamp) bits.push(String(ing.timestamp).replace("T", " ").slice(0, 19));
+        const when = ing.last_seen_local || formatLocal(liveStamp(ing));
+        const age = formatAge(liveStamp(ing));
+        if (when && when !== "—") bits.push(age ? `${when} · ${age}` : when);
         if (ing.patient_id) bits.push(ing.patient_id);
         sub.textContent = bits.join(" · ") || "Telemetria recebida";
         if (card) card.classList.add("online");
@@ -444,6 +497,9 @@ document.addEventListener("DOMContentLoaded", () => {
             device_id: row.device_id,
             patient_id: row.patient_id,
             timestamp: row.last_seen,
+            received_at: row.received_at,
+            last_seen_local: row.last_seen_local,
+            device_time_local: row.device_time_local,
             raw_telemetry: {
                 heart_rate_bpm: row.heart_rate,
                 spo2_percent: row.spo2
@@ -459,7 +515,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const next = {
             device_id: ing.device_id,
             patient_id: ing.patient_id,
-            last_seen: ing.timestamp,
+            last_seen: ing.received_at || ing.timestamp,
+            received_at: ing.received_at || ing.timestamp,
+            last_seen_local: ing.last_seen_local || formatLocal(liveStamp(ing)),
+            device_time_local: ing.device_time_local,
             online: true,
             heart_rate: hr,
             spo2,
@@ -509,7 +568,8 @@ document.addEventListener("DOMContentLoaded", () => {
             .replace(/"/g, "&quot;");
         body.innerHTML = slice.map((d) => {
             const selected = d.device_id === selectedDeviceId ? " selected" : "";
-            const when = d.last_seen ? String(d.last_seen).replace("T", " ").slice(0, 19) : "—";
+            const when = d.last_seen_local || formatLocal(d.received_at || d.last_seen);
+            const age = formatAge(d.received_at || d.last_seen);
             const hr = d.heart_rate != null ? Math.round(Number(d.heart_rate)) : "—";
             const spo2 = d.spo2 != null ? Number(d.spo2).toFixed(0) + "%" : "—";
             return `<tr data-device="${esc(d.device_id)}" class="${selected}">
@@ -518,7 +578,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td>${esc(d.patient_id || "—")}</td>
                 <td>${hr}</td>
                 <td>${spo2}</td>
-                <td>${esc(when)}</td>
+                <td>${esc(age ? `${when} · ${age}` : when)}</td>
             </tr>`;
         }).join("");
         body.querySelectorAll("tr[data-device]").forEach((tr) => {
@@ -532,7 +592,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderWatchStrip(devices) {
-        fleetDevices = devices || [];
+        const incoming = devices || [];
+        const byId = {};
+        fleetDevices.forEach((d) => {
+            if (d && d.device_id) byId[d.device_id] = d;
+        });
+        incoming.forEach((row) => {
+            if (!row || !row.device_id) return;
+            const prev = byId[row.device_id] || {};
+            byId[row.device_id] = { ...prev, ...row };
+        });
+        fleetDevices = Object.values(byId);
         renderFleetTable();
         const focused = fleetDevices.find((d) => d.device_id === selectedDeviceId)
             || fleetDevices.find((d) => d.online)
@@ -573,6 +643,9 @@ document.addEventListener("DOMContentLoaded", () => {
         pollDevices();
         if (!apiKey) return;
         devicePollTimer = setInterval(pollDevices, 2000);
+        if (!window.__fleetClock) {
+            window.__fleetClock = setInterval(() => renderFleetTable(), 1000);
+        }
     }
 
     async function bootstrapDashboard() {
