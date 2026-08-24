@@ -2,9 +2,14 @@
 Modelos de dados para o motor preditivo clínico multimodal.
 """
 
+from __future__ import annotations
+
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from src.clinical_intelligence.game_theory import GameTheoryAssessment
 
 
 @dataclass
@@ -121,7 +126,7 @@ class ClinicalIntelligenceResult:
     predictions: List[ClinicalEventPrediction]
     fusion_score: float
     ontology_domains: Dict[str, float] = field(default_factory=dict)
-    game_theory: Optional["GameTheoryAssessment"] = None
+    game_theory: Optional[GameTheoryAssessment] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {

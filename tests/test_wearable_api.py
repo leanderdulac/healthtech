@@ -79,3 +79,16 @@ def test_wearable_batch_ingest():
     assert res["processed_count"] == 3
     assert res["latest_result"]["raw_telemetry"]["heart_rate_bpm"] == 80.0
 
+
+def test_wearable_batch_ingest_legacy_path():
+    """O companion Android ainda chama /ingest/batch; o alias precisa responder igual."""
+    batch_payload = {
+        "patient_id": "TEST_PATIENT_BATCH_LEGACY",
+        "readings": [
+            {"patient_id": "TEST_PATIENT_BATCH_LEGACY", "heart_rate": 70.0, "hrv_rmssd": 50.0},
+        ],
+    }
+    response = client.post("/api/v1/wearables/ingest/batch", headers=INGEST_HEADERS, json=batch_payload)
+    assert response.status_code == 200
+    assert response.json()["processed_count"] == 1
+

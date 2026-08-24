@@ -18,6 +18,13 @@ build/
 .env.local
 *.pem
 
+# Android (companion-android) — credenciais locais e keystores
+local.properties
+google-services.json
+*.keystore
+*.jks
+*.p12
+
 # Arquivos de sistema
 .DS_Store
 Thumbs.db

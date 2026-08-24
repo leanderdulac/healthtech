@@ -3963,7 +3963,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const snippets = {
         curl: `curl -X POST "${API_URL}/api/v1/wearables/ingest" \\
-     -H "X-API-Key: healthtech_live_key_2026" \\
+     -H "X-API-Key: $INGEST_API_KEY" \\
      -H "Content-Type: application/json" \\
      -d '{
        "patient_id": "PAT-PULSO-101",
@@ -3977,7 +3977,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 url = "${API_URL}/api/v1/wearables/ingest"
 headers = {
-    "X-API-Key": "healthtech_live_key_2026",
+    "X-API-Key": "<SUA_INGEST_API_KEY>",
     "Content-Type": "application/json"
 }
 payload = {
@@ -3994,7 +3994,7 @@ print(response.json())`,
         js: `const response = await fetch("${API_URL}/api/v1/wearables/ingest", {
     method: "POST",
     headers: {
-        "X-API-Key": "healthtech_live_key_2026",
+        "X-API-Key": "<SUA_INGEST_API_KEY>",
         "Content-Type": "application/json"
     },
     body: JSON.stringify({

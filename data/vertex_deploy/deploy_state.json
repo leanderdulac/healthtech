@@ -55,6 +55,8 @@
       "modo": "Vertex-TCN-per-horizon"
     }
   ],
-  "updated_at": "2026-08-06T04:29:27.783486+00:00",
-  "tcn_predictions_smoke_error": null
+  "updated_at": "2026-08-21T20:20:33.158426+00:00",
+  "tcn_predictions_smoke_error": null,
+  "alert_matrix_gcs_prefix": "gs://healthtech-gcp-2026-vertex-staging/alert_matrix/20260821_202027",
+  "alert_matrix_uploaded_at": "2026-08-21T20:20:33.158426+00:00"
 }

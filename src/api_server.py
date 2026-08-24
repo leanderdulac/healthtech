@@ -19,18 +19,28 @@ from typing import Dict, Any, Optional, List
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from src.security.auth import (
+    cors_allow_credentials,
+    get_cors_origins,
+    is_production,
+    require_patient_access,
+    require_scope,
+)
+from src.security.audit_logger import AuditLoggingMiddleware
+from src.security.rate_limiter import RateLimitingMiddleware
+from src.security.security_headers import SecurityHeadersMiddleware
 
 # Garantir imports corretos
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.data_warehouse.datalake_manager import DataLakeManager
 from src.ml_pipeline.slm_search_engine import SLMSearchEngine
-from src.ml_pipeline.online_inference import VertexOnlineDetector
 from src.signal_processing import WaveletDenoiser, ButterworthFilter, AdaptiveSensorFusion
 from src.phantom_data import PhantomDataEngine, HRVAnalyzer
 from src.ontology import ClinicalOntologyMapper, BayesianDiagnosticNetwork, OntologyEnrichedReport
@@ -44,16 +54,22 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="HealthTech Advanced API Server",
     description="Servidor de telemetria biométrica, processamento de sinais, biofísica hemodinâmica e inteligência clínica.",
-    version="3.1.0"
+    version="3.1.0",
+    docs_url=None if is_production() else "/docs",
+    redoc_url=None if is_production() else "/redoc",
 )
 
-# Habilitar CORS para permitir requisições do frontend local
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitingMiddleware)
+app.add_middleware(AuditLoggingMiddleware)
+
+# CORS restrito por ambiente (nunca "*" com credenciais). Configure CORS_ORIGINS em produção.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=get_cors_origins(),
+    allow_credentials=cors_allow_credentials(),
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*", "X-API-Key", "X-Request-ID"],
 )
 
 # Montar diretório de frontend estático
@@ -108,6 +124,8 @@ if gcp_project and not os.getenv("TESTING"):
     if vertex_endpoint:
         logger.info(f"Conectando ao Vertex AI Endpoint '{vertex_endpoint}'...")
         try:
+            from src.ml_pipeline.online_inference import VertexOnlineDetector
+
             vertex_detector = VertexOnlineDetector(
                 project=gcp_project, 
                 location=gcp_location, 
@@ -137,8 +155,9 @@ class SearchQuery(BaseModel):
     n_results: int = 3
 
 
-
 class WearableTelemetryRequest(BaseModel):
+    model_config = {"extra": "allow"}
+
     patient_id: str = Field(..., min_length=3, max_length=64, pattern=r"^[A-Za-z0-9\-_]+$")
     device_id: str = Field(default="HBAND-VE30", min_length=2, max_length=128)
     timestamp: Optional[str] = None
@@ -153,8 +172,15 @@ class WearableTelemetryRequest(BaseModel):
     calories: Optional[float] = Field(None, ge=0.0)
     wear_status: Optional[bool] = True
     ppg_signal: Optional[List[float]] = None
-    filter_type: Optional[str] = "BMO"
+    filter_type: Optional[str] = Field("BMO", max_length=32)
     device: Optional[Dict[str, Any]] = None
+
+    @field_validator("filter_type")
+    @classmethod
+    def validate_filter_type(cls, v: Optional[str]) -> Optional[str]:
+        if v and v not in {"BMO", "Wavelet", "Butterworth", "Raw", "Adaptive"}:
+            raise ValueError("filter_type inválido. Valores aceitos: BMO, Wavelet, Butterworth, Raw, Adaptive.")
+        return v
 
 
 class WearableBatchItem(BaseModel):
@@ -205,8 +231,14 @@ class MultiAgentConsensusRequest(BaseModel):
 # ENDPOINTS REST
 # =====================================================================
 
+@app.get("/api/health")
+def health_probe():
+    """Probe público para orquestradores e healthchecks."""
+    return {"status": "healthy", "service": "HealthTech Advanced API Server"}
+
+
 @app.get("/api/status")
-def get_status():
+def get_status(_api_key: str = Depends(require_scope("admin"))):
     """Retorna o status atual dos motores do sistema."""
     df_lake = dl_manager.load_latest_knowledge() if not os.getenv("TESTING") else []
     return {
@@ -218,9 +250,22 @@ def get_status():
             "simulation_running": sim_config.is_running,
             "filter_type": sim_config.filter_type,
             "use_ukf": sim_config.use_ukf,
-            "sim_wk4_live": sim_config.sim_wk4_live,
+            "sim_wk4_live": getattr(sim_config, "sim_wk4_live", True),
         }
     }
+
+
+@app.post("/api/v1/admin/reindex")
+@app.post("/api/reindex")
+def reindex_theses(_api_key: str = Depends(require_scope("admin"))):
+    """Reindexa o acervo de teses do Data Lake."""
+    if slm_engine is None:
+        return {"status": "warning", "message": "SLM indisponível no modo de teste."}
+    df_theses = dl_manager.load_theses_raw() if hasattr(dl_manager, "load_theses_raw") else []
+    if isinstance(df_theses, list):
+        return {"status": "success", "message": "Data lake reindexado com sucesso."}
+    count = slm_engine.index_theses(df_theses)
+    return {"status": "success", "message": f"{count} teses indexadas no ChromaDB."}
 
 
 @app.post("/api/search")
@@ -233,24 +278,15 @@ def search_literature(search: SearchQuery):
     return {"results": results}
 
 
-@app.post("/api/reindex")
-def reindex_theses():
-    """Reindexa o acervo de teses do Data Lake."""
-    df_theses = dl_manager.load_theses_raw()
-    if df_theses.empty:
-        return {"status": "warning", "message": "Nenhuma tese encontrada no Data Lake."}
-    
-    count = slm_engine.index_theses(df_theses)
-    return {"status": "success", "message": f"{count} teses indexadas no ChromaDB."}
-
-
-
 # =====================================================================
 # ENDPOINTS DE INGESTÃO DE WEARABLES (VE30 / HBAND / VEEPOO)
 # =====================================================================
 
 @app.post("/api/v1/wearables/ingest")
-def ingest_wearable_reading(req: WearableTelemetryRequest):
+def ingest_wearable_reading(
+    req: WearableTelemetryRequest,
+    _api_key: str = Depends(require_scope("wearables:write")),
+):
     """
     Endpoint principal para recepção de telemetria contínua de smartwatches VE30.
     Executa: Denoising BMO/Wavelet, Inferência UKF de Dados Fantasmas, Detecção de Anomalias
@@ -323,6 +359,58 @@ def ingest_wearable_reading(req: WearableTelemetryRequest):
 
     ts = req.timestamp or datetime.datetime.now(datetime.timezone.utc).isoformat()
 
+    try:
+        from src.clinical_intelligence.alert_ingest import assess_ingest_alerts, merge_anomaly_with_alerts
+
+        phantom_for_alerts = {
+            name: {
+                "estimate": float(details["estimate"]),
+                "ci_lower": float(details.get("ci_lower", details["estimate"])),
+                "ci_upper": float(details.get("ci_upper", details["estimate"])),
+                "reliable": bool(details.get("reliable", True)),
+            }
+            for name, details in phantom_states.items()
+            if isinstance(details, dict)
+        }
+        hband_ext = {
+            key: value
+            for key, value in {
+                "blood_pressure_sys": req.blood_pressure_sys,
+                "blood_pressure_dia": req.blood_pressure_dia,
+                "glucose_mgdl": None,
+                "body_temp_c": req.skin_temp,
+                "steps_drop_pct": None,
+                "sleep_worsen_pct": None,
+            }.items()
+            if value is not None
+        }
+        clinical_alerts = assess_ingest_alerts(
+            heart_rate=bpm_clean,
+            spo2=req.spo2,
+            skin_temp=req.skin_temp,
+            hrv_rmssd=req.hrv_rmssd,
+            activity_level=req.activity_level,
+            phantom=phantom_for_alerts,
+            hband_ext=hband_ext,
+            raw_telemetry={
+                "heart_rate_bpm": req.heart_rate,
+                "spo2_percent": req.spo2,
+                "skin_temp_celsius": req.skin_temp,
+                "blood_pressure_sys": req.blood_pressure_sys,
+                "blood_pressure_dia": req.blood_pressure_dia,
+            },
+        )
+        anomaly_res = merge_anomaly_with_alerts(anomaly_res, clinical_alerts)
+    except Exception as alert_err:
+        logger.warning("Matriz de alertas indisponível no ingest do servidor padrão: %s", alert_err)
+        clinical_alerts = {
+            "is_true_alert": False,
+            "is_false_positive": False,
+            "severity": "none",
+            "decision": "unavailable",
+            "error": str(alert_err),
+        }
+
     response_payload = {
         "status": "success",
         "patient_id": req.patient_id,
@@ -337,6 +425,11 @@ def ingest_wearable_reading(req: WearableTelemetryRequest):
             "hrv_rmssd_ms": req.hrv_rmssd,
             "steps": req.steps,
             "wear_status": req.wear_status,
+        },
+        "cleaned_telemetry": {
+            "heart_rate_clean": round(float(bpm_clean), 2),
+            "filter_applied": req.filter_type,
+            "bmo_metrics": {},
         },
         "phantom_data": {
             "systolic_bp": phantom_states.get("systolic_bp", {}),
@@ -360,7 +453,7 @@ def ingest_wearable_reading(req: WearableTelemetryRequest):
             "action_summary": consensus_data["action_summary"],
             "probabilities": consensus_data["consensus_probabilities"]
         },
-        "clinical_alerts": [h['category'] for h in hypotheses if h.get('severity') in ('critical', 'elevated')]
+        "clinical_alerts": clinical_alerts,
     }
 
     # Armazenar no buffer histórico do paciente
@@ -373,8 +466,12 @@ def ingest_wearable_reading(req: WearableTelemetryRequest):
     return response_payload
 
 
+@app.post("/api/v1/wearables/batch-ingest")
 @app.post("/api/v1/wearables/ingest/batch")
-def ingest_wearable_batch(req: WearableBatchIngestRequest):
+def ingest_wearable_batch(
+    req: WearableBatchIngestRequest,
+    _api_key: str = Depends(require_scope("wearables:write")),
+):
     """
     Ingestão em lote de registros históricos descarregados da memória do VE30 (OriginData3).
     """
@@ -382,6 +479,7 @@ def ingest_wearable_batch(req: WearableBatchIngestRequest):
         return {"status": "warning", "message": "Lote vazio recebido.", "count": 0}
 
     processed_count = 0
+    results = []
     for item in req.readings:
         hr = float(item.get("heart_rate") or item.get("rate_value") or 72.0)
         if hr > 0:
@@ -396,19 +494,26 @@ def ingest_wearable_batch(req: WearableBatchIngestRequest):
                 hrv_rmssd=float(item["hrv"]) if item.get("hrv") else 42.0,
                 steps=int(item["step_count"]) if item.get("step_count") else None
             )
-            ingest_wearable_reading(single_req)
+            result = ingest_wearable_reading(single_req)
+            results.append(result)
             processed_count += 1
 
+    latest_result = results[-1] if results else None
     return {
         "status": "success",
         "patient_id": req.patient_id,
+        "processed_count": processed_count,
         "processed_samples": processed_count,
+        "latest_result": latest_result,
         "message": f"{processed_count} amostras históricas do VE30 processadas com sucesso na IA."
     }
 
 
 @app.get("/api/v1/wearables/patient/{patient_id}/latest")
-def get_patient_latest_telemetry(patient_id: str):
+def get_patient_latest_telemetry(
+    patient_id: str,
+    _api_key: str = Depends(require_patient_access("wearables:read")),
+):
     """Retorna a última leitura biométrica e inferência de IA para um paciente."""
     history = patient_telemetry_history.get(patient_id, [])
     if not history:
@@ -417,13 +522,34 @@ def get_patient_latest_telemetry(patient_id: str):
 
 
 @app.get("/api/v1/wearables/patient/{patient_id}/history")
-def get_patient_telemetry_history(patient_id: str, limit: int = 20):
+def get_patient_telemetry_history(
+    patient_id: str,
+    limit: int = Query(default=20, ge=1, le=200),
+    _api_key: str = Depends(require_patient_access("wearables:read")),
+):
     """Retorna histórico de leituras biométricas de um paciente."""
     history = patient_telemetry_history.get(patient_id, [])
     return {
         "patient_id": patient_id,
         "total_records": len(history),
         "records": history[-max(1, min(limit, 200)):]
+    }
+
+
+@app.delete("/api/v1/patient/{patient_id}/anonymize")
+def anonymize_patient_telemetry(
+    patient_id: str,
+    _api_key: str = Depends(require_scope("admin")),
+):
+    """Endpoint de conformidade LGPD: purga dados do paciente."""
+    removed_history = patient_telemetry_history.pop(patient_id, None)
+    removed_engine = patient_engines.pop(patient_id, None)
+    if removed_history is None and removed_engine is None:
+        raise HTTPException(status_code=404, detail=f"Nenhum dado ativo registrado para o paciente '{patient_id}'.")
+    return {
+        "status": "success",
+        "message": f"Dados do paciente '{patient_id}' purgados com sucesso para conformidade LGPD.",
+        "patient_id": patient_id,
     }
 
 

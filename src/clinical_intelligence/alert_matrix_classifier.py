@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
@@ -55,7 +55,7 @@ class AlertMatrixClassifier:
     def __init__(self):
         self.scaler = StandardScaler()
         self.severity_encoder = LabelEncoder()
-        self.severity_clf: Optional[GradientBoostingClassifier] = None
+        self.severity_clf: Optional[HistGradientBoostingClassifier] = None
         self.fp_clf: Optional[RandomForestClassifier] = None
         self.alert_clf: Optional[RandomForestClassifier] = None
         self.feature_columns = list(FEATURE_COLUMNS)
@@ -88,10 +88,10 @@ class AlertMatrixClassifier:
         Xtr = self.scaler.transform(X_train)
         Xte = self.scaler.transform(X_test)
 
-        self.severity_clf = GradientBoostingClassifier(
-            n_estimators=120,
-            max_depth=4,
+        self.severity_clf = HistGradientBoostingClassifier(
+            max_depth=6,
             learning_rate=0.08,
+            max_iter=300,
             random_state=random_state,
         )
         self.severity_clf.fit(Xtr, ysev_tr)
