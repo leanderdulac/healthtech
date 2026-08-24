@@ -28,7 +28,7 @@
         $("gcp-kpi-today").textContent = BRL.format(k.spent_today_brl);
         $("gcp-kpi-balance").textContent = BRL.format(k.balance_brl);
         $("gcp-kpi-balance").className = "value " + (k.balance_brl < 0 ? "neg" : "pos");
-        $("gcp-kpi-credit").textContent = BRL.format(k.credits_scheduled_brl);
+        $("gcp-kpi-credit").textContent = BRL.format(k.credits_today_brl || k.credits_scheduled_brl || 0);
         $("gcp-kpi-forecast").textContent = BRL.format(k.forecast_week_brl);
         $("gcp-account-id").textContent = data.meta.billing_account_id;
         $("gcp-project-id").textContent = data.meta.project_id;
@@ -38,18 +38,22 @@
 
     function startCountdown(iso) {
         const el = $("gcp-countdown");
-        if (!el) return;
+        if (!el || !ledger) return;
+        const cloud = (ledger.credits || [])
+            .filter((c) => c.kind === "cloud_budget" || c.payer)
+            .map((c) => `${c.date.slice(8, 10)}/${c.date.slice(5, 7)} ${BRL.format(c.amount_brl)}`)
+            .join(" · ");
+        if (cloud) el.textContent = cloud;
+        if (!iso) return;
         const target = new Date(iso).getTime();
+        if (Number.isNaN(target) || target <= Date.now()) return;
         const tick = () => {
             const ms = target - Date.now();
-            if (ms <= 0) {
-                el.textContent = "Crédito de R$ 4.000,00 disponível.";
-                return;
-            }
+            if (ms <= 0) return;
             const h = Math.floor(ms / 3600000);
             const m = Math.floor((ms % 3600000) / 60000);
             const s = Math.floor((ms % 60000) / 1000);
-            el.textContent = `Lançamento do crédito em ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")} (BRT)`;
+            el.textContent = `${cloud}  ·  próximo em ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
         };
         tick();
         if (countdownTimer) clearInterval(countdownTimer);
@@ -133,11 +137,21 @@
         data.credits.forEach((c) => {
             rows.push({
                 date: c.date,
-                type: c.status === "posted" ? "Payment" : "Scheduled payment",
-                desc: c.description,
+                type: "Payment (Next2U cloud budget)",
+                desc: `${c.payer || "NEXT2U SAUDE LTDA"} — ${c.description}`,
                 doc: c.document,
                 amount: c.amount_brl,
                 status: c.status,
+            });
+        });
+        (data.other_next2u_pix || []).forEach((c) => {
+            rows.push({
+                date: c.date,
+                type: "Payment (Next2U other)",
+                desc: `${c.payer} — PIX fora do orçamento semanal de nuvem`,
+                doc: c.document,
+                amount: c.amount_brl,
+                status: "posted",
             });
         });
         data.daily.forEach((d) => {
@@ -188,7 +202,7 @@
 
     function renderBudget(data) {
         const weekSpend = data.kpis.spent_today_brl;
-        const cap = data.meta.weekly_credit_brl;
+        const cap = data.kpis.credits_today_brl || data.meta.weekly_credit_brl;
         const pct = Math.min(100, (weekSpend / cap) * 100);
         $("gcp-budget-name").textContent = data.meta.budget_name;
         $("gcp-budget-amount").textContent = `${BRL.format(weekSpend)} de ${BRL.format(cap)}`;
@@ -196,7 +210,7 @@
         const bar = $("gcp-budget-fill");
         bar.style.width = pct + "%";
         $("gcp-budget-bar").classList.toggle("over", pct >= 100);
-        const monthCap = cap * 4;
+        const monthCap = data.kpis.credits_posted_brl || cap * 4;
         const monthPct = Math.min(100, (data.kpis.mtd_brl / monthCap) * 100);
         $("gcp-budget-month").textContent = `${BRL.format(data.kpis.mtd_brl)} de ${BRL.format(monthCap)}`;
         $("gcp-budget-month-fill").style.width = monthPct + "%";

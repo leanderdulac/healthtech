@@ -1,13 +1,12 @@
 """
 Simulação de faturamento Google Cloud alinhada ao uso real do HealthTech.
 
-Orçamento: R$ 4.000,00 toda segunda-feira (processamento + tokens Vertex).
-As 3 semanas anteriores (03, 10 e 17/08/2026) já receberam R$ 12.000,00.
-O próximo crédito entra até o fim do dia 24/08/2026.
+Créditos de nuvem/tokens vêm de PIX da NEXT2U SAUDE LTDA (extrato C6
+25/06–24/08/2026, exportado 24/08 às 12:38), mais o aporte de R$ 4.800
+informado em 24/08 (não constava nesse recorte das 12:38).
 
-Os SKUs, regiões e o projeto `healthtech-gcp-2026` espelham o que o
-repositório realmente usa: Cloud Run, Vertex (IF + TCN), BigQuery, GCS,
-Cloud Build, Artifact Registry, Logging e Gemini (tokens de RAG/SLM).
+Os SKUs espelham Cloud Run, Vertex (IF + TCN), BigQuery, GCS, Cloud Build,
+Artifact Registry, Logging e Gemini (tokens de RAG/SLM).
 """
 
 from __future__ import annotations
@@ -23,8 +22,58 @@ from zoneinfo import ZoneInfo
 TZ = ZoneInfo("America/Sao_Paulo")
 FX_USD_BRL = 5.42
 WEEKLY_CREDIT_BRL = 4000.00
-INVESTED_WEEKS = 3
 AS_OF_DEFAULT = date(2026, 8, 24)
+
+# PIX NEXT2U SAUDE LTDA no extrato C6 (lançamento / valor).
+# R$ 4.800 em 24/08: informado pelo titular; o export de 12:38 ainda não trazia.
+CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
+    {
+        "date": "2026-08-03",
+        "amount_brl": 4780.00,
+        "payer": "NEXT2U SAUDE LTDA",
+        "status": "posted",
+        "source": "extrato_c6",
+        "document": "PIX-20260803-4780",
+        "description": "PIX Next2U Saúde Ltda — processamento e tokens (R$ 4.780,00)",
+    },
+    {
+        "date": "2026-08-10",
+        "amount_brl": 2000.00,
+        "payer": "NEXT2U SAUDE LTDA",
+        "status": "posted",
+        "source": "extrato_c6",
+        "document": "PIX-20260810-2000",
+        "description": "PIX Next2U Saúde Ltda — complemento semanal (R$ 2.000,00)",
+    },
+    {
+        "date": "2026-08-17",
+        "amount_brl": 4000.00,
+        "payer": "NEXT2U SAUDE LTDA",
+        "status": "posted",
+        "source": "extrato_c6",
+        "document": "PIX-20260817-4000",
+        "description": "PIX Next2U Saúde Ltda — processamento e tokens (R$ 4.000,00)",
+    },
+    {
+        "date": "2026-08-24",
+        "amount_brl": 4800.00,
+        "payer": "NEXT2U SAUDE LTDA",
+        "status": "posted",
+        "source": "titular_2026-08-24",
+        "document": "PIX-20260824-4800",
+        "description": "PIX Next2U Saúde Ltda — processamento e tokens (R$ 4.800,00). Não constava no extrato C6 de 12:38.",
+    },
+)
+
+# Demais PIX Next2U no mesmo extrato (não entram no orçamento semanal de nuvem).
+OTHER_NEXT2U_PIX: Tuple[Dict[str, Any], ...] = (
+    {"date": "2026-07-21", "amount_brl": 11500.00, "payer": "NEXT2U HEALTHCARE", "document": "PIX-20260721-11500"},
+    {"date": "2026-08-02", "amount_brl": 743.00, "payer": "NEXT2U HEALTHCARE", "document": "PIX-20260802-0743"},
+    {"date": "2026-08-11", "amount_brl": 180.00, "payer": "NEXT2U SAUDE LTDA", "document": "PIX-20260811-0180"},
+    {"date": "2026-08-15", "amount_brl": 1135.00, "payer": "NEXT2U SAUDE LTDA", "document": "PIX-20260815-1135"},
+    {"date": "2026-08-20", "amount_brl": 300.00, "payer": "NEXT2U SAUDE LTDA", "document": "PIX-20260820-0300"},
+    {"date": "2026-08-20", "amount_brl": 12000.00, "payer": "NEXT2U SAUDE LTDA", "document": "PIX-20260820-12000"},
+)
 
 BILLING_ACCOUNT_ID = "01A37F-2C9E14-8B03D1"
 BILLING_ACCOUNT_NAME = "My Billing Account"
@@ -84,18 +133,6 @@ ENGINEERING_EVENTS: Tuple[Tuple[str, str, str, Dict[str, float]], ...] = (
     ("2026-08-24", "platform", "Redeploy Cloud Run (CSP + app.js)", {"build": 5.5, "run_cpu": 1.7, "ar": 1.4, "log": 1.6}),
     ("2026-08-24", "database", "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest", {"bq_scan": 2.8, "gem_in": 2.4, "gem_out": 2.1, "run_req": 1.3}),
 )
-
-
-def _mondays_on_or_before(end: date, count: int) -> List[date]:
-    d = end
-    while d.weekday() != 0:
-        d -= timedelta(days=1)
-    out = []
-    cur = d - timedelta(weeks=count)
-    for _ in range(count):
-        out.append(cur)
-        cur += timedelta(weeks=1)
-    return out
 
 
 def _hash_unit(day: date, sku_key: str) -> float:
@@ -171,10 +208,11 @@ def _add_usage(dst: Dict[str, float], src: Dict[str, float]) -> None:
 
 def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
     today = as_of or AS_OF_DEFAULT
-    posted_credits = _mondays_on_or_before(today, INVESTED_WEEKS)
-    next_credit = posted_credits[-1] + timedelta(weeks=1) if posted_credits else today
-    period_start = posted_credits[0]
-    idle_end = min(today, next_credit - timedelta(days=1))  # 17–23 se today=24
+    budget_credits = [dict(c) for c in CLOUD_BUDGET_CREDITS if date.fromisoformat(c["date"]) <= today]
+    prior_credits = [c for c in budget_credits if date.fromisoformat(c["date"]) < today]
+    today_credits = [c for c in budget_credits if date.fromisoformat(c["date"]) == today]
+    period_start = date.fromisoformat(budget_credits[0]["date"]) if budget_credits else today
+    invested_end = today - timedelta(days=1)
 
     events_by_day: Dict[str, List[Tuple[str, str, Dict[str, float]]]] = {}
     for day_s, kind, title, mult in ENGINEERING_EVENTS:
@@ -215,11 +253,10 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             "events": notes,
         })
 
-    # Semanas investidas (03–23) fecham em exatamente R$ 12.000,00.
-    invested_end = idle_end
+    # Período anterior ao crédito de hoje consome exatamente os PIX Next2U já compensados.
     hist = [d for d in raw_days if period_start <= date.fromisoformat(d["date"]) <= invested_end]
     hist_sum = sum(d["total_brl"] for d in hist)
-    target = WEEKLY_CREDIT_BRL * INVESTED_WEEKS
+    target = round(sum(c["amount_brl"] for c in prior_credits), 2)
     factor = (target / hist_sum) if hist_sum else 1.0
     for d in hist:
         d["total_brl"] = 0.0
@@ -238,31 +275,23 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             d["total_brl"] = round(sum(it["cost_brl"] for it in d["items"]), 2)
 
     credits = []
-    for i, d in enumerate(posted_credits, start=1):
+    for c in budget_credits:
+        day = date.fromisoformat(c["date"])
         credits.append({
-            "date": d.isoformat(),
-            "posted_at": datetime.combine(d, time(0, 7), tzinfo=TZ).isoformat(),
-            "amount_brl": WEEKLY_CREDIT_BRL,
-            "status": "posted",
-            "description": f"Crédito semanal de processamento e tokens (semana {i})",
-            "document": f"PAY-{d.strftime('%Y%m%d')}-4000",
+            **c,
+            "posted_at": datetime.combine(day, time(10, 15), tzinfo=TZ).isoformat(),
+            "kind": "cloud_budget",
         })
-    credits.append({
-        "date": next_credit.isoformat(),
-        "posted_at": datetime.combine(next_credit, time(23, 59), tzinfo=TZ).isoformat(),
-        "amount_brl": WEEKLY_CREDIT_BRL,
-        "status": "scheduled",
-        "description": "Crédito semanal de processamento e tokens (lançamento até 23:59 BRT)",
-        "document": f"PAY-{next_credit.strftime('%Y%m%d')}-4000",
-    })
 
-    posted_total = WEEKLY_CREDIT_BRL * INVESTED_WEEKS
+    posted_total = round(sum(c["amount_brl"] for c in budget_credits), 2)
+    prior_total = round(sum(c["amount_brl"] for c in prior_credits), 2)
+    today_credit = round(sum(c["amount_brl"] for c in today_credits), 2)
     spent_to_date = round(sum(d["total_brl"] for d in raw_days), 2)
     spent_invested = round(sum(d["total_brl"] for d in hist), 2)
     spent_today = round(sum(d["total_brl"] for d in raw_days if d["date"] == today.isoformat()), 2)
     balance = round(posted_total - spent_to_date, 2)
 
-    invoices = _build_invoices(raw_days, posted_credits, next_credit, today)
+    invoices = _build_invoices(raw_days, budget_credits, today)
     by_service = _group_service(raw_days)
     by_sku = _group_sku(raw_days)
 
@@ -270,9 +299,11 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
         "meta": {
             "simulation": True,
             "disclaimer": (
-                "Simulação operacional do projeto healthtech-gcp-2026, calibrada no mix "
-                "real de Cloud Run, Vertex AI, BigQuery, GCS e tokens Gemini. "
-                "Não substitui a fatura oficial do Google Cloud."
+                "Créditos de nuvem batem com PIX NEXT2U SAUDE LTDA no extrato C6 "
+                "(03/08 R$ 4.780, 10/08 R$ 2.000, 17/08 R$ 4.000). "
+                "O PIX de R$ 4.800 em 24/08 foi informado pelo titular e não aparecia "
+                "no export de 12:38. Aportes Next2U fora dessa faixa (~R$ 4 mil) ficam "
+                "em other_next2u_pix e não queimam SKUs. Simulação operacional — não é fatura Google."
             ),
             "as_of": today.isoformat(),
             "timezone": "America/Sao_Paulo",
@@ -285,20 +316,26 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             "project_number": PROJECT_NUMBER,
             "project_name": PROJECT_NAME,
             "location": LOCATION,
-            "budget_name": "HealthTech weekly compute & tokens",
-            "next_credit_at": datetime.combine(next_credit, time(23, 59), tzinfo=TZ).isoformat(),
+            "budget_name": "HealthTech weekly compute & tokens (Next2U Saúde)",
+            "next_credit_at": None,
+            "bank_statement": "C6 Bank · 25/06/2026–24/08/2026 · export 24/08/2026 12:38",
         },
         "kpis": {
             "credits_posted_brl": posted_total,
-            "credits_scheduled_brl": WEEKLY_CREDIT_BRL,
+            "credits_scheduled_brl": 0.0,
+            "credits_prior_brl": prior_total,
+            "credits_today_brl": today_credit,
             "spent_to_date_brl": spent_to_date,
             "spent_last_3_weeks_brl": spent_invested,
             "spent_today_brl": spent_today,
             "balance_brl": balance,
-            "forecast_week_brl": round(spent_today * 7 if spent_today else WEEKLY_CREDIT_BRL * 0.92, 2),
+            "forecast_week_brl": round(
+                (spent_today / max(today.weekday() + 1, 1)) * 7, 2
+            ),
             "mtd_brl": spent_to_date,
         },
         "credits": credits,
+        "other_next2u_pix": [dict(x) for x in OTHER_NEXT2U_PIX],
         "daily": raw_days,
         "by_service": by_service,
         "by_sku": by_sku,
@@ -363,18 +400,17 @@ def _group_sku(days: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def _build_invoices(
     days: List[Dict[str, Any]],
-    posted: List[date],
-    next_credit: date,
+    credits: List[Dict[str, Any]],
     today: date,
 ) -> List[Dict[str, Any]]:
     invoices = []
-    windows = []
-    for i, start in enumerate(posted):
-        end = start + timedelta(days=6)
-        windows.append((i + 1, start, end, "finalized"))
-    windows.append((len(posted) + 1, next_credit, next_credit + timedelta(days=6), "open"))
-
-    for idx, start, end, status in windows:
+    for idx, credit in enumerate(credits):
+        start = date.fromisoformat(credit["date"])
+        if idx + 1 < len(credits):
+            end = date.fromisoformat(credits[idx + 1]["date"]) - timedelta(days=1)
+        else:
+            end = start + timedelta(days=6)
+        status = "open" if start >= today else "finalized"
         slice_days = [
             d for d in days
             if start <= date.fromisoformat(d["date"]) <= min(end, today)
@@ -388,6 +424,8 @@ def _build_invoices(
             "issue_date": end.isoformat() if status == "finalized" else None,
             "period_start": start.isoformat(),
             "period_end": end.isoformat(),
+            "credit_brl": credit["amount_brl"],
+            "payer": credit.get("payer"),
             "subtotal_brl": subtotal,
             "iss_brl": iss,
             "total_brl": round(subtotal + iss, 2),

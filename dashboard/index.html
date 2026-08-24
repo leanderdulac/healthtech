@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
     <link rel="stylesheet" href="style.css?v=20260824b">
-    <link rel="stylesheet" href="gcp-billing.css?v=20260824b">
+    <link rel="stylesheet" href="gcp-billing.css?v=20260824c">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -603,18 +603,18 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                 <div class="gcp-body">
                     <div id="gcp-panel-overview" class="gcp-panel active">
                         <div class="gcp-banner warn">
-                            <span class="material-icons-round">schedule</span>
+                            <span class="material-icons-round">payments</span>
                             <div>
-                                <strong>Próximo crédito: R$ 4.000,00 hoje até 23:59 BRT.</strong>
-                                <div id="gcp-countdown">Calculando…</div>
-                                Saldo atual negativo porque as 3 semanas anteriores (R$ 12.000,00) já foram consumidas em Vertex, tokens e Run. O lançamento de hoje zera o déficit e reabre o orçamento da semana.
+                                <strong>PIX Next2U Saúde — orçamento de nuvem e tokens</strong>
+                                <div id="gcp-countdown">03/08 R$ 4.780 · 10/08 R$ 2.000 · 17/08 R$ 4.000 · 24/08 R$ 4.800</div>
+                                Extrato C6 (12:38) confirma 4.780 / 2.000 / 4.000. O R$ 4.800 de hoje foi informado à parte (não estava nesse export). Outros PIX Next2U (11.500, 12.000, etc.) aparecem em Transactions e não queimam SKUs.
                             </div>
                         </div>
                         <div class="gcp-kpis">
                             <div class="gcp-card">
-                                <div class="label">Last 3 weeks (invested)</div>
+                                <div class="label">PIX Next2U 03–17/08 (nuvem)</div>
                                 <div class="value" id="gcp-kpi-spent">—</div>
-                                <div class="hint">Créditos lançados em 03, 10 e 17/08</div>
+                                <div class="hint">4.780 + 2.000 + 4.000 já consumidos</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Today so far</div>
@@ -623,12 +623,12 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Available balance</div>
-                                <div class="value neg" id="gcp-kpi-balance">—</div>
-                                <div class="hint">Até o crédito das 23:59</div>
+                                <div class="value pos" id="gcp-kpi-balance">—</div>
+                                <div class="hint">Após o PIX de R$ 4.800 hoje</div>
                             </div>
                             <div class="gcp-card">
-                                <div class="label">Scheduled credit</div>
-                                <div class="value pos" id="gcp-kpi-credit">R$ 4.000,00</div>
+                                <div class="label">Credit today (Next2U)</div>
+                                <div class="value pos" id="gcp-kpi-credit">R$ 4.800,00</div>
                                 <div class="hint">Forecast semana: <span id="gcp-kpi-forecast">—</span></div>
                             </div>
                         </div>
@@ -730,13 +730,13 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                             <div id="gcp-budget-amount">—</div>
                             <div class="gcp-budget-bar" id="gcp-budget-bar"><span id="gcp-budget-fill"></span></div>
                             <div class="hint" id="gcp-budget-pct">—</div>
-                            <div class="hint">Alert thresholds: 50% · 90% · 100% of R$ 4.000,00 / week</div>
+                            <div class="hint">Alert thresholds: 50% · 90% · 100% of the current Next2U PIX (R$ 4.800 this week)</div>
                         </div>
                         <div class="gcp-card">
                             <div class="label">August ceiling (4 Mondays)</div>
                             <div id="gcp-budget-month">—</div>
                             <div class="gcp-budget-bar"><span id="gcp-budget-month-fill"></span></div>
-                            <div class="hint">R$ 4.000 × 4 semanas de agosto (03, 10, 17, 24)</div>
+                            <div class="hint">Teto agosto = soma dos PIX Next2U de nuvem (4.780 + 2.000 + 4.000 + 4.800)</div>
                         </div>
                     </div>
                 </div>
@@ -746,6 +746,6 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
 
     <!-- Script da Aplicação -->
     <script src="app.js?v=20260824b"></script>
-    <script src="gcp-billing.js?v=20260824b"></script>
+    <script src="gcp-billing.js?v=20260824c"></script>
 </body>
 </html>
