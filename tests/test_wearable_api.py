@@ -63,6 +63,33 @@ def test_wearable_get_latest_and_history():
     assert len(hist_data["records"]) == 2
 
 
+def test_dashboard_bootstrap_saves_read_key(monkeypatch):
+    monkeypatch.setenv("READ_API_KEY", "ht_read_test_key_32chars_long_token")
+    res = client.get("/api/v1/ops/dashboard-bootstrap")
+    assert res.status_code == 200
+    assert res.json()["api_key"] == "ht_read_test_key_32chars_long_token"
+
+
+def test_device_registry_handles_hundreds_of_watches():
+    from src.ops.device_registry import clear_all, list_devices, upsert_frame
+
+    clear_all()
+    for i in range(120):
+        upsert_frame({
+            "patient_id": f"PAT-{i:03d}",
+            "device_id": f"VE30-{i:03d}",
+            "timestamp": f"2026-08-24T20:00:{i % 60:02d}+00:00",
+            "raw_telemetry": {"heart_rate_bpm": 60 + (i % 40), "spo2_percent": 97},
+            "cleaned_telemetry": {"heart_rate_clean": 60 + (i % 40)},
+        })
+    page = list_devices(limit=50, offset=0)
+    assert page["counts"]["total"] == 120
+    assert len(page["devices"]) == 50
+    q = list_devices(q="VE30-001")
+    assert q["counts"]["total"] == 1
+    clear_all()
+
+
 def test_live_watch_bridge_module_imports():
     from src.ops.live_watch_bridge import cached_devices, new_ingest_frames, poll_once
 
@@ -108,11 +135,14 @@ def test_wearable_devices_lists_ingested_watch():
     assert ingested.status_code == 200
     listed = client.get("/api/v1/wearables/devices", headers=READ_HEADERS)
     assert listed.status_code == 200
-    devices = listed.json()["devices"]
+    body = listed.json()
+    devices = body["devices"]
+    assert "counts" in body
     match = next(d for d in devices if d["device_id"] == "VE30-AA:BB:CC:DD:EE:FF")
     assert match["patient_id"] == "TEST_PATIENT_VE30"
     assert match["heart_rate"] == 74.0
-    assert match["latest"]["raw_telemetry"]["spo2_percent"] == 97.0
+    assert match["spo2"] == 97.0
+    assert "latest" not in match
     denied = client.get("/api/v1/wearables/devices", headers=INGEST_HEADERS)
     assert denied.status_code == 403
 
