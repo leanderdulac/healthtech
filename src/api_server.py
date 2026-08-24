@@ -231,6 +231,11 @@ class MultiAgentConsensusRequest(BaseModel):
 # ENDPOINTS REST
 # =====================================================================
 
+from src.ops.billing_routes import register_billing_routes
+
+register_billing_routes(app)
+
+
 @app.get("/api/health")
 def health_probe():
     """Probe público para orquestradores e healthchecks."""

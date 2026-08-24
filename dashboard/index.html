@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saúde Responsiva — Telemetria Fisiológica & API Wearables</title>
     <!-- Fonte Premium -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Roboto:wght@400;500;700&display=swap">
     <!-- Icones Material -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
-    <link rel="stylesheet" href="style.css?v=20260824">
+    <link rel="stylesheet" href="style.css?v=20260824b">
+    <link rel="stylesheet" href="gcp-billing.css?v=20260824b">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -35,6 +36,9 @@
                 </button>
                 <button type="button" class="nav-btn" data-tab="api-docs" onclick="switchTab('api-docs')">
                     <span class="material-icons-round">menu_book</span> Documentação da API
+                </button>
+                <button type="button" class="nav-btn" data-tab="billing" onclick="switchTab('billing')">
+                    <span class="material-icons-round">cloud</span> Faturamento GCP
                 </button>
             </nav>
 
@@ -558,9 +562,190 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                 </div>
             </div>
         </div>
+
+        <!-- VIEW: GOOGLE CLOUD BILLING (simulação) -->
+        <div id="view-billing" class="tab-content">
+            <section class="gcp-console" aria-label="Google Cloud Billing">
+                <div class="gcp-topbar">
+                    <div class="gcp-brand">
+                        <svg width="28" height="28" viewBox="0 0 24 24" aria-label="Google">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        <div class="gcp-brand-sep"></div>
+                        <svg width="26" height="20" viewBox="0 0 32 26" aria-label="Google Cloud">
+                            <path fill="#4285F4" d="M28.4 21.2H8.7c-2.4 0-4.4-2-4.4-4.4 0-1.8 1.1-3.4 2.8-4.1C7.4 9.3 10.3 7 13.8 7c.6 0 1.2.1 1.8.2C16.8 5.1 19.2 4 21.9 4c4.1 0 7.4 3.3 7.4 7.4 0 .3 0 .6-.1.9 1.7.6 2.8 2.2 2.8 4 0 2.7-2 4.9-3.6 4.9z"/>
+                            <path fill="#34A853" d="M8.7 21.2c-2.4 0-4.4-2-4.4-4.4 0-1.8 1.1-3.4 2.8-4.1.3 3.6 2.5 6.6 5.7 8.5H8.7z"/>
+                            <path fill="#FBBC04" d="M13.8 7c.6 0 1.2.1 1.8.2C16.3 5.8 15.2 4.7 13.6 4.2 10.6 5.1 8.4 7.6 7.1 10.7 8.2 9.4 10.8 7 13.8 7z"/>
+                            <path fill="#EA4335" d="M21.9 4c-1.6 0-3.1.5-4.3 1.3 1.4.7 2.6 1.8 3.4 3.2 2.4.3 4.4 1.7 5.4 3.8.1-.3.1-.6.1-.9 0-4.1-3.3-7.4-4.6-7.4z"/>
+                        </svg>
+                        <span style="font-weight:500;font-size:15px;color:#202124">Google Cloud</span>
+                    </div>
+                    <h2>Billing</h2>
+                    <span class="gcp-sim-pill">Simulation</span>
+                    <div class="gcp-account">
+                        <span>Billing account</span>
+                        <strong id="gcp-account-id">—</strong>
+                        <span>·</span>
+                        <span id="gcp-project-id">healthtech-gcp-2026</span>
+                    </div>
+                </div>
+                <nav class="gcp-subnav">
+                    <button type="button" class="active" data-gcp="overview">Overview</button>
+                    <button type="button" data-gcp="reports">Reports</button>
+                    <button type="button" data-gcp="cost-table">Cost table</button>
+                    <button type="button" data-gcp="transactions">Transactions</button>
+                    <button type="button" data-gcp="documents">Documents</button>
+                    <button type="button" data-gcp="budgets">Budgets &amp; alerts</button>
+                </nav>
+                <div class="gcp-body">
+                    <div id="gcp-panel-overview" class="gcp-panel active">
+                        <div class="gcp-banner warn">
+                            <span class="material-icons-round">schedule</span>
+                            <div>
+                                <strong>Próximo crédito: R$ 4.000,00 hoje até 23:59 BRT.</strong>
+                                <div id="gcp-countdown">Calculando…</div>
+                                Saldo atual negativo porque as 3 semanas anteriores (R$ 12.000,00) já foram consumidas em Vertex, tokens e Run. O lançamento de hoje zera o déficit e reabre o orçamento da semana.
+                            </div>
+                        </div>
+                        <div class="gcp-kpis">
+                            <div class="gcp-card">
+                                <div class="label">Last 3 weeks (invested)</div>
+                                <div class="value" id="gcp-kpi-spent">—</div>
+                                <div class="hint">Créditos lançados em 03, 10 e 17/08</div>
+                            </div>
+                            <div class="gcp-card">
+                                <div class="label">Today so far</div>
+                                <div class="value due" id="gcp-kpi-today">—</div>
+                                <div class="hint">Redeploy Cloud Run + fluxos clínicos</div>
+                            </div>
+                            <div class="gcp-card">
+                                <div class="label">Available balance</div>
+                                <div class="value neg" id="gcp-kpi-balance">—</div>
+                                <div class="hint">Até o crédito das 23:59</div>
+                            </div>
+                            <div class="gcp-card">
+                                <div class="label">Scheduled credit</div>
+                                <div class="value pos" id="gcp-kpi-credit">R$ 4.000,00</div>
+                                <div class="hint">Forecast semana: <span id="gcp-kpi-forecast">—</span></div>
+                            </div>
+                        </div>
+                        <div class="gcp-chart-wrap"><canvas id="gcp-cost-chart"></canvas></div>
+                        <table class="gcp-table">
+                            <thead>
+                                <tr><th>Service</th><th class="num">Share</th><th class="num">Cost</th></tr>
+                            </thead>
+                            <tbody id="gcp-service-body"></tbody>
+                            <tfoot>
+                                <tr><td><strong>Subtotal</strong></td><td></td><td class="num" id="gcp-service-total">—</td></tr>
+                            </tfoot>
+                        </table>
+                        <p class="gcp-footer-note" id="gcp-disclaimer"></p>
+                    </div>
+
+                    <div id="gcp-panel-reports" class="gcp-panel">
+                        <div class="gcp-filters">
+                            <span class="gcp-chip">Time range: Aug 3 – 24, 2026</span>
+                            <span class="gcp-chip">Group by: Service</span>
+                            <span class="gcp-chip">Project: healthtech-gcp-2026</span>
+                            <span class="gcp-chip">Location: us-central1</span>
+                        </div>
+                        <div class="gcp-toolbar">
+                            <div class="label" style="color:#5f6368;font-size:13px">Services — this period (stacked daily)</div>
+                            <button type="button" class="gcp-btn primary" id="gcp-download-report">Download PDF report</button>
+                        </div>
+                        <p class="gcp-footer-note">O gráfico da Overview é o relatório padrão do console (custos diários empilhados por serviço). Use Documents para faturas individuais.</p>
+                        <h3 style="font-weight:500;font-size:14px;margin:16px 0 8px">Engineering events that burned budget</h3>
+                        <table class="gcp-table">
+                            <thead><tr><th>Date</th><th>Kind</th><th>Change</th></tr></thead>
+                            <tbody id="gcp-events"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="gcp-panel-cost-table" class="gcp-panel">
+                        <div class="gcp-toolbar">
+                            <div class="gcp-filters">
+                                <span class="gcp-chip">Group by: SKU</span>
+                                <span class="gcp-chip">Include credits: No</span>
+                            </div>
+                            <button type="button" class="gcp-btn" id="gcp-download-csv">Download CSV</button>
+                        </div>
+                        <table class="gcp-table">
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th>SKU description</th>
+                                    <th>SKU ID</th>
+                                    <th class="num">Usage</th>
+                                    <th class="num">Cost (BRL)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gcp-sku-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="gcp-panel-transactions" class="gcp-panel">
+                        <table class="gcp-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Document</th>
+                                    <th>Status</th>
+                                    <th class="num">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gcp-tx-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="gcp-panel-documents" class="gcp-panel">
+                        <div class="gcp-banner">
+                            <span class="material-icons-round">picture_as_pdf</span>
+                            <div>Invoices no formato Google Cloud (número 5048-…, SKU ID, ISS 2% nas faturas fechadas). Clique em PDF para baixar.</div>
+                        </div>
+                        <table class="gcp-table">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Number</th>
+                                    <th>Period</th>
+                                    <th>Issue date</th>
+                                    <th>Status</th>
+                                    <th class="num">Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="gcp-docs-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="gcp-panel-budgets" class="gcp-panel">
+                        <div class="gcp-card" style="margin-bottom:16px">
+                            <div class="label">Budget</div>
+                            <div style="font-size:16px;margin:4px 0" id="gcp-budget-name">HealthTech weekly compute &amp; tokens</div>
+                            <div id="gcp-budget-amount">—</div>
+                            <div class="gcp-budget-bar" id="gcp-budget-bar"><span id="gcp-budget-fill"></span></div>
+                            <div class="hint" id="gcp-budget-pct">—</div>
+                            <div class="hint">Alert thresholds: 50% · 90% · 100% of R$ 4.000,00 / week</div>
+                        </div>
+                        <div class="gcp-card">
+                            <div class="label">August ceiling (4 Mondays)</div>
+                            <div id="gcp-budget-month">—</div>
+                            <div class="gcp-budget-bar"><span id="gcp-budget-month-fill"></span></div>
+                            <div class="hint">R$ 4.000 × 4 semanas de agosto (03, 10, 17, 24)</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
 
     <!-- Script da Aplicação -->
-    <script src="app.js?v=20260824"></script>
+    <script src="app.js?v=20260824b"></script>
+    <script src="gcp-billing.js?v=20260824b"></script>
 </body>
 </html>

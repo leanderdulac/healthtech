@@ -1,0 +1,3994 @@
+{
+  "meta": {
+    "simulation": true,
+    "disclaimer": "Simulação operacional do projeto healthtech-gcp-2026, calibrada no mix real de Cloud Run, Vertex AI, BigQuery, GCS e tokens Gemini. Não substitui a fatura oficial do Google Cloud.",
+    "as_of": "2026-08-24",
+    "timezone": "America/Sao_Paulo",
+    "currency": "BRL",
+    "fx_usd_brl": 5.42,
+    "weekly_credit_brl": 4000.0,
+    "billing_account_id": "01A37F-2C9E14-8B03D1",
+    "billing_account_name": "My Billing Account",
+    "project_id": "healthtech-gcp-2026",
+    "project_number": "5794833455",
+    "project_name": "healthtech-responsive",
+    "location": "us-central1",
+    "budget_name": "HealthTech weekly compute & tokens",
+    "next_credit_at": "2026-08-24T23:59:00-03:00"
+  },
+  "kpis": {
+    "credits_posted_brl": 12000.0,
+    "credits_scheduled_brl": 4000.0,
+    "spent_to_date_brl": 12442.38,
+    "spent_last_3_weeks_brl": 12000.0,
+    "spent_today_brl": 442.38,
+    "balance_brl": -442.38,
+    "forecast_week_brl": 3096.66,
+    "mtd_brl": 12442.38
+  },
+  "credits": [
+    {
+      "date": "2026-08-03",
+      "posted_at": "2026-08-03T00:07:00-03:00",
+      "amount_brl": 4000.0,
+      "status": "posted",
+      "description": "Crédito semanal de processamento e tokens (semana 1)",
+      "document": "PAY-20260803-4000"
+    },
+    {
+      "date": "2026-08-10",
+      "posted_at": "2026-08-10T00:07:00-03:00",
+      "amount_brl": 4000.0,
+      "status": "posted",
+      "description": "Crédito semanal de processamento e tokens (semana 2)",
+      "document": "PAY-20260810-4000"
+    },
+    {
+      "date": "2026-08-17",
+      "posted_at": "2026-08-17T00:07:00-03:00",
+      "amount_brl": 4000.0,
+      "status": "posted",
+      "description": "Crédito semanal de processamento e tokens (semana 3)",
+      "document": "PAY-20260817-4000"
+    },
+    {
+      "date": "2026-08-24",
+      "posted_at": "2026-08-24T23:59:00-03:00",
+      "amount_brl": 4000.0,
+      "status": "scheduled",
+      "description": "Crédito semanal de processamento e tokens (lançamento até 23:59 BRT)",
+      "document": "PAY-20260824-4000"
+    }
+  ],
+  "daily": [
+    {
+      "date": "2026-08-03",
+      "total_brl": 483.63,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 50230.59741,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 11.5275,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 104670.717082,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.5022,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 15983.837389,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0612,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.060856,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 174.4504,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 37243.675679,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.5698,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 39250.659158,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 131.3619,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 11248.574474,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 150.5844,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.043334,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 2.5897,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.324116,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.633,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 38.698487,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 1.1842,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 1.585779,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 7.5818,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "platform",
+          "title": "Arquitetura Do Caos à Precisão"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-04",
+      "total_brl": 630.4,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 45441.895014,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 10.4285,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 78164.20126,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.8685,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 31883.587638,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.1219,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.976207,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 174.1433,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 41497.058168,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.6349,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 73938.074509,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 247.4518,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 14207.169516,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 190.191,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.020341,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.2157,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 0.902043,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.4314,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 3.061984,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0937,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.677343,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 3.2384,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "platform",
+          "title": "BMO/VMO e signal processing"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-05",
+      "total_brl": 557.2,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 74778.202046,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 17.1608,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 99158.109983,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.3704,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 14966.067481,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0572,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.13979,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 174.7369,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 17273.968462,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.2643,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 48137.508196,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 161.104,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 13794.679488,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 184.669,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.012599,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 0.753,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.648115,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.7879,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 149.032638,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 4.5602,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.476667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.4559,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 2.06992,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 9.8964,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "platform",
+          "title": "Cloud Run inicial, LGPD e matriz de alertas"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-06",
+      "total_brl": 750.18,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 22950.509294,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.2669,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 95651.277617,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.2866,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 18146.462749,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0693,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.1938,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 174.9331,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Custom training NVIDIA T4 (us-central1)",
+          "sku_id": "B77E-4D21-0F9A",
+          "sku_key": "vtx_train",
+          "usage": 27.625,
+          "unit": "node-hours",
+          "unit_price_usd": 0.95,
+          "cost_brl": 250.946,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 49585.194767,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.7586,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 38987.427099,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 130.4809,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 13263.325578,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 177.5558,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.022643,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.3532,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 3.38,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.6464,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.544721,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.7385,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 78.63833,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 2.4062,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.506302,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.4207,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "ai_train",
+          "title": "Deploy IsolationForest no Vertex AI"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-07",
+      "total_brl": 620.93,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 25390.581753,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.8269,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 97221.731373,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.3242,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 32377.705477,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.1238,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.903645,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.8799,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 29835.561689,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.4564,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 66373.545603,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 222.1352,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 15711.951831,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 210.3355,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.039464,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 2.3584,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.825291,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.8728,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 4.243801,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.1298,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.397551,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 1.9008,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-08",
+      "total_brl": 384.83,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 20607.670134,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 4.7292,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 108293.595323,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.5888,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 6088.94013,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0233,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.761217,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.3629,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 8837.566191,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.1351,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 28183.644439,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 94.3235,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 7740.396933,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 103.6205,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.035003,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 2.0918,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 2.070174,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.9897,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 1.125445,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0344,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.491497,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.35,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-09",
+      "total_brl": 658.38,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 25715.402264,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.9015,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 78381.348096,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.8738,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 12641.741177,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0483,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.251426,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 175.1422,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Custom training NVIDIA T4 (us-central1)",
+          "sku_id": "B77E-4D21-0F9A",
+          "sku_key": "vtx_train",
+          "usage": 30.6,
+          "unit": "node-hours",
+          "unit_price_usd": 0.95,
+          "cost_brl": 277.971,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 13621.326792,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.2084,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 31050.361633,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 103.9176,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 6337.659363,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 84.8422,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.016494,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 0.9857,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 3.02,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.5776,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.829295,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.8745,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 109.294477,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 3.3443,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.566667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.5418,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.424781,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.031,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "ai_train",
+          "title": "TCN custom container + smoke Vertex"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-10",
+      "total_brl": 555.05,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 49617.068704,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 11.3867,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 70065.831104,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.675,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 17983.477649,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0688,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.739196,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.283,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 51769.136153,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.792,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 49369.445774,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 165.2268,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 14485.511345,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 193.9173,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.025724,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.5373,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 2.217024,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 1.0599,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 6.93742,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.2122,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 1.110359,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 5.3087,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "platform",
+          "title": "Hardening de API keys"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-11",
+      "total_brl": 538.65,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 25175.431365,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.7775,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 93063.903074,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.2247,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 31086.157005,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.1189,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.714155,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.192,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 33803.159382,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.5171,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 56808.390392,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 190.1231,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 11961.518058,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 160.1286,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.040628,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 2.4281,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 2.256217,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 1.0787,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 5.102201,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.1561,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.485661,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.3219,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-12",
+      "total_brl": 502.06,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 23324.662117,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.3529,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 103585.782189,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.4763,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 13541.5524,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0519,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.209898,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 174.9915,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 16849.774776,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.2578,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 40836.931665,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 136.6708,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 13114.621554,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 175.565,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.031012,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.8533,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 2.088055,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.9984,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 4.450967,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.1362,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.65261,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 3.1202,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-13",
+      "total_brl": 573.83,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 19329.626863,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 4.436,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 95707.591676,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.2879,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 15570.503511,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0596,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.027526,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 174.3296,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 38077.934104,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.5825,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 53758.941542,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 179.9174,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 15456.433936,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 206.9149,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.031403,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.8768,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.299138,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.6212,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 2.90467,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0889,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.44554,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.1301,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-14",
+      "total_brl": 517.36,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 22402.94335,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.1413,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 106731.015499,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.5514,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 29688.256405,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.1136,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.20413,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 174.9705,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 20937.5816,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.3204,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 40742.440159,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 136.3545,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 14240.098641,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 190.6319,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.025408,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.5185,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.71207,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.8186,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 6.999366,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.2142,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.866495,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 4.1428,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-15",
+      "total_brl": 376.22,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 23175.145572,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.3184,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 78005.647913,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.8648,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 12658.770283,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0483,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.778491,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.4256,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 26438.102241,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.4045,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 30612.013642,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 102.4506,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 6483.413938,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 86.7932,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.03071,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.8353,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 0.977195,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.4672,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 0.420732,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0129,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.630678,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 3.0152,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-16",
+      "total_brl": 382.07,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 21967.040424,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.0413,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 99718.886369,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.3838,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 12747.390195,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0487,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.838962,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.645,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 14173.257876,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.2168,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 31910.519349,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 106.7964,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 6576.119774,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 88.0344,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.015582,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 0.9312,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.853286,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.886,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 0.804254,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0245,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.727301,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 3.4773,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-17",
+      "total_brl": 605.89,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 19678.390312,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 4.5161,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 109463.874781,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.6167,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 27215.07081,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.1041,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.92041,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.9407,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 51936.676569,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.7946,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 69235.551452,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 231.7136,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 13856.99319,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 185.5033,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.017254,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.0312,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.389123,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.6642,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 6.727744,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.2059,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.882181,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 4.2177,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-18",
+      "total_brl": 543.6,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 57540.984655,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 13.2051,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 82782.9487,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.9789,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 20812.974589,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0796,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.750499,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.3239,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 33909.584908,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.5189,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 55223.087946,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 184.8176,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 11855.879977,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 158.7144,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.025141,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.5026,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 0.890085,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.4255,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 70.030685,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 2.1428,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 1.319169,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 6.3069,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "platform",
+          "title": "v3.0 Windkessel 4E + CI/CD"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-19",
+      "total_brl": 597.8,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 64523.817326,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 14.8077,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 78742.444908,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.8824,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 45868.211487,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.1754,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.749986,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.322,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 18845.960196,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.2883,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 69898.048241,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 233.9309,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 12405.483257,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 166.0719,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.03128,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.8694,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.166304,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.5577,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 44.888454,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 1.3735,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.615575,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.9431,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "platform",
+          "title": "VE30 BLE ingest + dashboard v3.1"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-20",
+      "total_brl": 588.81,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 20503.275124,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 4.7054,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 83526.349015,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.9968,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 30896.127026,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.1182,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.883027,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.8051,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 22140.346671,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.3387,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 64508.287389,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 215.8927,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 13910.203476,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 186.2155,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.01221,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 0.7297,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.852183,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.8855,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 4.211075,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.1288,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.71434,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 3.4154,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-21",
+      "total_brl": 1365.74,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 25717.009289,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.9019,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 96051.462019,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.2961,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 25705.904,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0983,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.194002,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 174.9338,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Custom training NVIDIA T4 (us-central1)",
+          "sku_id": "B77E-4D21-0F9A",
+          "sku_key": "vtx_train",
+          "usage": 57.375,
+          "unit": "node-hours",
+          "unit_price_usd": 0.95,
+          "cost_brl": 521.1957,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 29131.475081,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.4456,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 105005.838329,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 351.4277,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 20641.081576,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 276.3216,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.47035,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 28.1097,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 5.27,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 1.0079,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.445491,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.691,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 7.445873,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.2278,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.579279,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.7695,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "ai_train",
+          "title": "Next2U 971 padrões + retreino do classificador"
+        },
+        {
+          "kind": "ai_train",
+          "title": "158 predicados Next2U e segundo retreino"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-22",
+      "total_brl": 380.22,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 23486.462879,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.3899,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 72993.579619,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.745,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 29080.398434,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.1111,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.075786,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 174.5047,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 14512.592205,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.2221,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 35805.181223,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 119.8307,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 5291.75256,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 70.8405,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.013576,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 0.8114,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 0.842625,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.403,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 0.969216,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0296,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 1.201916,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 5.7464,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "platform",
+          "title": "Companion VE30 Veepoo SDK"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-23",
+      "total_brl": 387.15,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 20318.812984,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 4.653,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 88768.141432,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.122,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 14182.620576,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0542,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.831752,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 173.6189,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 10731.43227,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.1642,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 28270.386616,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 94.6137,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 7936.510421,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 106.2458,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.036023,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 2.1529,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1173,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.2678,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.447573,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.6921,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 0.538793,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0164,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1976,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.466469,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.2302,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-24",
+      "total_brl": 442.38,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 56706.877781,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 7.3764,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 70328.429788,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 0.9529,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 31045.818998,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0673,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.915235,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 98.5823,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 38227.144549,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.3315,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 96198.438795,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 182.4884,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 18049.916056,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 136.9628,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.255162,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 8.6436,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.0665,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1518,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.530915,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.4149,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 101.225835,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 1.7557,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.416667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.2258,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 1.607725,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 4.3569,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "platform",
+          "title": "Redeploy Cloud Run (CSP + app.js)"
+        },
+        {
+          "kind": "database",
+          "title": "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest"
+        }
+      ]
+    }
+  ],
+  "by_service": [
+    {
+      "service": "Vertex AI",
+      "cost_brl": 12027.54,
+      "color": "#EA4335"
+    },
+    {
+      "service": "Cloud Run",
+      "cost_brl": 212.54,
+      "color": "#4285F4"
+    },
+    {
+      "service": "Cloud Logging",
+      "cost_brl": 84.92,
+      "color": "#FF6D01"
+    },
+    {
+      "service": "BigQuery",
+      "cost_brl": 70.71,
+      "color": "#34A853"
+    },
+    {
+      "service": "Cloud Storage",
+      "cost_brl": 23.2,
+      "color": "#FBBC04"
+    },
+    {
+      "service": "Cloud Build",
+      "cost_brl": 18.48,
+      "color": "#00ACC1"
+    },
+    {
+      "service": "Artifact Registry",
+      "cost_brl": 4.98,
+      "color": "#5F6368"
+    }
+  ],
+  "by_sku": [
+    {
+      "service": "Vertex AI",
+      "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+      "sku_id": "A12F-90C3-6B18",
+      "unit": "node-hours",
+      "usage": 1055.12,
+      "cost_brl": 3754.52,
+      "color": "#EA4335"
+    },
+    {
+      "service": "Vertex AI",
+      "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+      "sku_id": "E918-2B70-CC01",
+      "unit": "1k tokens",
+      "usage": 1154104.7232,
+      "cost_brl": 3723.03,
+      "color": "#9334E6"
+    },
+    {
+      "service": "Vertex AI",
+      "sku": "Gemini 2.0 Flash output tokens",
+      "sku_id": "E918-2B70-CC02",
+      "unit": "1k tokens",
+      "usage": 268569.2949,
+      "cost_brl": 3490.66,
+      "color": "#9334E6"
+    },
+    {
+      "service": "Vertex AI",
+      "sku": "Custom training NVIDIA T4 (us-central1)",
+      "sku_id": "B77E-4D21-0F9A",
+      "unit": "node-hours",
+      "usage": 115.6,
+      "cost_brl": 1050.11,
+      "color": "#EA4335"
+    },
+    {
+      "service": "Cloud Run",
+      "sku": "CPU allocation time (us-central1)",
+      "sku_id": "F64D-1C5A-8E2B",
+      "unit": "vCPU-seconds",
+      "usage": 738582.4067,
+      "cost_brl": 163.85,
+      "color": "#4285F4"
+    },
+    {
+      "service": "Cloud Logging",
+      "sku": "Log storage volume",
+      "sku_id": "58CD-A3F1-0B22",
+      "unit": "GiB",
+      "usage": 18.4585,
+      "cost_brl": 84.92,
+      "color": "#FF6D01"
+    },
+    {
+      "service": "BigQuery",
+      "sku": "Analysis (on-demand bytes scanned)",
+      "sku_id": "5510-B289-7FE2",
+      "unit": "TiB",
+      "usage": 1.2513,
+      "cost_brl": 68.18,
+      "color": "#34A853"
+    },
+    {
+      "service": "Cloud Run",
+      "sku": "Memory allocation time (us-central1)",
+      "sku_id": "C6E2-0A91-4D77",
+      "unit": "GiB-seconds",
+      "usage": 1991076.8688,
+      "cost_brl": 46.87,
+      "color": "#4285F4"
+    },
+    {
+      "service": "Cloud Build",
+      "sku": "e2-standard-2 build minutes",
+      "sku_id": "2E27-4F75-95CD",
+      "unit": "minutes",
+      "usage": 647.7524,
+      "cost_brl": 18.48,
+      "color": "#00ACC1"
+    },
+    {
+      "service": "Cloud Storage",
+      "sku": "Class A operations",
+      "sku_id": "E5F0-6A2D-2E8C",
+      "unit": "10k ops",
+      "usage": 34.111,
+      "cost_brl": 15.99,
+      "color": "#FBBC04"
+    },
+    {
+      "service": "Vertex AI",
+      "sku": "Prediction requests (sklearn + TCN container)",
+      "sku_id": "D04C-8A55-219E",
+      "unit": "count",
+      "usage": 619378.5103,
+      "cost_brl": 9.22,
+      "color": "#EA4335"
+    },
+    {
+      "service": "Cloud Storage",
+      "sku": "Standard storage us-central1",
+      "sku_id": "0D5D-67C9-76E5",
+      "unit": "GiB-month",
+      "usage": 38.27,
+      "cost_brl": 7.2,
+      "color": "#FBBC04"
+    },
+    {
+      "service": "Artifact Registry",
+      "sku": "Storage (us-central1)",
+      "sku_id": "6F81-5844-456A",
+      "unit": "GiB-month",
+      "usage": 5.3867,
+      "cost_brl": 4.98,
+      "color": "#5F6368"
+    },
+    {
+      "service": "BigQuery",
+      "sku": "Active logical storage",
+      "sku_id": "0D47-6E63-C5BD",
+      "unit": "GiB-month",
+      "usage": 13.4933,
+      "cost_brl": 2.53,
+      "color": "#34A853"
+    },
+    {
+      "service": "Cloud Run",
+      "sku": "Requests (us-central1)",
+      "sku_id": "9A1B-33E0-71C4",
+      "unit": "count",
+      "usage": 490171.5754,
+      "cost_brl": 1.82,
+      "color": "#4285F4"
+    }
+  ],
+  "invoices": [
+    {
+      "number": "5048-0803-4701",
+      "status": "finalized",
+      "issue_date": "2026-08-09",
+      "period_start": "2026-08-03",
+      "period_end": "2026-08-09",
+      "subtotal_brl": 4085.55,
+      "iss_brl": 81.71,
+      "total_brl": 4167.26,
+      "currency": "BRL",
+      "document_type": "Invoice"
+    },
+    {
+      "number": "5048-0810-4702",
+      "status": "finalized",
+      "issue_date": "2026-08-16",
+      "period_start": "2026-08-10",
+      "period_end": "2026-08-16",
+      "subtotal_brl": 3445.24,
+      "iss_brl": 68.9,
+      "total_brl": 3514.14,
+      "currency": "BRL",
+      "document_type": "Invoice"
+    },
+    {
+      "number": "5048-0817-4703",
+      "status": "finalized",
+      "issue_date": "2026-08-23",
+      "period_start": "2026-08-17",
+      "period_end": "2026-08-23",
+      "subtotal_brl": 4469.21,
+      "iss_brl": 89.38,
+      "total_brl": 4558.59,
+      "currency": "BRL",
+      "document_type": "Invoice"
+    },
+    {
+      "number": "5048-0824-4704",
+      "status": "open",
+      "issue_date": null,
+      "period_start": "2026-08-24",
+      "period_end": "2026-08-30",
+      "subtotal_brl": 442.38,
+      "iss_brl": 0.0,
+      "total_brl": 442.38,
+      "currency": "BRL",
+      "document_type": "Draft invoice"
+    }
+  ],
+  "events": [
+    {
+      "date": "2026-08-03",
+      "kind": "platform",
+      "title": "Arquitetura Do Caos à Precisão"
+    },
+    {
+      "date": "2026-08-04",
+      "kind": "platform",
+      "title": "BMO/VMO e signal processing"
+    },
+    {
+      "date": "2026-08-05",
+      "kind": "platform",
+      "title": "Cloud Run inicial, LGPD e matriz de alertas"
+    },
+    {
+      "date": "2026-08-06",
+      "kind": "ai_train",
+      "title": "Deploy IsolationForest no Vertex AI"
+    },
+    {
+      "date": "2026-08-09",
+      "kind": "ai_train",
+      "title": "TCN custom container + smoke Vertex"
+    },
+    {
+      "date": "2026-08-10",
+      "kind": "platform",
+      "title": "Hardening de API keys"
+    },
+    {
+      "date": "2026-08-18",
+      "kind": "platform",
+      "title": "v3.0 Windkessel 4E + CI/CD"
+    },
+    {
+      "date": "2026-08-19",
+      "kind": "platform",
+      "title": "VE30 BLE ingest + dashboard v3.1"
+    },
+    {
+      "date": "2026-08-21",
+      "kind": "ai_train",
+      "title": "Next2U 971 padrões + retreino do classificador"
+    },
+    {
+      "date": "2026-08-21",
+      "kind": "ai_train",
+      "title": "158 predicados Next2U e segundo retreino"
+    },
+    {
+      "date": "2026-08-22",
+      "kind": "platform",
+      "title": "Companion VE30 Veepoo SDK"
+    },
+    {
+      "date": "2026-08-24",
+      "kind": "platform",
+      "title": "Redeploy Cloud Run (CSP + app.js)"
+    },
+    {
+      "date": "2026-08-24",
+      "kind": "database",
+      "title": "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest"
+    }
+  ]
+}
