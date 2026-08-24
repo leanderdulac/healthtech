@@ -9,7 +9,7 @@
     <!-- Icones Material -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
-    <link rel="stylesheet" href="style.css?v=20260824b">
+    <link rel="stylesheet" href="style.css?v=20260824h">
     <link rel="stylesheet" href="gcp-billing.css?v=20260824g">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -42,9 +42,13 @@
                 </button>
             </nav>
 
-            <div class="connection-status" id="ws-status">
-                <span class="status-indicator red"></span>
-                <span class="status-text">Desconectado</span>
+            <div class="header-session">
+                <input type="password" id="dash-api-key" placeholder="API key" autocomplete="off" spellcheck="false">
+                <button type="button" class="btn btn-primary" id="btn-save-key">Entrar</button>
+                <div class="connection-status" id="ws-status">
+                    <span class="status-indicator red"></span>
+                    <span class="status-text">Desconectado</span>
+                </div>
             </div>
         </header>
 
@@ -105,6 +109,16 @@
 
                 <!-- DASHBOARD GRID -->
                 <main class="dashboard-grid">
+                    <section class="watch-strip" id="watch-strip">
+                        <div class="card watch-card" id="card-watch">
+                            <div class="metric-header">
+                                <span class="metric-title">Relógio VE30</span>
+                                <span class="material-icons-round icon-blue">watch</span>
+                            </div>
+                            <div class="watch-name" id="watch-name">Nenhum relógio no painel</div>
+                            <div class="metric-sub" id="watch-sub">Informe a API key e mantenha o companion enviando telemetria.</div>
+                        </div>
+                    </section>
                     <!-- SINAIS VITAIS -->
                     <section class="vitals-section">
                         <!-- BPM Card -->
@@ -744,7 +758,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
     </div>
 
     <!-- Script da Aplicação -->
-    <script src="app.js?v=20260824b"></script>
+    <script src="app.js?v=20260824h"></script>
     <script src="gcp-billing.js?v=20260824g"></script
 </body>
 </html>

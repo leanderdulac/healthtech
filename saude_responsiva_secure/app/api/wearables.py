@@ -64,6 +64,16 @@ def batch_ingest_wearables(
     }
 
 
+@router.get("/devices")
+def list_wearable_devices(
+    request: Request,
+    _api_key: str = Depends(require_scope("wearables:read")),
+):
+    """Relógios/wearables com última leitura neste processo. Requer wearables:read."""
+    _ = request
+    return {"devices": telemetry_store.list_devices()}
+
+
 @router.get("/patient/{patient_id}/latest")
 def get_latest_patient_telemetry(
     patient_id: str,
