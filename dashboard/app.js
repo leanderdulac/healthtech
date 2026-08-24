@@ -61,6 +61,10 @@ document.addEventListener("DOMContentLoaded", () => {
     let reconnectTimer = null;
     let devicePollTimer = null;
     let lastIngestStamp = "";
+    let fleetDevices = [];
+    let selectedDeviceId = "";
+    let fleetPage = 0;
+    const FLEET_PAGE_SIZE = 50;
 
     // Buffer de dados históricos para os gráficos (máximo 30 pontos)
     const MAX_POINTS = 30;
@@ -379,8 +383,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function applyIngestFrame(ing) {
         if (!ing) return;
-        const stamp = `${ing.device_id || ""}|${ing.timestamp || ""}`;
+        const deviceId = ing.device_id || "";
+        if (deviceId && !selectedDeviceId) selectedDeviceId = deviceId;
+        if (selectedDeviceId && deviceId && deviceId !== selectedDeviceId) {
+            upsertFleetFromIngest(ing);
+            return;
+        }
+        const stamp = `${deviceId}|${ing.timestamp || ""}`;
         renderWatchFromIngest(ing);
+        upsertFleetFromIngest(ing);
         if (stamp && stamp === lastIngestStamp) return;
         lastIngestStamp = stamp;
         const raw = ing.raw_telemetry || {};
@@ -427,19 +438,115 @@ document.addEventListener("DOMContentLoaded", () => {
         if (card) card.classList.add("online");
     }
 
+    function deviceToIngest(row) {
+        if (row && row.latest) return row.latest;
+        return {
+            device_id: row.device_id,
+            patient_id: row.patient_id,
+            timestamp: row.last_seen,
+            raw_telemetry: {
+                heart_rate_bpm: row.heart_rate,
+                spo2_percent: row.spo2
+            },
+            cleaned_telemetry: { heart_rate_clean: row.heart_rate }
+        };
+    }
+
+    function upsertFleetFromIngest(ing) {
+        if (!ing || !ing.device_id) return;
+        const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? (ing.raw_telemetry || {}).heart_rate_bpm;
+        const spo2 = (ing.raw_telemetry || {}).spo2_percent;
+        const next = {
+            device_id: ing.device_id,
+            patient_id: ing.patient_id,
+            last_seen: ing.timestamp,
+            online: true,
+            heart_rate: hr,
+            spo2,
+            latest: ing
+        };
+        const idx = fleetDevices.findIndex((d) => d.device_id === ing.device_id);
+        if (idx >= 0) fleetDevices[idx] = { ...fleetDevices[idx], ...next };
+        else fleetDevices.unshift(next);
+        renderFleetTable();
+    }
+
+    function filteredFleet() {
+        const q = (document.getElementById("fleet-search")?.value || "").trim().toLowerCase();
+        const filter = document.getElementById("fleet-filter")?.value || "all";
+        return fleetDevices.filter((d) => {
+            if (filter === "online" && !d.online) return false;
+            if (filter === "offline" && d.online) return false;
+            if (!q) return true;
+            return String(d.device_id || "").toLowerCase().includes(q)
+                || String(d.patient_id || "").toLowerCase().includes(q);
+        });
+    }
+
+    function renderFleetTable() {
+        const body = document.getElementById("fleet-body");
+        const onlineEl = document.getElementById("fleet-online");
+        const totalEl = document.getElementById("fleet-total");
+        const pageEl = document.getElementById("fleet-page");
+        if (!body) return;
+        const rows = filteredFleet();
+        const online = fleetDevices.filter((d) => d.online).length;
+        if (onlineEl) onlineEl.textContent = `${online} online`;
+        if (totalEl) totalEl.textContent = `${fleetDevices.length} no total`;
+        const pages = Math.max(1, Math.ceil(rows.length / FLEET_PAGE_SIZE));
+        if (fleetPage >= pages) fleetPage = pages - 1;
+        if (fleetPage < 0) fleetPage = 0;
+        if (pageEl) pageEl.textContent = `${fleetPage + 1} / ${pages}`;
+        const slice = rows.slice(fleetPage * FLEET_PAGE_SIZE, (fleetPage + 1) * FLEET_PAGE_SIZE);
+        if (!slice.length) {
+            body.innerHTML = '<tr><td colspan="6" class="fleet-empty">Nenhum relógio nesta página.</td></tr>';
+            return;
+        }
+        const esc = (value) => String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        body.innerHTML = slice.map((d) => {
+            const selected = d.device_id === selectedDeviceId ? " selected" : "";
+            const when = d.last_seen ? String(d.last_seen).replace("T", " ").slice(0, 19) : "—";
+            const hr = d.heart_rate != null ? Math.round(Number(d.heart_rate)) : "—";
+            const spo2 = d.spo2 != null ? Number(d.spo2).toFixed(0) + "%" : "—";
+            return `<tr data-device="${esc(d.device_id)}" class="${selected}">
+                <td><span class="fleet-dot ${d.online ? "on" : "off"}"></span>${d.online ? "Online" : "Offline"}</td>
+                <td>${esc(d.device_id)}</td>
+                <td>${esc(d.patient_id || "—")}</td>
+                <td>${hr}</td>
+                <td>${spo2}</td>
+                <td>${esc(when)}</td>
+            </tr>`;
+        }).join("");
+        body.querySelectorAll("tr[data-device]").forEach((tr) => {
+            tr.addEventListener("click", () => {
+                selectedDeviceId = tr.getAttribute("data-device") || "";
+                const row = fleetDevices.find((d) => d.device_id === selectedDeviceId);
+                if (row) applyIngestFrame(deviceToIngest(row));
+                renderFleetTable();
+            });
+        });
+    }
+
     function renderWatchStrip(devices) {
-        const live = (devices || []).find((d) => d.online) || (devices || [])[0];
-        if (live && live.latest) {
-            renderWatchFromIngest(live.latest);
+        fleetDevices = devices || [];
+        renderFleetTable();
+        const focused = fleetDevices.find((d) => d.device_id === selectedDeviceId)
+            || fleetDevices.find((d) => d.online)
+            || fleetDevices[0];
+        if (focused) {
+            if (!selectedDeviceId) selectedDeviceId = focused.device_id;
+            applyIngestFrame(deviceToIngest(focused));
             return;
         }
         const name = document.getElementById("watch-name");
         const sub = document.getElementById("watch-sub");
         const card = document.getElementById("card-watch");
         if (name) name.textContent = "Nenhum relógio no painel";
-        if (sub) sub.textContent = apiKey
-            ? "Aguardando ingestão do companion VE30…"
-            : "Informe a API key no canto superior para ver o relógio.";
+        if (sub) sub.textContent = "Aguardando ingestão dos apps companion…";
         if (card) card.classList.remove("online");
     }
 
@@ -449,16 +556,13 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         try {
-            const res = await fetch(`${API_URL}/api/v1/wearables/devices`, {
+            const res = await fetch(`${API_URL}/api/v1/wearables/devices?limit=500`, {
                 headers: { "X-API-Key": apiKey },
                 cache: "no-store"
             });
             if (!res.ok) return;
             const data = await res.json();
-            const devices = data.devices || [];
-            renderWatchStrip(devices);
-            const live = devices.find((d) => d.online && d.latest) || devices.find((d) => d.latest);
-            if (live && live.latest) applyIngestFrame(live.latest);
+            renderWatchStrip(data.devices || []);
         } catch (err) {
             /* o painel continua com o último estado conhecido */
         }
@@ -468,7 +572,26 @@ document.addEventListener("DOMContentLoaded", () => {
         if (devicePollTimer) clearInterval(devicePollTimer);
         pollDevices();
         if (!apiKey) return;
-        devicePollTimer = setInterval(pollDevices, 3000);
+        devicePollTimer = setInterval(pollDevices, 2000);
+    }
+
+    async function bootstrapDashboard() {
+        try {
+            const res = await fetch(`${API_URL}/api/v1/ops/dashboard-bootstrap`, { cache: "no-store" });
+            if (res.ok) {
+                const cfg = await res.json();
+                if (cfg.api_key) {
+                    apiKey = cfg.api_key;
+                    localStorage.setItem("api_key", apiKey);
+                    const display = document.getElementById("api-key-display");
+                    if (display) display.value = apiKey;
+                }
+            }
+        } catch (err) {
+            /* segue com localStorage se o bootstrap falhar */
+        }
+        connectWebSocket();
+        startDevicePoll();
     }
 
     function handleTelemetryFrame(frame) {
@@ -711,23 +834,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const apiKeyDisplay = document.getElementById("api-key-display");
     const copyFeedback = document.getElementById("copy-feedback");
     if (apiKeyDisplay && apiKey) apiKeyDisplay.value = apiKey;
-    const dashKeyInput = document.getElementById("dash-api-key");
-    const btnSaveKey = document.getElementById("btn-save-key");
-    if (dashKeyInput && apiKey) dashKeyInput.value = apiKey;
-    if (btnSaveKey && dashKeyInput) {
-        const persistKey = () => {
-            apiKey = (dashKeyInput.value || "").trim();
-            if (apiKey) localStorage.setItem("api_key", apiKey);
-            else localStorage.removeItem("api_key");
-            if (apiKeyDisplay) apiKeyDisplay.value = apiKey;
-            connectWebSocket();
-            startDevicePoll();
-        };
-        btnSaveKey.addEventListener("click", persistKey);
-        dashKeyInput.addEventListener("keydown", (ev) => {
-            if (ev.key === "Enter") persistKey();
-        });
-    }
+    const fleetSearch = document.getElementById("fleet-search");
+    const fleetFilter = document.getElementById("fleet-filter");
+    const fleetPrev = document.getElementById("fleet-prev");
+    const fleetNext = document.getElementById("fleet-next");
+    if (fleetSearch) fleetSearch.addEventListener("input", () => { fleetPage = 0; renderFleetTable(); });
+    if (fleetFilter) fleetFilter.addEventListener("change", () => { fleetPage = 0; renderFleetTable(); });
+    if (fleetPrev) fleetPrev.addEventListener("click", () => { fleetPage -= 1; renderFleetTable(); });
+    if (fleetNext) fleetNext.addEventListener("click", () => { fleetPage += 1; renderFleetTable(); });
 
     if (btnCopyKey && apiKeyDisplay) {
         btnCopyKey.addEventListener("click", () => {
@@ -1061,8 +1175,6 @@ console.log(data);`
     const initialTab = urlParams.get("tab");
     if (initialTab) window.switchTab(initialTab);
 
-    // Conectar ao WebSocket na inicialização
-    connectWebSocket();
-    startDevicePoll();
+    bootstrapDashboard();
 });
 
