@@ -192,12 +192,13 @@
     }
 
     function renderBudget(data) {
-        const weekSpend = data.kpis.spent_today_brl;
-        const cap = data.kpis.credits_today_brl || data.meta.weekly_credit_brl;
+        const ultra = data.kpis.gemini_ultra_brl || 0;
+        const weekSpend = Math.max(0, (data.kpis.spent_today_brl || 0) - ultra);
+        const cap = data.kpis.cloud_from_today_credit_brl || data.meta.weekly_credit_brl;
         const pct = Math.min(100, (weekSpend / cap) * 100);
         $("gcp-budget-name").textContent = data.meta.budget_name;
-        $("gcp-budget-amount").textContent = `${BRL.format(weekSpend)} de ${BRL.format(cap)}`;
-        $("gcp-budget-pct").textContent = `${pct.toFixed(1)}% do orçamento da semana corrente`;
+        $("gcp-budget-amount").textContent = `${BRL.format(weekSpend)} de ${BRL.format(cap)} em nuvem/tokens · Gemini Ultra ${BRL.format(ultra)} (pago)`;
+        $("gcp-budget-pct").textContent = `${pct.toFixed(1)}% da parcela de nuvem desta semana`;
         const bar = $("gcp-budget-fill");
         bar.style.width = pct + "%";
         $("gcp-budget-bar").classList.toggle("over", pct >= 100);

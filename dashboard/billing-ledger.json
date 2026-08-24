@@ -1,7 +1,7 @@
 {
   "meta": {
     "simulation": true,
-    "disclaimer": "Orçamento de nuvem/tokens: somente PIX Next2U Saúde de 03/08 R$ 4.780, 10/08 R$ 2.000, 17/08 R$ 4.000 e 24/08 R$ 4.800. Demais PIX Next2U não entram neste orçamento. Simulação operacional — não é fatura Google.",
+    "disclaimer": "Orçamento: PIX Next2U Saúde 03/08 R$ 4.780, 10/08 R$ 2.000, 17/08 R$ 4.000 e 24/08 R$ 4.800 (dos quais R$ 800 pagam a assinatura Gemini Ultra e R$ 4.000 vão para nuvem/tokens). Demais PIX Next2U não entram neste orçamento. Simulação operacional — não é fatura Google.",
     "as_of": "2026-08-24",
     "timezone": "America/Sao_Paulo",
     "currency": "BRL",
@@ -22,12 +22,14 @@
     "credits_scheduled_brl": 0.0,
     "credits_prior_brl": 10780.0,
     "credits_today_brl": 4800.0,
-    "spent_to_date_brl": 11222.38,
+    "spent_to_date_brl": 12022.38,
     "spent_last_3_weeks_brl": 10780.0,
-    "spent_today_brl": 442.38,
-    "balance_brl": 4357.62,
-    "forecast_week_brl": 3096.66,
-    "mtd_brl": 11222.38
+    "spent_today_brl": 1242.38,
+    "gemini_ultra_brl": 800.0,
+    "cloud_from_today_credit_brl": 4000.0,
+    "balance_brl": 3557.62,
+    "forecast_week_brl": 8696.66,
+    "mtd_brl": 12022.38
   },
   "credits": [
     {
@@ -70,7 +72,11 @@
       "status": "posted",
       "source": "titular_2026-08-24",
       "document": "PIX-20260824-4800",
-      "description": "PIX Next2U Saúde Ltda — processamento e tokens (R$ 4.800,00). Não constava no extrato C6 de 12:38.",
+      "description": "PIX Next2U Saúde Ltda — R$ 4.800,00 (R$ 4.000 nuvem/tokens + R$ 800 assinatura Gemini Ultra). Não constava no extrato C6 de 12:38.",
+      "allocation": {
+        "cloud_tokens_brl": 4000.0,
+        "gemini_ultra_brl": 800.0
+      },
       "posted_at": "2026-08-24T10:15:00-03:00",
       "kind": "cloud_budget"
     }
@@ -3546,7 +3552,7 @@
     },
     {
       "date": "2026-08-24",
-      "total_brl": 442.38,
+      "total_brl": 1242.38,
       "items": [
         {
           "service": "Cloud Run",
@@ -3701,6 +3707,17 @@
           "unit_price_usd": 0.5,
           "cost_brl": 4.3569,
           "color": "#FF6D01"
+        },
+        {
+          "service": "Google One",
+          "sku": "Gemini Ultra subscription (monthly)",
+          "sku_id": "G1U8-ULTRA-001A",
+          "sku_key": "gem_ultra",
+          "usage": 1.0,
+          "unit": "month",
+          "unit_price_usd": 147.601476,
+          "cost_brl": 800.0,
+          "color": "#9334E6"
         }
       ],
       "events": [
@@ -3711,6 +3728,10 @@
         {
           "kind": "database",
           "title": "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest"
+        },
+        {
+          "kind": "subscription",
+          "title": "Assinatura Gemini Ultra (R$ 800 dos R$ 4.800)"
         }
       ]
     }
@@ -3720,6 +3741,11 @@
       "service": "Vertex AI",
       "cost_brl": 10847.28,
       "color": "#EA4335"
+    },
+    {
+      "service": "Google One",
+      "cost_brl": 800.0,
+      "color": "#9334E6"
     },
     {
       "service": "Cloud Run",
@@ -3788,6 +3814,15 @@
       "usage": 115.6,
       "cost_brl": 943.35,
       "color": "#EA4335"
+    },
+    {
+      "service": "Google One",
+      "sku": "Gemini Ultra subscription (monthly)",
+      "sku_id": "G1U8-ULTRA-001A",
+      "unit": "month",
+      "usage": 1.0,
+      "cost_brl": 800.0,
+      "color": "#9334E6"
     },
     {
       "service": "Cloud Run",
@@ -3940,9 +3975,9 @@
       "period_end": "2026-08-30",
       "credit_brl": 4800.0,
       "payer": "NEXT2U SAUDE LTDA",
-      "subtotal_brl": 442.38,
+      "subtotal_brl": 1242.38,
       "iss_brl": 0.0,
-      "total_brl": 442.38,
+      "total_brl": 1242.38,
       "currency": "BRL",
       "document_type": "Draft invoice"
     }
@@ -4012,6 +4047,11 @@
       "date": "2026-08-24",
       "kind": "database",
       "title": "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest"
+    },
+    {
+      "date": "2026-08-24",
+      "kind": "subscription",
+      "title": "Assinatura Gemini Ultra (R$ 800 dos R$ 4.800)"
     }
   ]
 }

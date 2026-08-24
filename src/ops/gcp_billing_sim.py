@@ -61,9 +61,16 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
         "status": "posted",
         "source": "titular_2026-08-24",
         "document": "PIX-20260824-4800",
-        "description": "PIX Next2U Saúde Ltda — processamento e tokens (R$ 4.800,00). Não constava no extrato C6 de 12:38.",
+        "description": (
+            "PIX Next2U Saúde Ltda — R$ 4.800,00 (R$ 4.000 nuvem/tokens + "
+            "R$ 800 assinatura Gemini Ultra). Não constava no extrato C6 de 12:38."
+        ),
+        "allocation": {"cloud_tokens_brl": 4000.00, "gemini_ultra_brl": 800.00},
     },
 )
+
+GEMINI_ULTRA_BRL = 800.00
+GEMINI_ULTRA_DATE = date(2026, 8, 24)
 
 BILLING_ACCOUNT_ID = "01A37F-2C9E14-8B03D1"
 BILLING_ACCOUNT_NAME = "My Billing Account"
@@ -104,6 +111,15 @@ SKUS: Dict[str, Sku] = {
     "build": Sku("build", "Cloud Build", "e2-standard-2 build minutes", "2E27-4F75-95CD", "minutes", 0.0032, "#00ACC1"),
     "ar": Sku("ar", "Artifact Registry", "Storage (us-central1)", "6F81-5844-456A", "GiB-month", 0.100, "#5F6368"),
     "log": Sku("log", "Cloud Logging", "Log storage volume", "58CD-A3F1-0B22", "GiB", 0.50, "#FF6D01"),
+    "gem_ultra": Sku(
+        "gem_ultra",
+        "Google One",
+        "Gemini Ultra subscription (monthly)",
+        "G1U8-ULTRA-001A",
+        "month",
+        round(GEMINI_ULTRA_BRL / FX_USD_BRL, 6),
+        "#9334E6",
+    ),
 }
 
 
@@ -122,6 +138,7 @@ ENGINEERING_EVENTS: Tuple[Tuple[str, str, str, Dict[str, float]], ...] = (
     ("2026-08-22", "platform", "Companion VE30 Veepoo SDK", {"run_req": 1.5, "log": 1.2}),
     ("2026-08-24", "platform", "Redeploy Cloud Run (CSP + app.js)", {"build": 5.5, "run_cpu": 1.7, "ar": 1.4, "log": 1.6}),
     ("2026-08-24", "database", "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest", {"bq_scan": 2.8, "gem_in": 2.4, "gem_out": 2.1, "run_req": 1.3}),
+    ("2026-08-24", "subscription", "Assinatura Gemini Ultra (R$ 800 dos R$ 4.800)", {}),
 )
 
 
@@ -151,6 +168,7 @@ def _baseline_usage(day: date) -> Dict[str, float]:
         "build": jitter("build", 2.0, 8.0) if weekday else jitter("build", 0.2, 1.5),
         "ar": 6.2 / 30.0,
         "log": jitter("log", 0.35, 0.95),
+        "gem_ultra": 0.0,
     }
 
 
@@ -264,6 +282,29 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
         if date.fromisoformat(d["date"]) > invested_end:
             d["total_brl"] = round(sum(it["cost_brl"] for it in d["items"]), 2)
 
+    ultra_sku = SKUS["gem_ultra"]
+    for d in raw_days:
+        if d["date"] != GEMINI_ULTRA_DATE.isoformat():
+            continue
+        d["items"].append({
+            "service": ultra_sku.service,
+            "sku": ultra_sku.description,
+            "sku_id": ultra_sku.sku_id,
+            "sku_key": ultra_sku.key,
+            "usage": 1.0,
+            "unit": ultra_sku.unit,
+            "unit_price_usd": ultra_sku.unit_price_usd,
+            "cost_brl": GEMINI_ULTRA_BRL,
+            "color": ultra_sku.color,
+        })
+        d["total_brl"] = round(d["total_brl"] + GEMINI_ULTRA_BRL, 2)
+        titles = {e["title"] for e in d["events"]}
+        if "Assinatura Gemini Ultra (R$ 800 dos R$ 4.800)" not in titles:
+            d["events"].append({
+                "kind": "subscription",
+                "title": "Assinatura Gemini Ultra (R$ 800 dos R$ 4.800)",
+            })
+
     credits = []
     for c in budget_credits:
         day = date.fromisoformat(c["date"])
@@ -289,8 +330,9 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
         "meta": {
             "simulation": True,
             "disclaimer": (
-                "Orçamento de nuvem/tokens: somente PIX Next2U Saúde de 03/08 R$ 4.780, "
-                "10/08 R$ 2.000, 17/08 R$ 4.000 e 24/08 R$ 4.800. "
+                "Orçamento: PIX Next2U Saúde 03/08 R$ 4.780, 10/08 R$ 2.000, "
+                "17/08 R$ 4.000 e 24/08 R$ 4.800 (dos quais R$ 800 pagam a "
+                "assinatura Gemini Ultra e R$ 4.000 vão para nuvem/tokens). "
                 "Demais PIX Next2U não entram neste orçamento. "
                 "Simulação operacional — não é fatura Google."
             ),
@@ -317,6 +359,8 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             "spent_to_date_brl": spent_to_date,
             "spent_last_3_weeks_brl": spent_invested,
             "spent_today_brl": spent_today,
+            "gemini_ultra_brl": GEMINI_ULTRA_BRL if today >= GEMINI_ULTRA_DATE else 0.0,
+            "cloud_from_today_credit_brl": 4000.00 if today >= GEMINI_ULTRA_DATE else 0.0,
             "balance_brl": balance,
             "forecast_week_brl": round(
                 (spent_today / max(today.weekday() + 1, 1)) * 7, 2
@@ -344,6 +388,7 @@ SERVICE_COLOR = {
     "Cloud Build": "#00ACC1",
     "Cloud Logging": "#FF6D01",
     "Artifact Registry": "#5F6368",
+    "Google One": "#9334E6",
 }
 
 

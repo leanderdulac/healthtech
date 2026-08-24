@@ -23,14 +23,20 @@ def test_prior_weeks_consume_exact_pix_total():
 
 def test_today_4800_covers_morning_spend():
     ledger = build_ledger(as_of=date(2026, 8, 24))
-    assert ledger["kpis"]["spent_today_brl"] > 0
+    assert ledger["kpis"]["spent_today_brl"] > 800
+    assert ledger["kpis"]["gemini_ultra_brl"] == 800
+    assert ledger["kpis"]["cloud_from_today_credit_brl"] == 4000
     assert ledger["kpis"]["balance_brl"] == round(
         15580 - ledger["kpis"]["spent_to_date_brl"], 2
     )
     assert ledger["kpis"]["balance_brl"] > 0
     today_credit = [c for c in ledger["credits"] if c["date"] == "2026-08-24"]
     assert today_credit[0]["amount_brl"] == 4800
-    assert today_credit[0]["payer"] == "NEXT2U SAUDE LTDA"
+    assert today_credit[0]["allocation"]["gemini_ultra_brl"] == 800
+    today = next(d for d in ledger["daily"] if d["date"] == "2026-08-24")
+    ultra = next(i for i in today["items"] if i["sku_key"] == "gem_ultra")
+    assert ultra["cost_brl"] == 800
+    assert ultra["service"] == "Google One"
 
 
 def test_skus_match_real_project_services():

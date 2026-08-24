@@ -5,7 +5,7 @@
     {"date": "2026-08-03", "amount_brl": 4780.00, "payer": "NEXT2U SAUDE LTDA", "on_statement": true},
     {"date": "2026-08-10", "amount_brl": 2000.00, "payer": "NEXT2U SAUDE LTDA", "on_statement": true},
     {"date": "2026-08-17", "amount_brl": 4000.00, "payer": "NEXT2U SAUDE LTDA", "on_statement": true},
-    {"date": "2026-08-24", "amount_brl": 4800.00, "payer": "NEXT2U SAUDE LTDA", "on_statement": false, "note": "Informado pelo titular; não constava no export das 12:38. O valor mais próximo no extrato é R$ 4.780 em 03/08."}
+    {"date": "2026-08-24", "amount_brl": 4800.00, "payer": "NEXT2U SAUDE LTDA", "on_statement": false, "allocation": {"cloud_tokens_brl": 4000.00, "gemini_ultra_brl": 800.00}, "note": "Informado pelo titular; R$ 800 para assinatura Gemini Ultra e R$ 4.000 para nuvem/tokens."}
   ],
   "excluded_from_cloud_budget": [
     {"date": "2026-07-21", "amount_brl": 11500.00, "payer": "NEXT2U HEALTHCARE"},
