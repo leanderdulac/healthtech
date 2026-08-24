@@ -30,6 +30,8 @@ _devices: Dict[str, Dict[str, Any]] = {}
 _dirty = False
 _last_flush = 0.0
 _loaded = False
+_last_load = 0.0
+RELOAD_EVERY_SECONDS = 4.0
 
 
 def _now() -> datetime:
@@ -74,9 +76,10 @@ def _gcs_parts() -> Tuple[Optional[str], str]:
     return bucket or None, GCS_OBJECT
 
 
-def _load_unlocked() -> None:
-    global _loaded
-    if _loaded:
+def _load_unlocked(force: bool = False) -> None:
+    global _loaded, _last_load
+    now = time.time()
+    if _loaded and not force and now - _last_load < RELOAD_EVERY_SECONDS:
         return
     payload = None
     bucket_name, object_name = _gcs_parts()
@@ -107,8 +110,14 @@ def _load_unlocked() -> None:
         device_id = str(row.get("device_id") or "")
         if not device_id:
             continue
-        _devices[device_id] = row
+        prev = _devices.get(device_id)
+        if prev is None or str(row.get("last_seen") or "") >= str(prev.get("last_seen") or ""):
+            if prev and prev.get("latest") and not row.get("latest"):
+                row = dict(row)
+                row["latest"] = prev["latest"]
+            _devices[device_id] = row
     _loaded = True
+    _last_load = now
 
 
 def _evict_unlocked() -> None:
