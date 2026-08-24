@@ -27,7 +27,7 @@ def fetch_secure_devices(timeout: float = 8.0) -> List[Dict[str, Any]]:
     if not base or not key:
         return list(_state["cache"])
     req = urllib.request.Request(
-        f"{base}/api/v1/wearables/devices",
+        f"{base}/api/v1/wearables/devices?limit=500",
         headers={"X-API-Key": key, "Accept": "application/json"},
         method="GET",
     )
@@ -51,7 +51,18 @@ def new_ingest_frames(devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         device_id = str(row.get("device_id") or "")
         ts = str(row.get("last_seen") or "")
         latest = row.get("latest")
-        if not device_id or not isinstance(latest, dict):
+        if not isinstance(latest, dict):
+            latest = {
+                "device_id": device_id,
+                "patient_id": row.get("patient_id"),
+                "timestamp": ts,
+                "raw_telemetry": {
+                    "heart_rate_bpm": row.get("heart_rate"),
+                    "spo2_percent": row.get("spo2"),
+                },
+                "cleaned_telemetry": {"heart_rate_clean": row.get("heart_rate")},
+            }
+        if not device_id:
             continue
         if last_seen.get(device_id) == ts:
             continue

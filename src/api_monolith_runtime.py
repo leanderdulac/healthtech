@@ -524,6 +524,12 @@ def ingest_wearable_reading(
     if req.patient_id not in patient_history:
         patient_history[req.patient_id] = []
     patient_history[req.patient_id].append(processed_frame)
+    try:
+        from src.ops.device_registry import upsert_frame
+
+        upsert_frame(processed_frame)
+    except Exception:
+        pass
     if len(patient_history[req.patient_id]) > 100:
         patient_history[req.patient_id].pop(0)
 
@@ -577,18 +583,40 @@ def batch_ingest_wearables(
     }
 
 
+@app.get("/api/v1/ops/dashboard-bootstrap")
+def dashboard_bootstrap():
+    """Injeta a chave de leitura no dashboard (não pede colar no UI)."""
+    key = (os.environ.get("READ_API_KEY") or os.environ.get("API_KEY") or "").strip()
+    return {
+        "ok": True,
+        "api_key": key,
+        "fleet_poll_ms": 2000,
+        "page_size": 50,
+        "max_devices": 500,
+    }
+
+
 @app.get("/api/v1/wearables/devices")
-def list_wearable_devices(_api_key: str = Depends(require_scope("wearables:read"))):
-    """Relógios vistos neste processo e, se configurado, na API segura."""
-    from src.ops.live_devices import devices_from_patient_history, merge_device_lists
+def list_wearable_devices(
+    q: str = Query(default=""),
+    online: Optional[bool] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=10000),
+    include_latest: bool = Query(default=False),
+    _api_key: str = Depends(require_scope("wearables:read")),
+):
+    """Frota de relógios vista pelo dashboard (compacta, até 500 por página)."""
+    from src.ops.device_registry import list_devices as fleet_list, merge_remote_rows
     from src.ops.live_watch_bridge import cached_devices
 
-    return {
-        "devices": merge_device_lists(
-            devices_from_patient_history(patient_history),
-            cached_devices(),
-        )
-    }
+    merge_remote_rows(cached_devices())
+    return fleet_list(
+        q=q,
+        online=online,
+        limit=limit,
+        offset=offset,
+        include_latest=include_latest,
+    )
 
 
 @app.get("/api/v1/wearables/patient/{patient_id}/latest")

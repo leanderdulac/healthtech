@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # Rate limiting (slowapi)
     rate_limit_default: str = "120/minute"
-    rate_limit_ingest: str = "60/minute"
+    rate_limit_ingest: str = "180/minute"
     rate_limit_batch: str = "30/minute"
     rate_limit_admin: str = "10/minute"
 

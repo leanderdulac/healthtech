@@ -32,6 +32,8 @@ Thumbs.db
 # Health Aggregator — banco local
 health-aggregator/data/
 
+data/ops/fleet_devices.json
+
 # Dados regeneráveis em runtime (não versionar)
 data/lakehouse/
 data/bigquery_simulation/

@@ -467,6 +467,12 @@ def ingest_wearable_reading(
     patient_telemetry_history[req.patient_id].append(response_payload)
     if len(patient_telemetry_history[req.patient_id]) > 500:
         patient_telemetry_history[req.patient_id].pop(0)
+    try:
+        from src.ops.device_registry import upsert_frame
+
+        upsert_frame(response_payload)
+    except Exception:
+        pass
 
     return response_payload
 
@@ -514,12 +520,32 @@ def ingest_wearable_batch(
     }
 
 
-@app.get("/api/v1/wearables/devices")
-def list_wearable_devices(_api_key: str = Depends(require_scope("wearables:read"))):
-    """Relógios/wearables com última leitura neste processo."""
-    from src.ops.live_devices import devices_from_patient_history
+@app.get("/api/v1/ops/dashboard-bootstrap")
+def dashboard_bootstrap():
+    """Injeta a chave de leitura no dashboard."""
+    key = (os.environ.get("READ_API_KEY") or os.environ.get("API_KEY") or "").strip()
+    return {"ok": True, "api_key": key, "fleet_poll_ms": 2000, "page_size": 50, "max_devices": 500}
 
-    return {"devices": devices_from_patient_history(patient_telemetry_history)}
+
+@app.get("/api/v1/wearables/devices")
+def list_wearable_devices(
+    q: str = Query(default=""),
+    online: Optional[bool] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=10000),
+    include_latest: bool = Query(default=False),
+    _api_key: str = Depends(require_scope("wearables:read")),
+):
+    """Frota de relógios (payload compacto)."""
+    from src.ops.device_registry import list_devices as fleet_list
+
+    return fleet_list(
+        q=q,
+        online=online,
+        limit=limit,
+        offset=offset,
+        include_latest=include_latest,
+    )
 
 
 @app.get("/api/v1/wearables/patient/{patient_id}/latest")

@@ -9,7 +9,7 @@
     <!-- Icones Material -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
-    <link rel="stylesheet" href="style.css?v=20260824h">
+    <link rel="stylesheet" href="style.css?v=20260824i">
     <link rel="stylesheet" href="gcp-billing.css?v=20260824g">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -43,8 +43,6 @@
             </nav>
 
             <div class="header-session">
-                <input type="password" id="dash-api-key" placeholder="API key" autocomplete="off" spellcheck="false">
-                <button type="button" class="btn btn-primary" id="btn-save-key">Entrar</button>
                 <div class="connection-status" id="ws-status">
                     <span class="status-indicator red"></span>
                     <span class="status-text">Desconectado</span>
@@ -109,14 +107,54 @@
 
                 <!-- DASHBOARD GRID -->
                 <main class="dashboard-grid">
-                    <section class="watch-strip" id="watch-strip">
+                    <section class="fleet-panel card" id="fleet-panel">
+                        <div class="fleet-header">
+                            <div>
+                                <h2><span class="material-icons-round">watch</span> Frota de relógios</h2>
+                                <p class="fleet-desc">Pronto para centenas de VE30 e apps companion enviando telemetria.</p>
+                            </div>
+                            <div class="fleet-stats">
+                                <span id="fleet-online">0 online</span>
+                                <span id="fleet-total">0 no total</span>
+                            </div>
+                        </div>
+                        <div class="fleet-toolbar">
+                            <input type="search" id="fleet-search" placeholder="Buscar device ou paciente…">
+                            <select id="fleet-filter">
+                                <option value="all">Todos</option>
+                                <option value="online">Online</option>
+                                <option value="offline">Offline</option>
+                            </select>
+                        </div>
+                        <div class="fleet-table-wrap">
+                            <table class="fleet-table">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Relógio</th>
+                                        <th>Paciente / app</th>
+                                        <th>BPM</th>
+                                        <th>SpO₂</th>
+                                        <th>Última leitura</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fleet-body">
+                                    <tr><td colspan="6" class="fleet-empty">Aguardando relógios…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="fleet-pager">
+                            <button type="button" class="btn btn-secondary" id="fleet-prev">Anterior</button>
+                            <span id="fleet-page">1 / 1</span>
+                            <button type="button" class="btn btn-secondary" id="fleet-next">Próxima</button>
+                        </div>
                         <div class="card watch-card" id="card-watch">
                             <div class="metric-header">
-                                <span class="metric-title">Relógio VE30</span>
+                                <span class="metric-title">Relógio em foco</span>
                                 <span class="material-icons-round icon-blue">watch</span>
                             </div>
                             <div class="watch-name" id="watch-name">Nenhum relógio no painel</div>
-                            <div class="metric-sub" id="watch-sub">Informe a API key e mantenha o companion enviando telemetria.</div>
+                            <div class="metric-sub" id="watch-sub">Os companions autenticam com a chave de ingestão; o painel já entra com a chave de leitura.</div>
                         </div>
                     </section>
                     <!-- SINAIS VITAIS -->
@@ -758,7 +796,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
     </div>
 
     <!-- Script da Aplicação -->
-    <script src="app.js?v=20260824h"></script>
+    <script src="app.js?v=20260824i"></script>
     <script src="gcp-billing.js?v=20260824g"></script
 </body>
 </html>
