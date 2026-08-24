@@ -63,6 +63,16 @@ def test_wearable_get_latest_and_history():
     assert len(hist_data["records"]) == 2
 
 
+def test_live_watch_bridge_module_imports():
+    from src.ops.live_watch_bridge import cached_devices, new_ingest_frames, poll_once
+
+    assert cached_devices() == []
+    assert new_ingest_frames([]) == []
+    devices, frames = poll_once()
+    assert devices == []
+    assert frames == []
+
+
 def test_live_devices_summary_marks_recent_watch_online():
     from datetime import datetime, timezone
 
