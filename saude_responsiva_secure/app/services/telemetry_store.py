@@ -25,8 +25,10 @@ def append_reading(patient_id: str, frame: Dict[str, Any]) -> None:
         from src.ops.device_registry import upsert_frame
 
         upsert_frame(frame)
-    except Exception:
-        pass
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning("Falha ao registrar relógio na frota: %s", exc)
 
 
 def get_latest(patient_id: str) -> Optional[Dict[str, Any]]:
