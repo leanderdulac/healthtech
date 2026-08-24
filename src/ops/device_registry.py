@@ -16,12 +16,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.ops.live_devices import ONLINE_WITHIN_SECONDS, summarize_frame
+from src.ops.live_devices import summarize_frame
+from src.ops.timestamps import is_online, parse_timestamp
 
 logger = logging.getLogger(__name__)
 
 MAX_DEVICES = 5000
-FLUSH_EVERY_SECONDS = 8.0
+FLUSH_EVERY_SECONDS = 2.0
 LOCAL_FLEET_PATH = Path("data/ops/fleet_devices.json")
 GCS_OBJECT = "ops/fleet/devices.json"
 
@@ -43,7 +44,11 @@ def _compact(summary: Dict[str, Any]) -> Dict[str, Any]:
         "device_id": summary.get("device_id") or "unknown",
         "patient_id": summary.get("patient_id"),
         "last_seen": summary.get("last_seen"),
+        "received_at": summary.get("received_at"),
+        "last_seen_local": summary.get("last_seen_local"),
+        "device_time_local": summary.get("device_time_local"),
         "online": bool(summary.get("online")),
+        "age_seconds": summary.get("age_seconds"),
         "heart_rate": summary.get("heart_rate"),
         "spo2": summary.get("spo2"),
     }
@@ -51,19 +56,9 @@ def _compact(summary: Dict[str, Any]) -> Dict[str, Any]:
 
 def _refresh_online(row: Dict[str, Any], now: Optional[datetime] = None) -> Dict[str, Any]:
     now = now or _now()
-    ts = row.get("last_seen")
-    online = False
-    if isinstance(ts, str) and ts:
-        try:
-            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            age = (now - dt).total_seconds()
-            online = 0 <= age <= ONLINE_WITHIN_SECONDS
-        except ValueError:
-            online = False
+    live_ref = row.get("received_at") or row.get("last_seen")
     out = dict(row)
-    out["online"] = online
+    out["online"] = is_online(live_ref, now=now)
     return out
 
 
@@ -177,7 +172,9 @@ def upsert_frame(frame: Dict[str, Any]) -> Dict[str, Any]:
     with _lock:
         _load_unlocked()
         prev = _devices.get(device_id) or {}
-        if str(prev.get("last_seen") or "") > str(compact.get("last_seen") or ""):
+        prev_rx = parse_timestamp(prev.get("received_at") or prev.get("last_seen"))
+        new_rx = parse_timestamp(compact.get("received_at") or compact.get("last_seen"))
+        if prev_rx and new_rx and new_rx < prev_rx:
             return _compact(_refresh_online(prev))
         _devices[device_id] = compact
         _evict_unlocked()
@@ -260,7 +257,9 @@ def merge_remote_rows(rows: List[Dict[str, Any]]) -> None:
                 continue
             incoming = dict(row)
             prev = _devices.get(device_id)
-            if prev is None or str(incoming.get("last_seen") or "") >= str(prev.get("last_seen") or ""):
+            incoming_rx = parse_timestamp(incoming.get("received_at") or incoming.get("last_seen"))
+            prev_rx = parse_timestamp(prev.get("received_at") or prev.get("last_seen")) if prev else None
+            if prev is None or incoming_rx is None or prev_rx is None or incoming_rx >= prev_rx:
                 if prev and prev.get("latest") and not incoming.get("latest"):
                     incoming["latest"] = prev["latest"]
                 _devices[device_id] = incoming

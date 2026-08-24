@@ -49,19 +49,25 @@ def new_ingest_frames(devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     last_seen: Dict[str, str] = _state["last_seen"]
     for row in devices:
         device_id = str(row.get("device_id") or "")
-        ts = str(row.get("last_seen") or "")
+        ts = str(row.get("received_at") or row.get("last_seen") or "")
         latest = row.get("latest")
         if not isinstance(latest, dict):
             latest = {
                 "device_id": device_id,
                 "patient_id": row.get("patient_id"),
-                "timestamp": ts,
+                "timestamp": row.get("last_seen") or ts,
+                "received_at": row.get("received_at") or ts,
+                "last_seen_local": row.get("last_seen_local"),
+                "device_time_local": row.get("device_time_local"),
                 "raw_telemetry": {
                     "heart_rate_bpm": row.get("heart_rate"),
                     "spo2_percent": row.get("spo2"),
                 },
                 "cleaned_telemetry": {"heart_rate_clean": row.get("heart_rate")},
             }
+        else:
+            latest.setdefault("received_at", row.get("received_at") or ts)
+            latest.setdefault("last_seen_local", row.get("last_seen_local"))
         if not device_id:
             continue
         if last_seen.get(device_id) == ts:

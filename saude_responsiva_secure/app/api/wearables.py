@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -18,8 +17,9 @@ router = APIRouter(prefix="/api/v1/wearables", tags=["wearables"])
 
 def _with_timestamp(payload: WearableTelemetryRequest) -> Dict[str, Any]:
     data = payload.model_dump()
-    if not data.get("timestamp"):
-        data["timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    from src.ops.timestamps import stamp_ingest
+
+    data.update(stamp_ingest(data.get("timestamp")))
     return data
 
 
