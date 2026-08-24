@@ -172,6 +172,9 @@ class SearchQuery(BaseModel):
     n_results: int = 3
 
 
+
+
+
 @app.get("/api/health")
 def health_probe():
     """Probe público para orquestradores (Cloud Run / k8s)."""
