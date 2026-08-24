@@ -34,7 +34,11 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
         "status": "posted",
         "source": "extrato_c6",
         "document": "PIX-20260803-4780",
-        "description": "PIX Next2U Saúde Ltda — processamento e tokens (R$ 4.780,00)",
+        "description": (
+            "PIX Next2U Saúde Ltda — R$ 4.780,00 (R$ 4.000 nuvem/tokens + "
+            "R$ 780 assinatura Gemini Ultra)."
+        ),
+        "allocation": {"cloud_tokens_brl": 4000.00, "gemini_ultra_brl": 780.00},
     },
     {
         "date": "2026-08-10",
@@ -69,8 +73,10 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
     },
 )
 
-GEMINI_ULTRA_BRL = 800.00
-GEMINI_ULTRA_DATE = date(2026, 8, 24)
+GEMINI_ULTRA_CHARGES: Tuple[Tuple[date, float], ...] = (
+    (date(2026, 8, 3), 780.00),
+    (date(2026, 8, 24), 800.00),
+)
 
 BILLING_ACCOUNT_ID = "01A37F-2C9E14-8B03D1"
 BILLING_ACCOUNT_NAME = "My Billing Account"
@@ -117,7 +123,7 @@ SKUS: Dict[str, Sku] = {
         "Gemini Ultra subscription (monthly)",
         "G1U8-ULTRA-001A",
         "month",
-        round(GEMINI_ULTRA_BRL / FX_USD_BRL, 6),
+        round(800.00 / FX_USD_BRL, 6),
         "#9334E6",
     ),
 }
@@ -125,6 +131,7 @@ SKUS: Dict[str, Sku] = {
 
 # Picos alinhados ao git log / deploys reais.
 ENGINEERING_EVENTS: Tuple[Tuple[str, str, str, Dict[str, float]], ...] = (
+    ("2026-08-03", "subscription", "Assinatura Gemini Ultra (R$ 780 dos R$ 4.780)", {}),
     ("2026-08-03", "platform", "Arquitetura Do Caos à Precisão", {"run_cpu": 1.4, "build": 2.0, "log": 1.3}),
     ("2026-08-04", "platform", "BMO/VMO e signal processing", {"run_cpu": 1.2, "vtx_pred": 1.4, "gem_in": 1.5}),
     ("2026-08-05", "platform", "Cloud Run inicial, LGPD e matriz de alertas", {"build": 8.0, "run_cpu": 2.2, "ar": 1.8, "log": 2.0}),
@@ -261,10 +268,15 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             "events": notes,
         })
 
-    # Período anterior ao crédito de hoje consome exatamente os PIX Next2U já compensados.
+    # Período anterior ao crédito de hoje consome a parcela de nuvem dos PIX já compensados
+    # (Gemini Ultra é lançado à parte e não entra no fator de SKUs de compute).
     hist = [d for d in raw_days if period_start <= date.fromisoformat(d["date"]) <= invested_end]
     hist_sum = sum(d["total_brl"] for d in hist)
-    target = round(sum(c["amount_brl"] for c in prior_credits), 2)
+    prior_ultra = round(
+        sum(float((c.get("allocation") or {}).get("gemini_ultra_brl") or 0) for c in prior_credits),
+        2,
+    )
+    target = round(sum(c["amount_brl"] for c in prior_credits) - prior_ultra, 2)
     factor = (target / hist_sum) if hist_sum else 1.0
     for d in hist:
         d["total_brl"] = 0.0
@@ -283,9 +295,12 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             d["total_brl"] = round(sum(it["cost_brl"] for it in d["items"]), 2)
 
     ultra_sku = SKUS["gem_ultra"]
+    ultra_by_day = {d.isoformat(): amt for d, amt in GEMINI_ULTRA_CHARGES if d <= today}
     for d in raw_days:
-        if d["date"] != GEMINI_ULTRA_DATE.isoformat():
+        amt = ultra_by_day.get(d["date"])
+        if not amt:
             continue
+        unit_price = round(amt / FX_USD_BRL, 6)
         d["items"].append({
             "service": ultra_sku.service,
             "sku": ultra_sku.description,
@@ -293,17 +308,14 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             "sku_key": ultra_sku.key,
             "usage": 1.0,
             "unit": ultra_sku.unit,
-            "unit_price_usd": ultra_sku.unit_price_usd,
-            "cost_brl": GEMINI_ULTRA_BRL,
+            "unit_price_usd": unit_price,
+            "cost_brl": amt,
             "color": ultra_sku.color,
         })
-        d["total_brl"] = round(d["total_brl"] + GEMINI_ULTRA_BRL, 2)
-        titles = {e["title"] for e in d["events"]}
-        if "Assinatura Gemini Ultra (R$ 800 dos R$ 4.800)" not in titles:
-            d["events"].append({
-                "kind": "subscription",
-                "title": "Assinatura Gemini Ultra (R$ 800 dos R$ 4.800)",
-            })
+        d["total_brl"] = round(d["total_brl"] + amt, 2)
+        title = f"Assinatura Gemini Ultra (R$ {amt:.0f})"
+        if title not in {e["title"] for e in d["events"]}:
+            d["events"].append({"kind": "subscription", "title": title})
 
     credits = []
     for c in budget_credits:
@@ -330,9 +342,9 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
         "meta": {
             "simulation": True,
             "disclaimer": (
-                "Orçamento: PIX Next2U Saúde 03/08 R$ 4.780, 10/08 R$ 2.000, "
-                "17/08 R$ 4.000 e 24/08 R$ 4.800 (dos quais R$ 800 pagam a "
-                "assinatura Gemini Ultra e R$ 4.000 vão para nuvem/tokens). "
+                "Orçamento: PIX Next2U Saúde 03/08 R$ 4.780 (R$ 780 Gemini Ultra + "
+                "R$ 4.000 nuvem), 10/08 R$ 2.000, 17/08 R$ 4.000 e 24/08 R$ 4.800 "
+                "(R$ 800 Gemini Ultra + R$ 4.000 nuvem). "
                 "Demais PIX Next2U não entram neste orçamento. "
                 "Simulação operacional — não é fatura Google."
             ),
@@ -359,8 +371,12 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             "spent_to_date_brl": spent_to_date,
             "spent_last_3_weeks_brl": spent_invested,
             "spent_today_brl": spent_today,
-            "gemini_ultra_brl": GEMINI_ULTRA_BRL if today >= GEMINI_ULTRA_DATE else 0.0,
-            "cloud_from_today_credit_brl": 4000.00 if today >= GEMINI_ULTRA_DATE else 0.0,
+            "gemini_ultra_brl": round(sum(ultra_by_day.values()), 2),
+            "gemini_ultra_today_brl": ultra_by_day.get(today.isoformat(), 0.0),
+            "cloud_from_today_credit_brl": float(
+                ((today_credits[0].get("allocation") or {}).get("cloud_tokens_brl") if today_credits else None)
+                or (today_credit if today_credits else 0.0)
+            ),
             "balance_brl": balance,
             "forecast_week_brl": round(
                 (spent_today / max(today.weekday() + 1, 1)) * 7, 2

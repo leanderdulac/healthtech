@@ -607,14 +607,14 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                             <div>
                                 <strong>PIX Next2U Saúde — orçamento de nuvem e tokens</strong>
                                 <div id="gcp-countdown">03/08 R$ 4.780 · 10/08 R$ 2.000 · 17/08 R$ 4.000 · 24/08 R$ 4.800</div>
-                                Extrato C6 (12:38) confirma 4.780 / 2.000 / 4.000. Dos R$ 4.800 de hoje, R$ 800 pagam a assinatura Gemini Ultra e R$ 4.000 vão para nuvem/tokens.
+                                Extrato C6: 03/08 R$ 4.780 (R$ 780 Ultra + R$ 4.000 nuvem), 10/08 R$ 2.000, 17/08 R$ 4.000. Hoje R$ 4.800 (R$ 800 Ultra + R$ 4.000 nuvem).
                             </div>
                         </div>
                         <div class="gcp-kpis">
                             <div class="gcp-card">
                                 <div class="label">PIX Next2U 03–17/08 (nuvem)</div>
                                 <div class="value" id="gcp-kpi-spent">—</div>
-                                <div class="hint">4.780 + 2.000 + 4.000 já consumidos</div>
+                                <div class="hint">Inclui Ultra 03/08 (R$ 780) + nuvem já queimada</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Today so far</div>
@@ -730,7 +730,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                             <div id="gcp-budget-amount">—</div>
                             <div class="gcp-budget-bar" id="gcp-budget-bar"><span id="gcp-budget-fill"></span></div>
                             <div class="hint" id="gcp-budget-pct">—</div>
-                            <div class="hint">Deste PIX: R$ 4.000 nuvem/tokens · R$ 800 Gemini Ultra. Alertas em 50% / 90% / 100% da parcela de nuvem.</div>
+                            <div class="hint">Ultra: R$ 780 em 03/08 + R$ 800 em 24/08. Nuvem desta semana: R$ 4.000 (alertas 50/90/100%).</div>
                         </div>
                         <div class="gcp-card">
                             <div class="label">August ceiling (4 Mondays)</div>
@@ -746,6 +746,6 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
 
     <!-- Script da Aplicação -->
     <script src="app.js?v=20260824b"></script>
-    <script src="gcp-billing.js?v=20260824e"></script>
+    <script src="gcp-billing.js?v=20260824f"></script>
 </body>
 </html>

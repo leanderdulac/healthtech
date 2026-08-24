@@ -24,7 +24,8 @@ def test_prior_weeks_consume_exact_pix_total():
 def test_today_4800_covers_morning_spend():
     ledger = build_ledger(as_of=date(2026, 8, 24))
     assert ledger["kpis"]["spent_today_brl"] > 800
-    assert ledger["kpis"]["gemini_ultra_brl"] == 800
+    assert ledger["kpis"]["gemini_ultra_brl"] == 1580
+    assert ledger["kpis"]["gemini_ultra_today_brl"] == 800
     assert ledger["kpis"]["cloud_from_today_credit_brl"] == 4000
     assert ledger["kpis"]["balance_brl"] == round(
         15580 - ledger["kpis"]["spent_to_date_brl"], 2
@@ -37,6 +38,18 @@ def test_today_4800_covers_morning_spend():
     ultra = next(i for i in today["items"] if i["sku_key"] == "gem_ultra")
     assert ultra["cost_brl"] == 800
     assert ultra["service"] == "Google One"
+
+
+def test_aug3_4780_includes_780_gemini_ultra():
+    ledger = build_ledger(as_of=date(2026, 8, 24))
+    credit = next(c for c in ledger["credits"] if c["date"] == "2026-08-03")
+    assert credit["allocation"]["gemini_ultra_brl"] == 780
+    assert credit["allocation"]["cloud_tokens_brl"] == 4000
+    day = next(d for d in ledger["daily"] if d["date"] == "2026-08-03")
+    ultra = next(i for i in day["items"] if i["sku_key"] == "gem_ultra")
+    assert ultra["cost_brl"] == 780
+    google_one = next(s for s in ledger["by_service"] if s["service"] == "Google One")
+    assert google_one["cost_brl"] == 1580
 
 
 def test_skus_match_real_project_services():
