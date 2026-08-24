@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gera o ledger simulado de faturamento GCP e registra eventos de engenharia."""
+"""Gera o ledger de faturamento GCP e registra eventos de engenharia."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from src.ops.gcp_billing_sim import LEDGER_DASHBOARD, WEEKLY_CREDIT_BRL, write_l
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Simulação de faturamento Google Cloud")
+    parser = argparse.ArgumentParser(description="Ledger de faturamento Google Cloud")
     parser.add_argument("--as-of", default="2026-08-24", help="Data de corte YYYY-MM-DD")
     args = parser.parse_args()
     as_of = date.fromisoformat(args.as_of)

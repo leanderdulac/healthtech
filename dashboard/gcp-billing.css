@@ -1,4 +1,4 @@
-/* Google Cloud Console — Billing (simulação HealthTech) */
+/* Google Cloud Console — Billing (HealthTech) */
 .gcp-console {
     --gcp-text: #202124;
     --gcp-muted: #5f6368;
@@ -66,17 +66,7 @@
     font-weight: 500;
 }
 
-.gcp-sim-pill {
-    font-size: 11px;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-    background: #fef7e0;
-    color: #5c4400;
-    border: 1px solid #fde293;
-    border-radius: 12px;
-    padding: 2px 8px;
-    font-weight: 500;
-}
+
 
 .gcp-subnav {
     display: flex;

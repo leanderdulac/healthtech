@@ -1,4 +1,4 @@
-/* Google Cloud Billing console (simulação HealthTech) */
+/* Google Cloud Billing console (HealthTech) */
 (function () {
     const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
     const NUM = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });

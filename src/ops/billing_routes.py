@@ -1,4 +1,4 @@
-"""Rotas REST do faturamento GCP simulado."""
+"""Rotas REST do faturamento GCP."""
 
 from __future__ import annotations
 

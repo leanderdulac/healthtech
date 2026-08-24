@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
     <link rel="stylesheet" href="style.css?v=20260824b">
-    <link rel="stylesheet" href="gcp-billing.css?v=20260824d">
+    <link rel="stylesheet" href="gcp-billing.css?v=20260824g">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -563,7 +563,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
             </div>
         </div>
 
-        <!-- VIEW: GOOGLE CLOUD BILLING (simulação) -->
+        <!-- VIEW: GOOGLE CLOUD BILLING -->
         <div id="view-billing" class="tab-content">
             <section class="gcp-console" aria-label="Google Cloud Billing">
                 <div class="gcp-topbar">
@@ -584,7 +584,6 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                         <span style="font-weight:500;font-size:15px;color:#202124">Google Cloud</span>
                     </div>
                     <h2>Billing</h2>
-                    <span class="gcp-sim-pill">Simulation</span>
                     <div class="gcp-account">
                         <span>Billing account</span>
                         <strong id="gcp-account-id">—</strong>
@@ -746,6 +745,6 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
 
     <!-- Script da Aplicação -->
     <script src="app.js?v=20260824b"></script>
-    <script src="gcp-billing.js?v=20260824f"></script>
+    <script src="gcp-billing.js?v=20260824g"></script
 </body>
 </html>
