@@ -9,7 +9,7 @@
     <!-- Icones Material -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260824">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -297,7 +297,105 @@
             </div>
         </div>
 
-        <!-- VIEW 3: DOCUMENTAÇÃO INTERATIVA E WEARABLES -->
+        <!-- VIEW 3: BIOFÍSICA HEMODINÂMICA & TRIAGEM -->
+        <div id="view-biophysics" class="tab-content">
+            <div class="biophysics-grid">
+                <div class="card card-wk4">
+                    <div class="card-header-flex">
+                        <h2><span class="material-icons-round">monitor_heart</span> Windkessel 4 Elementos</h2>
+                        <span class="badge">RK4 · Barorreflexo</span>
+                    </div>
+                    <p class="section-desc">Simula pressão aórtica P(t) e fluxo ejetado Q(t) a partir de resistência, complacência, impedância e inertância.</p>
+
+                    <div class="wk4-metrics-banner">
+                        <div class="wk4-metric-box highlight-blue">
+                            <span class="m-title">PAS</span>
+                            <span class="m-val" id="wk4-pas">-- mmHg</span>
+                        </div>
+                        <div class="wk4-metric-box">
+                            <span class="m-title">PAD</span>
+                            <span class="m-val" id="wk4-pad">-- mmHg</span>
+                        </div>
+                        <div class="wk4-metric-box">
+                            <span class="m-title">PAM</span>
+                            <span class="m-val" id="wk4-pam">-- mmHg</span>
+                        </div>
+                        <div class="wk4-metric-box">
+                            <span class="m-title">PWV</span>
+                            <span class="m-val" id="wk4-pwv">-- m/s</span>
+                        </div>
+                    </div>
+
+                    <div class="wk4-controls-grid">
+                        <div class="slider-group">
+                            <label>Rp (resistência) <strong id="lbl-rp">1.0</strong></label>
+                            <input type="range" id="slider-rp" min="0.4" max="2.4" step="0.05" value="1.0">
+                        </div>
+                        <div class="slider-group">
+                            <label>C (complacência) <strong id="lbl-c">1.2</strong></label>
+                            <input type="range" id="slider-c" min="0.4" max="2.4" step="0.05" value="1.2">
+                        </div>
+                        <div class="slider-group">
+                            <label>Zc (impedância) <strong id="lbl-zc">0.05</strong></label>
+                            <input type="range" id="slider-zc" min="0.01" max="0.12" step="0.005" value="0.05">
+                        </div>
+                        <div class="slider-group">
+                            <label>L (inertância) <strong id="lbl-l">0.005</strong></label>
+                            <input type="range" id="slider-l" min="0.001" max="0.02" step="0.001" value="0.005">
+                        </div>
+                        <div class="slider-group">
+                            <label>FC (bpm) <strong id="lbl-hr">75</strong></label>
+                            <input type="range" id="slider-hr" min="40" max="160" step="1" value="75">
+                        </div>
+                        <div class="slider-group">
+                            <label>Volume sistólico (mL) <strong id="lbl-sv">70</strong></label>
+                            <input type="range" id="slider-sv" min="40" max="120" step="1" value="70">
+                        </div>
+                    </div>
+
+                    <div class="chart-container" style="height: 280px;">
+                        <canvas id="chart-wk4"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><span class="material-icons-round">account_tree</span> Triagem — Equilíbrio de Nash</h2>
+                    <p class="section-desc">Aloca leitos de UTI e enfermaria sob restrição de capacidade. Fronteira de Pareto à direita.</p>
+                    <div class="triage-controls-row">
+                        <div class="input-control">
+                            <label>Capacidade UTI</label>
+                            <input type="number" id="inp-icu-cap" value="10" min="1">
+                        </div>
+                        <div class="input-control">
+                            <label>Capacidade enfermaria</label>
+                            <input type="number" id="inp-ward-cap" value="40" min="1">
+                        </div>
+                        <div class="input-control">
+                            <label>Demanda UTI</label>
+                            <input type="number" id="inp-icu-dem" value="14" min="0">
+                        </div>
+                        <div class="input-control">
+                            <label>Fração crítica (%)</label>
+                            <input type="number" id="inp-crit-frac" value="40" min="0" max="100">
+                        </div>
+                        <button type="button" id="btn-calc-triage" class="btn btn-primary">Calcular</button>
+                    </div>
+                    <div class="triage-result-banner">
+                        <span class="triage-status-pill" id="triage-nash-badge">Nash: aguardando cálculo</span>
+                        <p id="triage-recommendation">Ajuste os parâmetros e calcule o equilíbrio.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><span class="material-icons-round">bubble_chart</span> Fronteira de Pareto</h2>
+                    <div class="chart-container" style="height: 280px;">
+                        <canvas id="chart-pareto"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 4: DOCUMENTAÇÃO INTERATIVA E WEARABLES -->
         <div id="view-api-docs" class="tab-content">
             <div class="docs-container">
                 <!-- CABEÇALHO DA DOCUMENTAÇÃO -->
@@ -463,6 +561,6 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
     </div>
 
     <!-- Script da Aplicação -->
-    <script src="app.js"></script>
+    <script src="app.js?v=20260824"></script>
 </body>
 </html>

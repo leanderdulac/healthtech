@@ -154,6 +154,19 @@ def test_security_headers_present():
     assert headers["x-frame-options"] == "DENY"
     assert "referrer-policy" in headers
     assert "content-security-policy" in headers
+    assert "default-src 'none'" in headers["content-security-policy"]
+
+
+def test_dashboard_csp_allows_styles_and_scripts():
+    from app.security.headers import _csp_for_path
+
+    dashboard_csp = _csp_for_path("/dashboard/index.html")
+    assert "default-src 'self'" in dashboard_csp
+    assert "style-src 'self'" in dashboard_csp
+    assert "script-src 'self'" in dashboard_csp
+    assert "https://cdn.jsdelivr.net" in dashboard_csp
+    assert "https://fonts.googleapis.com" in dashboard_csp
+    assert "default-src 'none'" in _csp_for_path("/api/health")
 
 
 def test_x_request_id_header_injected():

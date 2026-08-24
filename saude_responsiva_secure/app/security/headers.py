@@ -6,6 +6,31 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+# API JSON: bloqueia scripts/estilos. Dashboard: self + Chart.js + Google Fonts.
+_API_CSP = (
+    "default-src 'none'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'none'; "
+    "form-action 'self'"
+)
+_DASHBOARD_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data: https:; "
+    "connect-src 'self' wss: ws: https:; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
+
+def _csp_for_path(path: str) -> str:
+    if path.startswith("/dashboard") or path in {"/", "/index.html"}:
+        return _DASHBOARD_CSP
+    return _API_CSP
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
@@ -21,14 +46,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = (
             "geolocation=(), microphone=(), camera=()"
         )
-
-        # CSP enxuta para API JSON (sem scripts de terceiros)
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; "
-            "frame-ancestors 'none'; "
-            "base-uri 'none'; "
-            "form-action 'self'"
-        )
+        response.headers["Content-Security-Policy"] = _csp_for_path(request.url.path)
 
         # Não vazar stack / tech
         if "Server" in response.headers:
