@@ -25,6 +25,9 @@ window.switchTab = function(targetTab) {
     if (targetTab === "biophysics" && typeof window.initBiophysicsView === "function") {
         window.initBiophysicsView();
     }
+    if (targetTab === "billing" && typeof window.initGcpBilling === "function") {
+        window.initGcpBilling();
+    }
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -553,6 +556,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (activeContent) activeContent.classList.add("active");
             if (targetTab === "biophysics" && typeof window.initBiophysicsView === "function") {
                 window.initBiophysicsView();
+            }
+            if (targetTab === "billing" && typeof window.initGcpBilling === "function") {
+                window.initGcpBilling();
             }
         });
     });

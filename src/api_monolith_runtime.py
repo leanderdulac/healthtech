@@ -172,6 +172,11 @@ class SearchQuery(BaseModel):
     n_results: int = 3
 
 
+from src.ops.billing_routes import register_billing_routes
+
+register_billing_routes(app)
+
+
 @app.get("/api/health")
 def health_probe():
     """Probe público para orquestradores (Cloud Run / k8s)."""
