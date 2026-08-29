@@ -35,7 +35,8 @@ class SLMSearchEngine:
     def __init__(self, db_path='data/chroma_db'):
         """
         Inicializa o Motor de Busca RAG.
-        Utiliza um Small Language Model (SLM) para criar Embeddings.
+        Utiliza o Healthtech Language v1 (BioBERTpt fino-ajustado) para embeddings.
+        MiniLM só entra se o v1 não estiver em disco.
         Caso o deep learning falhe, implementa um fallback robusto.
         """
         self.db_path = db_path
@@ -45,21 +46,40 @@ class SLMSearchEngine:
         self.download_db_from_gcs()
         
         self.encoder = None
+        self.encoder_name = "fallback-hash"
+        self.embedding_dim = 768
         if _HAS_TRANSFORMERS:
             try:
-                logger.info("Carregando o Small Language Model (SLM)...")
-                self.encoder = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+                v1_path = os.path.join(
+                    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
+                    "data", "models", "language_v1", "encoder",
+                )
+                if os.path.isdir(v1_path):
+                    logger.info("Carregando Healthtech Language v1 (BioBERTpt)...")
+                    self.encoder = SentenceTransformer(v1_path)
+                    self.encoder_name = "healthtech-language-v1"
+                else:
+                    logger.warning("Language v1 ausente em %s. Fallback MiniLM.", v1_path)
+                    self.encoder = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+                    self.encoder_name = "minilm"
+                dim_fn = getattr(self.encoder, "get_sentence_embedding_dimension", None) or getattr(
+                    self.encoder, "get_embedding_dimension", None
+                )
+                if dim_fn:
+                    self.embedding_dim = int(dim_fn())
             except Exception as e:
                 logger.warning(
                     f"Erro ao instanciar o SentenceTransformer ({e}). "
                     "Ativando codificador fallback."
                 )
                 self.encoder = None
-        
+                self.encoder_name = "fallback-hash"
+
         if _HAS_CHROMADB:
             logger.info("Conectando ao Vector Database (ChromaDB)...")
             self.chroma_client = chromadb.PersistentClient(path=self.db_path)
-            self.collection = self.chroma_client.get_or_create_collection(name="medical_knowledge")
+            collection_name = "medical_knowledge_v1" if self.encoder_name == "healthtech-language-v1" else "medical_knowledge"
+            self.collection = self.chroma_client.get_or_create_collection(name=collection_name)
             self.seed_global_knowledge()
         else:
             logger.warning("ChromaDB não instalado. SLMSearchEngine operando em modo fallback estático.")
@@ -67,37 +87,63 @@ class SLMSearchEngine:
             self.collection = None
 
     def seed_global_knowledge(self):
-        """Preenche o banco vetorial com artigos da USP, Johns Hopkins e literatura de Catecolaminas se estiver vazio."""
-        if self.collection is not None and self.collection.count() == 0:
-            logger.info("Semeando base de conhecimento global: USP + Johns Hopkins + Catecolaminas...")
+        """Semeia o Chroma com teses USP (Language v1) se a coleção estiver vazia."""
+        if self.collection is None or self.collection.count() != 0:
+            return
+
+        seed_docs = []
+        seed_meta = []
+        theses_path = os.path.join(
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
+            "data", "scraping", "usp_teses", "theses.jsonl",
+        )
+        if os.path.isfile(theses_path):
+            import json
+            with open(theses_path, encoding="utf-8") as f:
+                for line in f:
+                    rec = json.loads(line)
+                    title = (rec.get("titulo") or "").strip()
+                    abstract = (rec.get("resumo_pt") or "").strip()
+                    if not title:
+                        continue
+                    seed_docs.append(f"Título: {title}\nResumo: {abstract[:1200]}")
+                    seed_meta.append({
+                        "autor": str(rec.get("autor") or "USP"),
+                        "topico_dominante": str(rec.get("area") or "medicina"),
+                        "source": "usp_teses",
+                    })
+            logger.info("Semeando RAG Language v1 com %d teses USP...", len(seed_docs))
+        else:
+            logger.info("theses.jsonl ausente. Semeando stubs clínicos.")
             seed_docs = [
                 "USP - Estudo de Reatividade Cardíaca e Variação Autonômica em Pacientes Críticos.",
                 "Johns Hopkins Medicine - Global Cardiology Review: Catecholamines, HRV and Autonomic Stress Signals.",
                 "USP Medicina - Telemetria Contínua e Monitoramento do Microclima Fisiológico no SUS.",
-                "Johns Hopkins Research - Predictive Hemodynamic Instability and Sympathetic Tone Evaluation."
+                "Johns Hopkins Research - Predictive Hemodynamic Instability and Sympathetic Tone Evaluation.",
             ]
             seed_meta = [
                 {"autor": "USP Faculdade de Medicina", "topico_dominante": "Cardiologia"},
                 {"autor": "Johns Hopkins University", "topico_dominante": "Catecolaminas e Estresse"},
                 {"autor": "USP Medicina", "topico_dominante": "SUS Prevenção"},
-                {"autor": "Johns Hopkins Medicine", "topico_dominante": "Hemodinâmica"}
+                {"autor": "Johns Hopkins Medicine", "topico_dominante": "Hemodinâmica"},
             ]
-            ids = [str(uuid.uuid4()) for _ in range(len(seed_docs))]
-            if self.encoder is not None:
-                try:
-                    embs = self.encoder.encode(seed_docs).tolist()
-                except Exception:
-                    embs = self._fallback_encode(seed_docs).tolist()
-            else:
-                embs = self._fallback_encode(seed_docs).tolist()
 
-            self.collection.add(
-                embeddings=embs,
-                documents=seed_docs,
-                metadatas=seed_meta,
-                ids=ids
-            )
-            logger.info("Base Global (USP + Johns Hopkins + Catecolaminas) semeada com sucesso!")
+        ids = [str(uuid.uuid4()) for _ in range(len(seed_docs))]
+        if self.encoder is not None:
+            try:
+                embs = self.encoder.encode(seed_docs, show_progress_bar=False).tolist()
+            except Exception:
+                embs = self._fallback_encode(seed_docs).tolist()
+        else:
+            embs = self._fallback_encode(seed_docs).tolist()
+
+        self.collection.add(
+            embeddings=embs,
+            documents=seed_docs,
+            metadatas=seed_meta,
+            ids=ids,
+        )
+        logger.info("RAG semeado: %d docs, encoder=%s dim=%s", len(seed_docs), self.encoder_name, self.embedding_dim)
 
     def download_db_from_gcs(self):
         """Baixa o backup do ChromaDB do GCS se disponível."""
@@ -172,7 +218,7 @@ class SLMSearchEngine:
         Retorna vetores de dimensão 384.
         """
         embeddings = []
-        dim = 384
+        dim = getattr(self, "embedding_dim", 768)
         for text in texts:
             # Semente com base no hash do texto
             # Usamos hashes deterministicos para que o mesmo documento gere sempre o mesmo vetor
