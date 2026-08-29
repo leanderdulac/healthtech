@@ -184,7 +184,6 @@ healthtech-main/
 ### 3. Executando a Suíte Completa de Testes
 ```bash
 python -m unittest discover -s tests -v
->>>>>>> dc998f1 (feat(core): elevate platform to v3.0.0 with Windkessel 4E, Adaptive UKF, complete automated test suite and CI/CD GitHub Actions)
 ```
 
 ### 4. Executando os Pipelines Demonstrativos

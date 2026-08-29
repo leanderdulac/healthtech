@@ -1,0 +1,23 @@
+{
+  "name": "Healthtech Language v1",
+  "backbone": "pucpr/biobertpt-all",
+  "trained_at": "2026-08-29T16:32:37.984988-03:00",
+  "theses": 200,
+  "train_pairs": 3398,
+  "epochs": 2,
+  "max_seq_length": 256,
+  "task": "sentence embedding (title/abstract/keyword), RAG only",
+  "not_used_for": "clinical decision path",
+  "baseline_retrieval": {
+    "n": 80,
+    "top1": 0.45,
+    "top5": 0.6625,
+    "mrr": 0.5611
+  },
+  "trained_retrieval": {
+    "n": 80,
+    "top1": 0.95,
+    "top5": 1.0,
+    "mrr": 0.975
+  }
+}
