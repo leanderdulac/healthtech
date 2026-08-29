@@ -221,7 +221,12 @@ class TemporalModelWrapper:
             X_train, X_val = X_scaled[:split], X_scaled[split:]
             y_train, y_val = y[:split], y[split:]
 
-        self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            self._device = "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            self._device = "mps"
+        else:
+            self._device = "cpu"
         horizon_names = ["event_6h", "event_24h", "event_72h"]
         self._horizon_models = []
         all_metrics = {}
