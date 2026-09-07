@@ -139,6 +139,7 @@ class ExtendedKalmanFilter:
                 "EKF predict: x_pred=%s, trace(P_pred)=%.4f",
                 self._x_pred, np.trace(self._P_pred),
             )
+            return self._x_pred.copy(), self._P_pred.copy()
         except Exception as e:
             logger.error("Erro na etapa de predição do EKF: %s", e)
             raise
@@ -148,7 +149,7 @@ class ExtendedKalmanFilter:
         z: np.ndarray,
         h_func: Callable[[np.ndarray], np.ndarray],
         H_jacobian: Callable[[np.ndarray], np.ndarray],
-    ) -> None:
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Etapa de atualização (correção) do EKF.
 
@@ -209,6 +210,7 @@ class ExtendedKalmanFilter:
                 "EKF update: inovação=%s, trace(P)=%.4f",
                 y, np.trace(self.P),
             )
+            return self.x.copy(), self.P.copy()
         except Exception as e:
             logger.error("Erro na etapa de atualização do EKF: %s", e)
             raise
@@ -628,7 +630,7 @@ class PhysiologicalTransitionModel:
             self.mu, self.theta,
         )
 
-    def f(self, x: np.ndarray, dt: float) -> np.ndarray:
+    def f(self, x: np.ndarray, dt: float = 1.0) -> np.ndarray:
         """
         Função de transição de estado (discretização de Euler do processo OU).
 
@@ -654,7 +656,7 @@ class PhysiologicalTransitionModel:
         x_new = x + self.theta * (self.mu - x) * dt
         return x_new
 
-    def F_jacobian(self, x: np.ndarray, dt: float) -> np.ndarray:
+    def F_jacobian(self, x: np.ndarray, dt: float = 1.0) -> np.ndarray:
         """
         Jacobiano analítico da função de transição.
 

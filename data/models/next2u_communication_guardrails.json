@@ -1,0 +1,41 @@
+{
+  "nomenclature": "Todos os nomes de alerta começam com Possível.",
+  "does_not": [
+    "diagnosticar",
+    "confirmar causalidade medicamentosa",
+    "substituir avaliação clínica",
+    "prescrever",
+    "calcular dose",
+    "revelar estrelas, pontuação, risco ou hipótese interna ao paciente/cuidador"
+  ],
+  "safety_lock": "Escore, doença ou medicamento isolados não criam alerta. É indispensável o padrão fisiológico original.",
+  "social_isolation": "Altera rota operacional e urgência de busca ativa, mas não promove estrela nem simula segundo sinal fisiológico.",
+  "star_care_pathways": {
+    "1": {
+      "nurse": "Vigilância ampliada na plataforma e acompanhamento das próximas medições.",
+      "acs": "Visita domiciliar em até 1 semana."
+    },
+    "2": {
+      "nurse": "Contatar paciente/cuidador, perguntar por sintomas e ordenar visita.",
+      "acs": "Visita domiciliar e conferência dos dados em até 48 horas."
+    },
+    "3": {
+      "nurse": "Contato imediato com paciente/cuidador e acionamento prioritário do ACS.",
+      "acs": "Conferência domiciliar em até 4 horas, no mesmo dia do alerta."
+    }
+  },
+  "evaluation_criteria": [
+    "linguagem_simples",
+    "seguranca_clinica",
+    "transparencia",
+    "autonomia",
+    "completude",
+    "privacidade",
+    "separacao_de_publicos",
+    "escalonamento",
+    "rastreabilidade",
+    "fidelidade_regulatoria",
+    "equidade",
+    "transferencia_humana"
+  ]
+}

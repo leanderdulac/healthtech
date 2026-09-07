@@ -9,6 +9,7 @@ from src.fhir.builders import (
     build_bundle,
     build_device,
     build_flag,
+    build_game_theory_flag,
     build_observation,
     build_patient,
     resource_to_dict,
@@ -16,6 +17,7 @@ from src.fhir.builders import (
 from src.fhir.export import FhirExporter
 from src.fhir.mappers import (
     bronze_to_observation,
+    game_theory_to_flag,
     lakehouse_to_fhir_bundle,
     patient_fhir_mock_to_anonymized,
     silver_row_to_observation,
@@ -27,9 +29,11 @@ __all__ = [
     "build_bundle",
     "build_device",
     "build_flag",
+    "build_game_theory_flag",
     "build_observation",
     "build_patient",
     "bronze_to_observation",
+    "game_theory_to_flag",
     "lakehouse_to_fhir_bundle",
     "patient_fhir_mock_to_anonymized",
     "resource_to_dict",

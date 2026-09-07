@@ -1,9 +1,4 @@
-"""Security Headers middleware (OWASP / LGPD).
-
-CSP é path-aware:
-- Rotas de API JSON usam política restritiva (`default-src 'none'`).
-- Dashboard estático, Swagger e raiz usam política que permite CSS/JS/fonts/CDN.
-"""
+"""Security Headers middleware (OWASP / LGPD)."""
 
 from __future__ import annotations
 
@@ -11,35 +6,20 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-# API JSON / endpoints de dados — sem scripts de terceiros
-CSP_API = (
+# API JSON: bloqueia scripts/estilos. Dashboard: self + Chart.js + Google Fonts.
+_API_CSP = (
     "default-src 'none'; "
     "frame-ancestors 'none'; "
     "base-uri 'none'; "
     "form-action 'self'"
 )
-
-# Dashboard glassmórfico + Chart.js + Google Fonts + WebSocket
-CSP_DASHBOARD = (
+_DASHBOARD_CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
     "font-src 'self' https://fonts.gstatic.com; "
     "img-src 'self' data: https:; "
-    "connect-src 'self' wss: ws: http: https:; "
-    "frame-ancestors 'none'; "
-    "base-uri 'self'; "
-    "form-action 'self'"
-)
-
-# Swagger UI / ReDoc (quando docs_url está habilitado em não-produção)
-CSP_DOCS = (
-    "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
-    "font-src 'self' https://fonts.gstatic.com; "
-    "img-src 'self' data: https:; "
-    "connect-src 'self'; "
+    "connect-src 'self' wss: ws: https:; "
     "frame-ancestors 'none'; "
     "base-uri 'self'; "
     "form-action 'self'"
@@ -47,11 +27,9 @@ CSP_DOCS = (
 
 
 def _csp_for_path(path: str) -> str:
-    if path.startswith("/dashboard") or path in {"/", "/favicon.ico"}:
-        return CSP_DASHBOARD
-    if path.startswith("/docs") or path.startswith("/redoc") or path == "/openapi.json":
-        return CSP_DOCS
-    return CSP_API
+    if path.startswith("/dashboard") or path in {"/", "/index.html"}:
+        return _DASHBOARD_CSP
+    return _API_CSP
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

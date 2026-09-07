@@ -16,7 +16,16 @@ from app.config import get_settings
 
 
 def _rate_limit_key(request: Request) -> str:
-    """Identifica cliente por X-API-Key (preferido) ou IP remoto."""
+    """Identifica cliente por X-API-Key (preferido) ou IP remoto.
+
+    Ingestão de wearables usa IP: centenas de apps compartilham a mesma
+    INGEST_API_KEY e não podem cair no mesmo bucket global.
+    """
+    path = request.url.path
+    if path.startswith("/api/v1/wearables/ingest") or path.startswith(
+        "/api/v1/wearables/batch-ingest"
+    ):
+        return f"ip:{get_remote_address(request)}"
     api_key = request.headers.get("X-API-Key")
     if api_key:
         return f"key:{api_key[:16]}"
@@ -88,9 +97,14 @@ class PathRateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         path = request.url.path
-        if path in {"/api/health", "/health", "/favicon.ico"} or path.startswith(
-            "/docs"
-        ) or path.startswith("/redoc") or path.startswith("/openapi"):
+        if (
+            path in {"/api/health", "/health", "/favicon.ico"}
+            or path.startswith("/docs")
+            or path.startswith("/redoc")
+            or path.startswith("/openapi")
+            or path.startswith("/dashboard")
+            or path == "/api/v1/ops/dashboard-bootstrap"
+        ):
             return await call_next(request)
 
         limit_str = _limit_for_path(path)

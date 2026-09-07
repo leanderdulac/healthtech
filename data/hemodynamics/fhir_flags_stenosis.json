@@ -5,7 +5,7 @@
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-7b20c49dd5d7",
+        "id": "HEMO-0f21da0f7b87",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -59,15 +59,15 @@
           "reference": "Patient/PAT-HEMO-STEN"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.232211",
-          "end": "2026-07-04T21:39:08.232211"
+          "start": "2026-08-19T02:56:56.958998",
+          "end": "2026-08-19T02:56:56.958998"
         }
       }
     },
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-2cacc4248e85",
+        "id": "HEMO-1f485783c6ff",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -121,15 +121,15 @@
           "reference": "Patient/PAT-HEMO-STEN"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.232211",
-          "end": "2026-07-04T21:39:08.232211"
+          "start": "2026-08-19T02:56:56.958998",
+          "end": "2026-08-19T02:56:56.958998"
         }
       }
     },
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-adfdb9214964",
+        "id": "HEMO-76249a22a0c8",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -183,15 +183,15 @@
           "reference": "Patient/PAT-HEMO-STEN"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.232211",
-          "end": "2026-07-04T21:39:08.232211"
+          "start": "2026-08-19T02:56:56.958998",
+          "end": "2026-08-19T02:56:56.958998"
         }
       }
     },
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-cbef9ca57cec",
+        "id": "HEMO-97472e1b7d56",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -245,15 +245,15 @@
           "reference": "Patient/PAT-HEMO-STEN"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.232211",
-          "end": "2026-07-04T21:39:08.232211"
+          "start": "2026-08-19T02:56:56.958998",
+          "end": "2026-08-19T02:56:56.958998"
         }
       }
     },
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-3befe46620da",
+        "id": "HEMO-2413e8bbb982",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -307,15 +307,15 @@
           "reference": "Patient/PAT-HEMO-STEN"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.232211",
-          "end": "2026-07-04T21:39:08.232211"
+          "start": "2026-08-19T02:56:56.958998",
+          "end": "2026-08-19T02:56:56.958998"
         }
       }
     },
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-638476cad779",
+        "id": "HEMO-a4814cf40d0b",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -369,8 +369,8 @@
           "reference": "Patient/PAT-HEMO-STEN"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.232211",
-          "end": "2026-07-04T21:39:08.232211"
+          "start": "2026-08-19T02:56:56.958998",
+          "end": "2026-08-19T02:56:56.958998"
         }
       }
     }

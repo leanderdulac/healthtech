@@ -43,10 +43,10 @@ def main():
     parser.add_argument("--skip-pipeline", action="store_true", help="Usar datalake existente")
     args = parser.parse_args()
 
-    print_section("TREINO TEMPORAL TCN+LSTM — GHOST + FUZZY")
+    print_section("TREINO TEMPORAL TCN+LSTM - GHOST + FUZZY")
     print(f"  PyTorch disponível : {'Sim' if TORCH_AVAILABLE else 'Não (fallback sklearn)'}")
     print(f"  Features/timestep  : {len(TEMPORAL_FEATURE_COLUMNS)}")
-    print(f"  Arquitetura        : TCN (dilatação 1,2,4) → BiLSTM → 3 heads")
+    print(f"  Arquitetura        : TCN (dilatacao 1,2,4) -> BiLSTM -> 3 heads")
 
     lakehouse_config = LakehouseConfig(base_path=Path("data/lakehouse"))
     orchestrator = DatalakeOrchestrator(lakehouse_config)

@@ -2,9 +2,14 @@
 Modelos de dados para o motor preditivo clínico multimodal.
 """
 
+from __future__ import annotations
+
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from src.clinical_intelligence.game_theory import GameTheoryAssessment
 
 
 @dataclass
@@ -15,11 +20,15 @@ class PatientBaseline:
     resting_hr: float
     baseline_spo2: float
     baseline_hrv: float
+    name: str = ""
+    birth_date: str = ""
+    gender: str = ""
     age: int = 0
     risk_factor: float = 0.0
     activity_level: str = "moderate"
     clinical_conditions: List[str] = field(default_factory=list)
     medications: List[str] = field(default_factory=list)
+    allergies: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -58,9 +67,9 @@ class GhostSignal:
 
     name: str
     value: float
-    confidence: float
-    derivation: str
-    clinical_relevance: str
+    confidence: float = 1.0
+    derivation: str = ""
+    clinical_relevance: str = ""
     operator: str = "inference"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -117,6 +126,7 @@ class ClinicalIntelligenceResult:
     predictions: List[ClinicalEventPrediction]
     fusion_score: float
     ontology_domains: Dict[str, float] = field(default_factory=dict)
+    game_theory: Optional[GameTheoryAssessment] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -128,4 +138,5 @@ class ClinicalIntelligenceResult:
             "predictions": [p.to_dict() for p in self.predictions],
             "fusion_score": float(self.fusion_score),
             "ontology_domains": self.ontology_domains,
+            "game_theory": self.game_theory.to_dict() if self.game_theory else None,
         }

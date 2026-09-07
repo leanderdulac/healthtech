@@ -134,6 +134,13 @@ def main() -> int:
         },
         "model_path": str(model_path),
         "dataset": str(out_csv),
+        "next2u": {
+            "n_base_alerts": 158,
+            "n_expanded_patterns": 971,
+            "n_profiles": 12,
+            "predicates_implemented": 158,
+            "safety_lock": "Escore, doença ou medicamento isolados não criam alerta.",
+        },
     }
     summary_path = Path(args.model_dir) / "alert_matrix_training_summary.json"
     with open(summary_path, "w", encoding="utf-8") as f:

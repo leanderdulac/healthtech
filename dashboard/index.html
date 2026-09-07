@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saúde Responsiva — Telemetria Fisiológica & API Wearables</title>
     <!-- Fonte Premium -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Roboto:wght@400;500;700&display=swap">
     <!-- Icones Material -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260824j">
+    <link rel="stylesheet" href="gcp-billing.css?v=20260824g">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -30,14 +31,22 @@
                 <button type="button" class="nav-btn" data-tab="api-access" onclick="switchTab('api-access')">
                     <span class="material-icons-round">key</span> Acesso à API
                 </button>
+                <button type="button" class="nav-btn" data-tab="biophysics" onclick="switchTab('biophysics')">
+                    <span class="material-icons-round">biotech</span> Biofísica & Triagem
+                </button>
                 <button type="button" class="nav-btn" data-tab="api-docs" onclick="switchTab('api-docs')">
                     <span class="material-icons-round">menu_book</span> Documentação da API
                 </button>
+                <button type="button" class="nav-btn" data-tab="billing" onclick="switchTab('billing')">
+                    <span class="material-icons-round">cloud</span> Faturamento GCP
+                </button>
             </nav>
 
-            <div class="connection-status" id="ws-status">
-                <span class="status-indicator red"></span>
-                <span class="status-text">Desconectado</span>
+            <div class="header-session">
+                <div class="connection-status" id="ws-status">
+                    <span class="status-indicator red"></span>
+                    <span class="status-text">Desconectado</span>
+                </div>
             </div>
         </header>
 
@@ -98,6 +107,56 @@
 
                 <!-- DASHBOARD GRID -->
                 <main class="dashboard-grid">
+                    <section class="fleet-panel card" id="fleet-panel">
+                        <div class="fleet-header">
+                            <div>
+                                <h2><span class="material-icons-round">watch</span> Frota de relógios</h2>
+                                <p class="fleet-desc">Pronto para centenas de VE30 e apps companion enviando telemetria.</p>
+                            </div>
+                            <div class="fleet-stats">
+                                <span id="fleet-online">0 online</span>
+                                <span id="fleet-total">0 no total</span>
+                            </div>
+                        </div>
+                        <div class="fleet-toolbar">
+                            <input type="search" id="fleet-search" placeholder="Buscar device ou paciente…">
+                            <select id="fleet-filter">
+                                <option value="all">Todos</option>
+                                <option value="online">Online</option>
+                                <option value="offline">Offline</option>
+                            </select>
+                        </div>
+                        <div class="fleet-table-wrap">
+                            <table class="fleet-table">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Relógio</th>
+                                        <th>Paciente / app</th>
+                                        <th>BPM</th>
+                                        <th>SpO₂</th>
+                                        <th>Horário (Brasília)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fleet-body">
+                                    <tr><td colspan="6" class="fleet-empty">Aguardando relógios…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="fleet-pager">
+                            <button type="button" class="btn btn-secondary" id="fleet-prev">Anterior</button>
+                            <span id="fleet-page">1 / 1</span>
+                            <button type="button" class="btn btn-secondary" id="fleet-next">Próxima</button>
+                        </div>
+                        <div class="card watch-card" id="card-watch">
+                            <div class="metric-header">
+                                <span class="metric-title">Relógio em foco</span>
+                                <span class="material-icons-round icon-blue">watch</span>
+                            </div>
+                            <div class="watch-name" id="watch-name">Nenhum relógio no painel</div>
+                            <div class="metric-sub" id="watch-sub">Os companions autenticam com a chave de ingestão; o painel já entra com a chave de leitura.</div>
+                        </div>
+                    </section>
                     <!-- SINAIS VITAIS -->
                     <section class="vitals-section">
                         <!-- BPM Card -->
@@ -449,7 +508,105 @@
             </div>
         </div>
 
-        <!-- VIEW 3: DOCUMENTAÇÃO INTERATIVA E WEARABLES -->
+        <!-- VIEW 3: BIOFÍSICA HEMODINÂMICA & TRIAGEM -->
+        <div id="view-biophysics" class="tab-content">
+            <div class="biophysics-grid">
+                <div class="card card-wk4">
+                    <div class="card-header-flex">
+                        <h2><span class="material-icons-round">monitor_heart</span> Windkessel 4 Elementos</h2>
+                        <span class="badge">RK4 · Barorreflexo</span>
+                    </div>
+                    <p class="section-desc">Simula pressão aórtica P(t) e fluxo ejetado Q(t) a partir de resistência, complacência, impedância e inertância.</p>
+
+                    <div class="wk4-metrics-banner">
+                        <div class="wk4-metric-box highlight-blue">
+                            <span class="m-title">PAS</span>
+                            <span class="m-val" id="wk4-pas">-- mmHg</span>
+                        </div>
+                        <div class="wk4-metric-box">
+                            <span class="m-title">PAD</span>
+                            <span class="m-val" id="wk4-pad">-- mmHg</span>
+                        </div>
+                        <div class="wk4-metric-box">
+                            <span class="m-title">PAM</span>
+                            <span class="m-val" id="wk4-pam">-- mmHg</span>
+                        </div>
+                        <div class="wk4-metric-box">
+                            <span class="m-title">PWV</span>
+                            <span class="m-val" id="wk4-pwv">-- m/s</span>
+                        </div>
+                    </div>
+
+                    <div class="wk4-controls-grid">
+                        <div class="slider-group">
+                            <label>Rp (resistência) <strong id="lbl-rp">1.0</strong></label>
+                            <input type="range" id="slider-rp" min="0.4" max="2.4" step="0.05" value="1.0">
+                        </div>
+                        <div class="slider-group">
+                            <label>C (complacência) <strong id="lbl-c">1.2</strong></label>
+                            <input type="range" id="slider-c" min="0.4" max="2.4" step="0.05" value="1.2">
+                        </div>
+                        <div class="slider-group">
+                            <label>Zc (impedância) <strong id="lbl-zc">0.05</strong></label>
+                            <input type="range" id="slider-zc" min="0.01" max="0.12" step="0.005" value="0.05">
+                        </div>
+                        <div class="slider-group">
+                            <label>L (inertância) <strong id="lbl-l">0.005</strong></label>
+                            <input type="range" id="slider-l" min="0.001" max="0.02" step="0.001" value="0.005">
+                        </div>
+                        <div class="slider-group">
+                            <label>FC (bpm) <strong id="lbl-hr">75</strong></label>
+                            <input type="range" id="slider-hr" min="40" max="160" step="1" value="75">
+                        </div>
+                        <div class="slider-group">
+                            <label>Volume sistólico (mL) <strong id="lbl-sv">70</strong></label>
+                            <input type="range" id="slider-sv" min="40" max="120" step="1" value="70">
+                        </div>
+                    </div>
+
+                    <div class="chart-container" style="height: 280px;">
+                        <canvas id="chart-wk4"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><span class="material-icons-round">account_tree</span> Triagem — Equilíbrio de Nash</h2>
+                    <p class="section-desc">Aloca leitos de UTI e enfermaria sob restrição de capacidade. Fronteira de Pareto à direita.</p>
+                    <div class="triage-controls-row">
+                        <div class="input-control">
+                            <label>Capacidade UTI</label>
+                            <input type="number" id="inp-icu-cap" value="10" min="1">
+                        </div>
+                        <div class="input-control">
+                            <label>Capacidade enfermaria</label>
+                            <input type="number" id="inp-ward-cap" value="40" min="1">
+                        </div>
+                        <div class="input-control">
+                            <label>Demanda UTI</label>
+                            <input type="number" id="inp-icu-dem" value="14" min="0">
+                        </div>
+                        <div class="input-control">
+                            <label>Fração crítica (%)</label>
+                            <input type="number" id="inp-crit-frac" value="40" min="0" max="100">
+                        </div>
+                        <button type="button" id="btn-calc-triage" class="btn btn-primary">Calcular</button>
+                    </div>
+                    <div class="triage-result-banner">
+                        <span class="triage-status-pill" id="triage-nash-badge">Nash: aguardando cálculo</span>
+                        <p id="triage-recommendation">Ajuste os parâmetros e calcule o equilíbrio.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><span class="material-icons-round">bubble_chart</span> Fronteira de Pareto</h2>
+                    <div class="chart-container" style="height: 280px;">
+                        <canvas id="chart-pareto"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 4: DOCUMENTAÇÃO INTERATIVA E WEARABLES -->
         <div id="view-api-docs" class="tab-content">
             <div class="docs-container">
                 <!-- CABEÇALHO DA DOCUMENTAÇÃO -->
@@ -612,9 +769,189 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                 </div>
             </div>
         </div>
+
+        <!-- VIEW: GOOGLE CLOUD BILLING -->
+        <div id="view-billing" class="tab-content">
+            <section class="gcp-console" aria-label="Google Cloud Billing">
+                <div class="gcp-topbar">
+                    <div class="gcp-brand">
+                        <svg width="28" height="28" viewBox="0 0 24 24" aria-label="Google">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        <div class="gcp-brand-sep"></div>
+                        <svg width="26" height="20" viewBox="0 0 32 26" aria-label="Google Cloud">
+                            <path fill="#4285F4" d="M28.4 21.2H8.7c-2.4 0-4.4-2-4.4-4.4 0-1.8 1.1-3.4 2.8-4.1C7.4 9.3 10.3 7 13.8 7c.6 0 1.2.1 1.8.2C16.8 5.1 19.2 4 21.9 4c4.1 0 7.4 3.3 7.4 7.4 0 .3 0 .6-.1.9 1.7.6 2.8 2.2 2.8 4 0 2.7-2 4.9-3.6 4.9z"/>
+                            <path fill="#34A853" d="M8.7 21.2c-2.4 0-4.4-2-4.4-4.4 0-1.8 1.1-3.4 2.8-4.1.3 3.6 2.5 6.6 5.7 8.5H8.7z"/>
+                            <path fill="#FBBC04" d="M13.8 7c.6 0 1.2.1 1.8.2C16.3 5.8 15.2 4.7 13.6 4.2 10.6 5.1 8.4 7.6 7.1 10.7 8.2 9.4 10.8 7 13.8 7z"/>
+                            <path fill="#EA4335" d="M21.9 4c-1.6 0-3.1.5-4.3 1.3 1.4.7 2.6 1.8 3.4 3.2 2.4.3 4.4 1.7 5.4 3.8.1-.3.1-.6.1-.9 0-4.1-3.3-7.4-4.6-7.4z"/>
+                        </svg>
+                        <span style="font-weight:500;font-size:15px;color:#202124">Google Cloud</span>
+                    </div>
+                    <h2>Billing</h2>
+                    <div class="gcp-account">
+                        <span>Billing account</span>
+                        <strong id="gcp-account-id">—</strong>
+                        <span>·</span>
+                        <span id="gcp-project-id">healthtech-gcp-2026</span>
+                    </div>
+                </div>
+                <nav class="gcp-subnav">
+                    <button type="button" class="active" data-gcp="overview">Overview</button>
+                    <button type="button" data-gcp="reports">Reports</button>
+                    <button type="button" data-gcp="cost-table">Cost table</button>
+                    <button type="button" data-gcp="transactions">Transactions</button>
+                    <button type="button" data-gcp="documents">Documents</button>
+                    <button type="button" data-gcp="budgets">Budgets &amp; alerts</button>
+                </nav>
+                <div class="gcp-body">
+                    <div id="gcp-panel-overview" class="gcp-panel active">
+                        <div class="gcp-banner warn">
+                            <span class="material-icons-round">payments</span>
+                            <div>
+                                <strong>PIX Next2U Saúde — orçamento de nuvem e tokens</strong>
+                                <div id="gcp-countdown">03/08 R$ 4.780 · 10/08 R$ 2.000 · 17/08 R$ 4.000 · 24/08 R$ 4.800</div>
+                                Extrato C6: 03/08 R$ 4.780 (R$ 779,90 Ultra + R$ 4.000,10 nuvem), 10/08 R$ 2.000, 17/08 R$ 4.000. Hoje R$ 4.800 (R$ 779,90 Ultra + R$ 4.020,10 nuvem).
+                            </div>
+                        </div>
+                        <div class="gcp-kpis">
+                            <div class="gcp-card">
+                                <div class="label">PIX Next2U 03–17/08 (nuvem)</div>
+                                <div class="value" id="gcp-kpi-spent">—</div>
+                                <div class="hint">Inclui Ultra 03/08 (R$ 779,90) + nuvem já queimada</div>
+                            </div>
+                            <div class="gcp-card">
+                                <div class="label">Today so far</div>
+                                <div class="value due" id="gcp-kpi-today">—</div>
+                                <div class="hint">Redeploy Cloud Run + fluxos clínicos</div>
+                            </div>
+                            <div class="gcp-card">
+                                <div class="label">Available balance</div>
+                                <div class="value pos" id="gcp-kpi-balance">—</div>
+                                <div class="hint">Após PIX R$ 4.800 − Ultra R$ 779,90 − uso de hoje</div>
+                            </div>
+                            <div class="gcp-card">
+                                <div class="label">Credit today (Next2U)</div>
+                                <div class="value pos" id="gcp-kpi-credit">R$ 4.800,00</div>
+                                <div class="hint">Forecast semana: <span id="gcp-kpi-forecast">—</span></div>
+                            </div>
+                        </div>
+                        <div class="gcp-chart-wrap"><canvas id="gcp-cost-chart"></canvas></div>
+                        <table class="gcp-table">
+                            <thead>
+                                <tr><th>Service</th><th class="num">Share</th><th class="num">Cost</th></tr>
+                            </thead>
+                            <tbody id="gcp-service-body"></tbody>
+                            <tfoot>
+                                <tr><td><strong>Subtotal</strong></td><td></td><td class="num" id="gcp-service-total">—</td></tr>
+                            </tfoot>
+                        </table>
+                        <p class="gcp-footer-note" id="gcp-disclaimer"></p>
+                    </div>
+
+                    <div id="gcp-panel-reports" class="gcp-panel">
+                        <div class="gcp-filters">
+                            <span class="gcp-chip">Time range: Aug 3 – 24, 2026</span>
+                            <span class="gcp-chip">Group by: Service</span>
+                            <span class="gcp-chip">Project: healthtech-gcp-2026</span>
+                            <span class="gcp-chip">Location: us-central1</span>
+                        </div>
+                        <div class="gcp-toolbar">
+                            <div class="label" style="color:#5f6368;font-size:13px">Services — this period (stacked daily)</div>
+                            <button type="button" class="gcp-btn primary" id="gcp-download-report">Download PDF report</button>
+                        </div>
+                        <p class="gcp-footer-note">O gráfico da Overview é o relatório padrão do console (custos diários empilhados por serviço). Use Documents para faturas individuais.</p>
+                        <h3 style="font-weight:500;font-size:14px;margin:16px 0 8px">Engineering events that burned budget</h3>
+                        <table class="gcp-table">
+                            <thead><tr><th>Date</th><th>Kind</th><th>Change</th></tr></thead>
+                            <tbody id="gcp-events"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="gcp-panel-cost-table" class="gcp-panel">
+                        <div class="gcp-toolbar">
+                            <div class="gcp-filters">
+                                <span class="gcp-chip">Group by: SKU</span>
+                                <span class="gcp-chip">Include credits: No</span>
+                            </div>
+                            <button type="button" class="gcp-btn" id="gcp-download-csv">Download CSV</button>
+                        </div>
+                        <table class="gcp-table">
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th>SKU description</th>
+                                    <th>SKU ID</th>
+                                    <th class="num">Usage</th>
+                                    <th class="num">Cost (BRL)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gcp-sku-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="gcp-panel-transactions" class="gcp-panel">
+                        <table class="gcp-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th>Document</th>
+                                    <th>Status</th>
+                                    <th class="num">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gcp-tx-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="gcp-panel-documents" class="gcp-panel">
+                        <div class="gcp-banner">
+                            <span class="material-icons-round">picture_as_pdf</span>
+                            <div>Invoices no formato Google Cloud (número 5048-…, SKU ID, ISS 2% nas faturas fechadas). Clique em PDF para baixar.</div>
+                        </div>
+                        <table class="gcp-table">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Number</th>
+                                    <th>Period</th>
+                                    <th>Issue date</th>
+                                    <th>Status</th>
+                                    <th class="num">Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="gcp-docs-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div id="gcp-panel-budgets" class="gcp-panel">
+                        <div class="gcp-card" style="margin-bottom:16px">
+                            <div class="label">Budget</div>
+                            <div style="font-size:16px;margin:4px 0" id="gcp-budget-name">HealthTech weekly compute &amp; tokens</div>
+                            <div id="gcp-budget-amount">—</div>
+                            <div class="gcp-budget-bar" id="gcp-budget-bar"><span id="gcp-budget-fill"></span></div>
+                            <div class="hint" id="gcp-budget-pct">—</div>
+                            <div class="hint">Ultra: R$ 779,90 em 03/08 + R$ 779,90 em 24/08. Nuvem desta semana: R$ 4.020,10 (alertas 50/90/100%).</div>
+                        </div>
+                        <div class="gcp-card">
+                            <div class="label">August ceiling (4 Mondays)</div>
+                            <div id="gcp-budget-month">—</div>
+                            <div class="gcp-budget-bar"><span id="gcp-budget-month-fill"></span></div>
+                            <div class="hint">Teto agosto = soma dos PIX Next2U de nuvem (4.780 + 2.000 + 4.000 + 4.800)</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
 
     <!-- Script da Aplicação -->
-    <script src="app.js"></script>
+    <script src="app.js?v=20260824j"></script>
+    <script src="gcp-billing.js?v=20260824g"></script
 </body>
 </html>

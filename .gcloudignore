@@ -1,0 +1,11 @@
+.git
+.gcloudignore
+
+#include .gitignore
+
+.venv313/
+data/models/_pre_v1_backup/
+data/models/v1/
+data/models/language_v1/train.log
+data/models/temporal_v1_train.log
+companion-android/

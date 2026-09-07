@@ -21,6 +21,13 @@ window.switchTab = function(targetTab) {
         activeContent.classList.add("active");
         activeContent.style.display = "block";
     }
+
+    if (targetTab === "biophysics" && typeof window.initBiophysicsView === "function") {
+        window.initBiophysicsView();
+    }
+    if (targetTab === "billing" && typeof window.initGcpBilling === "function") {
+        window.initGcpBilling();
+    }
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -33,18 +40,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const isHttps = protocol === "https:";
     const urlParams = new URLSearchParams(window.location.search);
     // Nunca embutir chave real no frontend versionado — use ?api_key= ou localStorage
-    const apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "";
-    if (urlParams.get("api_key")) {
-        try { localStorage.setItem("api_key", urlParams.get("api_key")); } catch (_) { /* ignore */ }
-    }
-
+    let apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "";
+    
     let API_URL = `${protocol}//${host}`;
     let WS_HOST = host;
-    const SECURE_CLOUD_URL =
-        "https://healthtech-secure-api-5794833455.us-central1.run.app";
-    const isCloudRunHost = host.includes(".run.app");
-    // App mobile de produção grava na secure-api (memória separada do monólito full)
-    const defaultConnSource = isCloudRunHost ? "secure" : "local";
 
     // Fallback automático para o Cloud Run se aberto como arquivo local (file://) ou sem host válido
     if (protocol === "file:" || !host || host === "" || host.includes("null")) {
@@ -52,10 +51,71 @@ document.addEventListener("DOMContentLoaded", () => {
         WS_HOST = CLOUD_RUN_HOST;
     }
 
-    const WS_URL = `${WS_HOST.includes(".run.app") || isHttps ? "wss:" : "ws:"}//${WS_HOST}/ws/telemetry${apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : ""}`;
+    function wsUrl() {
+        const scheme = WS_HOST.includes(".run.app") || isHttps ? "wss:" : "ws:";
+        const keyQs = apiKey ? `?api_key=${encodeURIComponent(apiKey)}` : "";
+        return `${scheme}//${WS_HOST}/ws/telemetry${keyQs}`;
+    }
     let ws = null;
     let isConnected = false;
-    let wsAuthMode = apiKey ? "control" : "viewer";
+    let reconnectTimer = null;
+    let devicePollTimer = null;
+    let lastIngestStamp = "";
+    let fleetDevices = [];
+    let selectedDeviceId = "";
+    let fleetPage = 0;
+    const FLEET_PAGE_SIZE = 50;
+    const DISPLAY_TZ = "America/Sao_Paulo";
+    const localDateFmt = new Intl.DateTimeFormat("pt-BR", {
+        timeZone: DISPLAY_TZ,
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+    });
+    const localClockFmt = new Intl.DateTimeFormat("pt-BR", {
+        timeZone: DISPLAY_TZ,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+    });
+
+    function parseStamp(value) {
+        if (!value) return null;
+        if (/^\d{2}\/\d{2}\/\d{4}/.test(String(value))) return null;
+        const d = new Date(value);
+        return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    function formatLocal(value) {
+        if (!value) return "—";
+        if (/^\d{2}\/\d{2}\/\d{4}/.test(String(value))) return String(value);
+        const d = parseStamp(value);
+        return d ? localDateFmt.format(d) : "—";
+    }
+
+    function formatClock(value) {
+        const d = parseStamp(value) || new Date();
+        return localClockFmt.format(d);
+    }
+
+    function formatAge(value) {
+        const d = parseStamp(value);
+        if (!d) return "";
+        const sec = Math.max(0, Math.round((Date.now() - d.getTime()) / 1000));
+        if (sec < 4) return "agora";
+        if (sec < 60) return `há ${sec}s`;
+        if (sec < 3600) return `há ${Math.floor(sec / 60)} min`;
+        return `há ${Math.floor(sec / 3600)} h`;
+    }
+
+    function liveStamp(rowOrFrame) {
+        return rowOrFrame.received_at || rowOrFrame.last_seen || rowOrFrame.timestamp || "";
+    }
 
     // Buffer de dados históricos para os gráficos (máximo 30 pontos)
     const MAX_POINTS = 30;
@@ -273,16 +333,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (status === "connected") {
             indicator.className = "status-indicator green";
-            text.textContent =
-                wsAuthMode === "viewer" ? "WS conectado (viewer)" : "WS conectado";
+            text.textContent = "Conectado";
             isConnected = true;
         } else if (status === "connecting") {
             indicator.className = "status-indicator yellow";
-            text.textContent = "Conectando WS...";
+            text.textContent = "Conectando...";
             isConnected = false;
         } else {
             indicator.className = "status-indicator red";
-            text.textContent = "WS desconectado";
+            text.textContent = "Desconectado";
             isConnected = false;
             // Desativar botões
             btnStart.disabled = true;
@@ -291,73 +350,328 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function connectWebSocket() {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        if (!apiKey) {
+            updateStatusIndicator("disconnected");
+            const hint = document.getElementById("watch-sub");
+            if (hint) hint.textContent = "Informe a API key no canto superior para ver o relógio.";
+            return;
+        }
         updateStatusIndicator("connecting");
-        ws = new WebSocket(WS_URL);
+        try {
+            if (ws) {
+                ws.onclose = null;
+                ws.close();
+            }
+        } catch (err) {
+            /* ignore */
+        }
+        ws = new WebSocket(wsUrl());
 
         ws.onopen = () => {
-            logger.info("Conectado ao WebSocket de Telemetria.");
             updateStatusIndicator("connected");
-            // Controles só com chave; viewer pode ver stream
-            btnStart.disabled = wsAuthMode === "viewer";
-            btnStop.disabled = true;
+            btnStart.disabled = false;
         };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-
-            if (data.type === "error") {
-                logger.warning(data.detail || data.error_code || "Erro WS");
-                return;
-            }
-
+            
             // Tratar mensagem de configuração inicial ou confirmação de estado
             if (data.type === "config") {
-                if (data.auth_mode) wsAuthMode = data.auth_mode;
-                updateStatusIndicator("connected");
                 updateUIState(data.is_running, data.filter_type, data.use_ukf);
                 return;
             }
-
-            // Tratar telemetria em tempo real
-            handleTelemetryFrame(data);
+            if (data.type === "patient_ingest") {
+                applyIngestFrame(data.data || data);
+                return;
+            }
+            if (data && data.sensor_readings) {
+                handleTelemetryFrame(data);
+            }
         };
 
         ws.onclose = () => {
-            logger.warning("Conexão WebSocket perdida. Tentando reconectar em 3s...");
             updateStatusIndicator("disconnected");
-            setTimeout(connectWebSocket, 3000);
+            if (!apiKey) return;
+            reconnectTimer = setTimeout(connectWebSocket, 3000);
         };
 
-        ws.onerror = (err) => {
-            logger.error("Erro na conexão WebSocket: " + err);
-            ws.close();
+        ws.onerror = () => {
+            if (ws) ws.close();
         };
     }
 
     function updateUIState(isRunning, filterType, useUkf) {
-        const canControl = wsAuthMode !== "viewer";
         if (isRunning) {
             btnStart.disabled = true;
-            btnStop.disabled = !canControl;
+            btnStop.disabled = false;
             btnStart.classList.add("active");
         } else {
-            btnStart.disabled = !canControl;
+            btnStart.disabled = false;
             btnStop.disabled = true;
             btnStart.classList.remove("active");
         }
 
         filterSelect.value = filterType;
         kalmanSelect.value = useUkf ? "UKF" : "EKF";
-        filterSelect.disabled = !canControl;
-        kalmanSelect.disabled = !canControl;
     }
 
     // ========================================================================
     // 3. PROCESSAMENTO DE LEITURA E RENDERIZAÇÃO NO DOM/GRAFICOS
     // ========================================================================
+    function phantomOr(value, fallback) {
+        if (value && typeof value.estimate === "number") return value;
+        return {
+            estimate: fallback,
+            ci_lower: fallback,
+            ci_upper: fallback,
+            reliable: fallback != null
+        };
+    }
+
+    function applyIngestFrame(ing) {
+        if (!ing) return;
+        const deviceId = ing.device_id || "";
+        if (deviceId && !selectedDeviceId) selectedDeviceId = deviceId;
+        if (selectedDeviceId && deviceId && deviceId !== selectedDeviceId) {
+            upsertFleetFromIngest(ing);
+            return;
+        }
+        const stamp = `${deviceId}|${liveStamp(ing)}`;
+        renderWatchFromIngest(ing);
+        upsertFleetFromIngest(ing);
+        if (stamp && stamp === lastIngestStamp) return;
+        lastIngestStamp = stamp;
+        const raw = ing.raw_telemetry || {};
+        const cleaned = ing.cleaned_telemetry || {};
+        const ph = ing.phantom_data || {};
+        const hr = Number(cleaned.heart_rate_clean != null ? cleaned.heart_rate_clean : raw.heart_rate_bpm);
+        const spo2Val = raw.spo2_percent;
+        const frame = {
+            step: formatClock(liveStamp(ing)),
+            sensor_readings: {
+                pixel_watch_raw: Number(raw.heart_rate_bpm != null ? raw.heart_rate_bpm : hr),
+                fitbit_band_raw: Number(raw.heart_rate_bpm != null ? raw.heart_rate_bpm : hr),
+                fused_estimate: hr,
+                clean_estimate: hr
+            },
+            sensor_weights: { pixel_watch: 1, fitbit_band: 0 },
+            phantom_data: {
+                systolic_bp: phantomOr(ph.systolic_bp, null),
+                diastolic_bp: phantomOr(ph.diastolic_bp, null),
+                spo2: phantomOr(ph.spo2, spo2Val == null ? null : Number(spo2Val)),
+                glucose: phantomOr(ph.glucose || ph.glucose_mgdl, null)
+            },
+            hypotheses: ing.hypotheses || ing.diagnostic_hypotheses || [],
+            clinical_codes: ing.clinical_codes || {}
+        };
+        if (!Number.isFinite(hr)) return;
+        handleTelemetryFrame(frame);
+    }
+
+    function renderWatchFromIngest(ing) {
+        const name = document.getElementById("watch-name");
+        const sub = document.getElementById("watch-sub");
+        const card = document.getElementById("card-watch");
+        if (!name || !sub) return;
+        const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? (ing.raw_telemetry || {}).heart_rate_bpm;
+        const spo2 = (ing.raw_telemetry || {}).spo2_percent;
+        name.textContent = ing.device_id || "VE30";
+        const bits = [];
+        if (hr != null) bits.push(`${Math.round(Number(hr))} BPM`);
+        if (spo2 != null) bits.push(`SpO₂ ${Number(spo2).toFixed(0)}%`);
+        const when = ing.last_seen_local || formatLocal(liveStamp(ing));
+        const age = formatAge(liveStamp(ing));
+        if (when && when !== "—") bits.push(age ? `${when} · ${age}` : when);
+        if (ing.patient_id) bits.push(ing.patient_id);
+        sub.textContent = bits.join(" · ") || "Telemetria recebida";
+        if (card) card.classList.add("online");
+    }
+
+    function deviceToIngest(row) {
+        if (row && row.latest) return row.latest;
+        return {
+            device_id: row.device_id,
+            patient_id: row.patient_id,
+            timestamp: row.last_seen,
+            received_at: row.received_at,
+            last_seen_local: row.last_seen_local,
+            device_time_local: row.device_time_local,
+            raw_telemetry: {
+                heart_rate_bpm: row.heart_rate,
+                spo2_percent: row.spo2
+            },
+            cleaned_telemetry: { heart_rate_clean: row.heart_rate }
+        };
+    }
+
+    function upsertFleetFromIngest(ing) {
+        if (!ing || !ing.device_id) return;
+        const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? (ing.raw_telemetry || {}).heart_rate_bpm;
+        const spo2 = (ing.raw_telemetry || {}).spo2_percent;
+        const next = {
+            device_id: ing.device_id,
+            patient_id: ing.patient_id,
+            last_seen: ing.received_at || ing.timestamp,
+            received_at: ing.received_at || ing.timestamp,
+            last_seen_local: ing.last_seen_local || formatLocal(liveStamp(ing)),
+            device_time_local: ing.device_time_local,
+            online: true,
+            heart_rate: hr,
+            spo2,
+            latest: ing
+        };
+        const idx = fleetDevices.findIndex((d) => d.device_id === ing.device_id);
+        if (idx >= 0) fleetDevices[idx] = { ...fleetDevices[idx], ...next };
+        else fleetDevices.unshift(next);
+        renderFleetTable();
+    }
+
+    function filteredFleet() {
+        const q = (document.getElementById("fleet-search")?.value || "").trim().toLowerCase();
+        const filter = document.getElementById("fleet-filter")?.value || "all";
+        return fleetDevices.filter((d) => {
+            if (filter === "online" && !d.online) return false;
+            if (filter === "offline" && d.online) return false;
+            if (!q) return true;
+            return String(d.device_id || "").toLowerCase().includes(q)
+                || String(d.patient_id || "").toLowerCase().includes(q);
+        });
+    }
+
+    function renderFleetTable() {
+        const body = document.getElementById("fleet-body");
+        const onlineEl = document.getElementById("fleet-online");
+        const totalEl = document.getElementById("fleet-total");
+        const pageEl = document.getElementById("fleet-page");
+        if (!body) return;
+        const rows = filteredFleet();
+        const online = fleetDevices.filter((d) => d.online).length;
+        if (onlineEl) onlineEl.textContent = `${online} online`;
+        if (totalEl) totalEl.textContent = `${fleetDevices.length} no total`;
+        const pages = Math.max(1, Math.ceil(rows.length / FLEET_PAGE_SIZE));
+        if (fleetPage >= pages) fleetPage = pages - 1;
+        if (fleetPage < 0) fleetPage = 0;
+        if (pageEl) pageEl.textContent = `${fleetPage + 1} / ${pages}`;
+        const slice = rows.slice(fleetPage * FLEET_PAGE_SIZE, (fleetPage + 1) * FLEET_PAGE_SIZE);
+        if (!slice.length) {
+            body.innerHTML = '<tr><td colspan="6" class="fleet-empty">Nenhum relógio nesta página.</td></tr>';
+            return;
+        }
+        const esc = (value) => String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        body.innerHTML = slice.map((d) => {
+            const selected = d.device_id === selectedDeviceId ? " selected" : "";
+            const when = d.last_seen_local || formatLocal(d.received_at || d.last_seen);
+            const age = formatAge(d.received_at || d.last_seen);
+            const hr = d.heart_rate != null ? Math.round(Number(d.heart_rate)) : "—";
+            const spo2 = d.spo2 != null ? Number(d.spo2).toFixed(0) + "%" : "—";
+            return `<tr data-device="${esc(d.device_id)}" class="${selected}">
+                <td><span class="fleet-dot ${d.online ? "on" : "off"}"></span>${d.online ? "Online" : "Offline"}</td>
+                <td>${esc(d.device_id)}</td>
+                <td>${esc(d.patient_id || "—")}</td>
+                <td>${hr}</td>
+                <td>${spo2}</td>
+                <td>${esc(age ? `${when} · ${age}` : when)}</td>
+            </tr>`;
+        }).join("");
+        body.querySelectorAll("tr[data-device]").forEach((tr) => {
+            tr.addEventListener("click", () => {
+                selectedDeviceId = tr.getAttribute("data-device") || "";
+                const row = fleetDevices.find((d) => d.device_id === selectedDeviceId);
+                if (row) applyIngestFrame(deviceToIngest(row));
+                renderFleetTable();
+            });
+        });
+    }
+
+    function renderWatchStrip(devices) {
+        const incoming = devices || [];
+        const byId = {};
+        fleetDevices.forEach((d) => {
+            if (d && d.device_id) byId[d.device_id] = d;
+        });
+        incoming.forEach((row) => {
+            if (!row || !row.device_id) return;
+            const prev = byId[row.device_id] || {};
+            byId[row.device_id] = { ...prev, ...row };
+        });
+        fleetDevices = Object.values(byId);
+        renderFleetTable();
+        const focused = fleetDevices.find((d) => d.device_id === selectedDeviceId)
+            || fleetDevices.find((d) => d.online)
+            || fleetDevices[0];
+        if (focused) {
+            if (!selectedDeviceId) selectedDeviceId = focused.device_id;
+            applyIngestFrame(deviceToIngest(focused));
+            return;
+        }
+        const name = document.getElementById("watch-name");
+        const sub = document.getElementById("watch-sub");
+        const card = document.getElementById("card-watch");
+        if (name) name.textContent = "Nenhum relógio no painel";
+        if (sub) sub.textContent = "Aguardando ingestão dos apps companion…";
+        if (card) card.classList.remove("online");
+    }
+
+    async function pollDevices() {
+        if (!apiKey) {
+            renderWatchStrip([]);
+            return;
+        }
+        try {
+            const res = await fetch(`${API_URL}/api/v1/wearables/devices?limit=500`, {
+                headers: { "X-API-Key": apiKey },
+                cache: "no-store"
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            renderWatchStrip(data.devices || []);
+        } catch (err) {
+            /* o painel continua com o último estado conhecido */
+        }
+    }
+
+    function startDevicePoll() {
+        if (devicePollTimer) clearInterval(devicePollTimer);
+        pollDevices();
+        if (!apiKey) return;
+        devicePollTimer = setInterval(pollDevices, 2000);
+        if (!window.__fleetClock) {
+            window.__fleetClock = setInterval(() => renderFleetTable(), 1000);
+        }
+    }
+
+    async function bootstrapDashboard() {
+        try {
+            const res = await fetch(`${API_URL}/api/v1/ops/dashboard-bootstrap`, { cache: "no-store" });
+            if (res.ok) {
+                const cfg = await res.json();
+                if (cfg.api_key) {
+                    apiKey = cfg.api_key;
+                    localStorage.setItem("api_key", apiKey);
+                    const display = document.getElementById("api-key-display");
+                    if (display) display.value = apiKey;
+                }
+            }
+        } catch (err) {
+            /* segue com localStorage se o bootstrap falhar */
+        }
+        connectWebSocket();
+        startDevicePoll();
+    }
+
     function handleTelemetryFrame(frame) {
+        if (!frame || !frame.sensor_readings) return;
+        const ph = frame.phantom_data || {};
         // A. Atualizar buffers de dados deslizantes (MAX_POINTS)
-        const label = frame.step.toString();
+        const label = String(frame.step ?? "");
         chartLabels.push(label);
         if (chartLabels.length > MAX_POINTS) chartLabels.shift();
 
@@ -370,8 +684,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // 2. Pressão Arterial
-        const s = frame.phantom_data.systolic_bp;
-        const d = frame.phantom_data.diastolic_bp;
+        const s = phantomOr(ph.systolic_bp, null);
+        const d = phantomOr(ph.diastolic_bp, null);
         bpData.sbp.push(s.estimate);
         bpData.sbp_low.push(s.ci_lower);
         bpData.sbp_up.push(s.ci_upper);
@@ -385,8 +699,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // 3. SpO2 & Glicose
-        const o = frame.phantom_data.spo2;
-        const g = frame.phantom_data.glucose;
+        const o = phantomOr(ph.spo2, null);
+        const g = phantomOr(ph.glucose || ph.glucose_mgdl, null);
         oxData.spo2.push(o.estimate);
         oxData.spo2_low.push(o.ci_lower);
         oxData.spo2_up.push(o.ci_upper);
@@ -407,25 +721,34 @@ document.addEventListener("DOMContentLoaded", () => {
         // C. Atualizar Métricas Textuais no DOM
         // BPM
         valBpm.textContent = Math.round(frame.sensor_readings.clean_estimate);
-        const pwWeight = Math.round(frame.sensor_weights.pixel_watch * 100);
-        const fbWeight = Math.round(frame.sensor_weights.fitbit_band * 100);
-        subBpm.textContent = `Pesos: Watch (${pwWeight}%) | Band (${fbWeight}%)`;
+        const weights = frame.sensor_weights || {};
+        const pwWeight = Math.round((weights.pixel_watch || 0) * 100);
+        const fbWeight = Math.round((weights.fitbit_band || 0) * 100);
+        subBpm.textContent = pwWeight || fbWeight
+            ? `Pesos: Watch (${pwWeight}%) | Band (${fbWeight}%)`
+            : "Relógio VE30";
 
         // Pressão Arterial
-        valBp.textContent = `${Math.round(s.estimate)} / ${Math.round(d.estimate)}`;
-        subBp.textContent = `Intervalo PAS: (${Math.round(s.ci_lower)} - ${Math.round(s.ci_upper)})`;
+        if (s.estimate != null) {
+            valBp.textContent = `${Math.round(s.estimate)} / ${Math.round(d.estimate || 0)}`;
+            subBp.textContent = `Intervalo PAS: (${Math.round(s.ci_lower)} - ${Math.round(s.ci_upper)})`;
+        }
 
         // SpO2
-        valSpo2.textContent = o.estimate.toFixed(1);
-        subSpo2.textContent = o.reliable ? "Sinal Válido ✓" : "Incerteza Alta ⚠️";
-        subSpo2.className = o.reliable ? "metric-sub text-green" : "metric-sub text-red";
+        if (o.estimate != null) {
+            valSpo2.textContent = Number(o.estimate).toFixed(1);
+            subSpo2.textContent = o.reliable ? "Sinal Válido ✓" : "Incerteza Alta ⚠️";
+            subSpo2.className = o.reliable ? "metric-sub text-green" : "metric-sub text-red";
+        }
 
         // Glicose
-        valGlucose.textContent = Math.round(g.estimate);
-        subGlucose.textContent = g.reliable ? "Sinal Válido ✓" : "Incerteza Alta ⚠️";
+        if (g.estimate != null) {
+            valGlucose.textContent = Math.round(g.estimate);
+            subGlucose.textContent = g.reliable ? "Sinal Válido ✓" : "Incerteza Alta ⚠️";
+        }
 
         // D. Atualizar Probabilidades da Rede Bayesiana (Barras)
-        frame.hypotheses.forEach(h => {
+        (frame.hypotheses || []).forEach(h => {
             const pct = (h.probability * 100).toFixed(1) + "%";
             const width = (h.probability * 100) + "%";
             
@@ -445,9 +768,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         // E. Atualizar Badges de Códigos Clínicos (Interoperabilidade)
-        updateBadges(badgesIcd10, frame.clinical_codes.icd10);
-        updateBadges(badgesSnomed, frame.clinical_codes.snomed);
-        updateBadges(badgesMesh, frame.clinical_codes.mesh);
+        const codes = frame.clinical_codes || {};
+        if (badgesIcd10) updateBadges(badgesIcd10, codes.icd10);
+        if (badgesSnomed) updateBadges(badgesSnomed, codes.snomed);
+        if (badgesMesh) updateBadges(badgesMesh, codes.mesh);
     }
 
     function updateBadges(container, codesArray) {
@@ -569,6 +893,12 @@ document.addEventListener("DOMContentLoaded", () => {
             btn.classList.add("active");
             const activeContent = document.getElementById(`view-${targetTab}`);
             if (activeContent) activeContent.classList.add("active");
+            if (targetTab === "biophysics" && typeof window.initBiophysicsView === "function") {
+                window.initBiophysicsView();
+            }
+            if (targetTab === "billing" && typeof window.initGcpBilling === "function") {
+                window.initGcpBilling();
+            }
         });
     });
 
@@ -576,6 +906,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnCopyKey = document.getElementById("btn-copy-key");
     const apiKeyDisplay = document.getElementById("api-key-display");
     const copyFeedback = document.getElementById("copy-feedback");
+    if (apiKeyDisplay && apiKey) apiKeyDisplay.value = apiKey;
+    const fleetSearch = document.getElementById("fleet-search");
+    const fleetFilter = document.getElementById("fleet-filter");
+    const fleetPrev = document.getElementById("fleet-prev");
+    const fleetNext = document.getElementById("fleet-next");
+    if (fleetSearch) fleetSearch.addEventListener("input", () => { fleetPage = 0; renderFleetTable(); });
+    if (fleetFilter) fleetFilter.addEventListener("change", () => { fleetPage = 0; renderFleetTable(); });
+    if (fleetPrev) fleetPrev.addEventListener("click", () => { fleetPage -= 1; renderFleetTable(); });
+    if (fleetNext) fleetNext.addEventListener("click", () => { fleetPage += 1; renderFleetTable(); });
 
     if (btnCopyKey && apiKeyDisplay) {
         btnCopyKey.addEventListener("click", () => {
@@ -665,7 +1004,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const snippets = {
         curl: `curl -X POST "${API_URL}/api/v1/wearables/ingest" \\
-     -H "X-API-Key: healthtech_live_key_2026" \\
+     -H "X-API-Key: $INGEST_API_KEY" \\
      -H "Content-Type: application/json" \\
      -d '{
        "patient_id": "PAT-PULSO-101",
@@ -679,7 +1018,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 url = "${API_URL}/api/v1/wearables/ingest"
 headers = {
-    "X-API-Key": "healthtech_live_key_2026",
+    "X-API-Key": "<SUA_INGEST_API_KEY>",
     "Content-Type": "application/json"
 }
 payload = {
@@ -696,7 +1035,7 @@ print(response.json())`,
         js: `const response = await fetch("${API_URL}/api/v1/wearables/ingest", {
     method: "POST",
     headers: {
-        "X-API-Key": "healthtech_live_key_2026",
+        "X-API-Key": "<SUA_INGEST_API_KEY>",
         "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -732,613 +1071,183 @@ console.log(data);`
     };
 
     // ========================================================================
-    // 9. CONEXÕES APP MOBILE + DEVICE (HBand) + SYNC DE VITAIS
+    // 9. BIOFÍSICA WINDKESSEL 4E & TEORIA DOS JOGOS
     // ========================================================================
-    const SECURE_DEFAULT = SECURE_CLOUD_URL;
-    const CONN_ONLINE_SEC = 30;
-    const CONN_POLL_MS = 5000;
-    let lastMobileTs = null;
+    let chartWk4 = null;
+    let chartPareto = null;
 
-    /**
-     * Aplica frame de ingest do companion (schema wearables) nos cards e gráficos.
-     * Diferente do frame WebSocket de simulação (sensor_readings / hypotheses).
-     */
-    function applyMobileIngestToDashboard(frame) {
-        if (!frame || typeof frame !== "object") return;
-        const ts = frame.timestamp || "";
-        if (ts && ts === lastMobileTs) return; // evita replot do mesmo ponto
-        lastMobileTs = ts || lastMobileTs;
-
-        const raw = frame.raw_telemetry || {};
-        const cleaned = frame.cleaned_telemetry || {};
-        const phantom = frame.phantom_data || {};
-        const hr =
-            cleaned.heart_rate_clean ??
-            raw.heart_rate_bpm ??
-            frame.heart_rate ??
-            null;
-
-        const label = (ts || new Date().toISOString()).slice(11, 19);
-        chartLabels.push(label);
-        if (chartLabels.length > MAX_POINTS) chartLabels.shift();
-
-        const hrNum = hr != null ? Number(hr) : null;
-        hrData.raw_watch.push(hrNum);
-        hrData.clean.push(hrNum);
-        if (hrData.raw_watch.length > MAX_POINTS) {
-            hrData.raw_watch.shift();
-            hrData.clean.shift();
-        }
-
-        const s = phantom.systolic_bp || {};
-        const d = phantom.diastolic_bp || {};
-        const sEst = s.estimate != null ? Number(s.estimate) : null;
-        const dEst = d.estimate != null ? Number(d.estimate) : null;
-        bpData.sbp.push(sEst);
-        bpData.sbp_low.push(s.ci_lower != null ? Number(s.ci_lower) : null);
-        bpData.sbp_up.push(s.ci_upper != null ? Number(s.ci_upper) : null);
-        bpData.dbp.push(dEst);
-        bpData.dbp_low.push(d.ci_lower != null ? Number(d.ci_lower) : null);
-        bpData.dbp_up.push(d.ci_upper != null ? Number(d.ci_upper) : null);
-        if (bpData.sbp.length > MAX_POINTS) {
-            bpData.sbp.shift(); bpData.sbp_low.shift(); bpData.sbp_up.shift();
-            bpData.dbp.shift(); bpData.dbp_low.shift(); bpData.dbp_up.shift();
-        }
-
-        // SpO2: preferir medido; glicose: phantom
-        const spo2 =
-            raw.spo2_percent != null
-                ? Number(raw.spo2_percent)
-                : phantom.spo2?.estimate != null
-                  ? Number(phantom.spo2.estimate)
-                  : null;
-        const g = phantom.glucose_mgdl || phantom.glucose || {};
-        const gEst = g.estimate != null ? Number(g.estimate) : null;
-        oxData.spo2.push(spo2);
-        oxData.spo2_low.push(spo2 != null ? spo2 - 1 : null);
-        oxData.spo2_up.push(spo2 != null ? spo2 + 1 : null);
-        oxData.glucose.push(gEst);
-        oxData.glucose_low.push(g.ci_lower != null ? Number(g.ci_lower) : null);
-        oxData.glucose_up.push(g.ci_upper != null ? Number(g.ci_upper) : null);
-        if (oxData.spo2.length > MAX_POINTS) {
-            oxData.spo2.shift(); oxData.spo2_low.shift(); oxData.spo2_up.shift();
-            oxData.glucose.shift(); oxData.glucose_low.shift(); oxData.glucose_up.shift();
-        }
-
-        chartHr.update();
-        chartBp.update();
-        chartOxygen.update();
-
-        if (hrNum != null && valBpm) {
-            valBpm.textContent = Math.round(hrNum);
-            if (subBpm) {
-                subBpm.textContent = `App mobile · ${frame.device_id || "device"} · ${ts || "agora"}`;
-            }
-        }
-        if (sEst != null && dEst != null && valBp) {
-            valBp.textContent = `${Math.round(sEst)} / ${Math.round(dEst)}`;
-            if (subBp) {
-                subBp.textContent = `Estimativa via app (phantom) · ${frame.patient_id || ""}`;
-            }
-        }
-        if (spo2 != null && valSpo2) {
-            valSpo2.textContent = Number(spo2).toFixed(1);
-            if (subSpo2) {
-                subSpo2.textContent = "Medido no ingest do app ✓";
-                subSpo2.className = "metric-sub text-green";
-            }
-        }
-        if (gEst != null && valGlucose) {
-            valGlucose.textContent = Math.round(gEst);
-            if (subGlucose) {
-                subGlucose.textContent = g.reliable === false ? "Incerteza alta ⚠️" : "Phantom via app ✓";
-            }
-        }
-    }
-
-    async function fetchMobileBridgeSnapshot(patientId) {
-        const q = new URLSearchParams({
-            patient_id: patientId || "PAT-HBAND-001",
-            online_threshold_sec: String(CONN_ONLINE_SEC),
-        });
-        // same-origin bridge no monólito full (usa READ_API_KEY server-side)
-        const res = await fetch(`${API_URL}/api/v1/mobile/bridge/snapshot?${q}`, {
-            headers: { Accept: "application/json" },
-        });
-        if (!res.ok) {
-            const err = new Error(`bridge HTTP ${res.status}`);
-            err.status = res.status;
-            throw err;
-        }
-        return res.json();
-    }
-
-    const connEls = {
-        patientId: document.getElementById("conn-patient-id"),
-        source: document.getElementById("conn-source"),
-        secureUrl: document.getElementById("conn-secure-url"),
-        refreshBtn: document.getElementById("btn-refresh-connections"),
-        pollHint: document.getElementById("conn-poll-hint"),
-        appLabel: document.getElementById("conn-app-label"),
-        appMeta: document.getElementById("conn-app-meta"),
-        deviceLabel: document.getElementById("conn-device-label"),
-        deviceMeta: document.getElementById("conn-device-meta"),
-        apiLabel: document.getElementById("conn-api-label"),
-        apiMeta: document.getElementById("conn-api-meta"),
-        nodeApp: document.getElementById("conn-node-app"),
-        nodeDevice: document.getElementById("conn-node-device"),
-        nodeApi: document.getElementById("conn-node-api"),
-        dotApp: document.getElementById("conn-dot-app"),
-        dotDevice: document.getElementById("conn-dot-device"),
-        dotApi: document.getElementById("conn-dot-api"),
-        linkDeviceApp: document.getElementById("conn-link-device-app"),
-        linkAppApi: document.getElementById("conn-link-app-api"),
-        linkDeviceCaption: document.getElementById("conn-link-device-caption"),
-        linkAppCaption: document.getElementById("conn-link-app-caption"),
-        statOnline: document.getElementById("conn-stat-online"),
-        statPatients: document.getElementById("conn-stat-patients"),
-        statHr: document.getElementById("conn-stat-hr"),
-        statDevice: document.getElementById("conn-stat-device"),
-        statTs: document.getElementById("conn-stat-ts"),
-        statAge: document.getElementById("conn-stat-age"),
-        sessionsBody: document.getElementById("conn-sessions-body"),
-        roadmap: document.getElementById("conn-roadmap-list"),
-    };
-
-    // Prefer patient do companion se já usado em simulação
-    try {
-        const savedPatient = localStorage.getItem("conn_patient_id");
-        if (savedPatient && connEls.patientId) connEls.patientId.value = savedPatient;
-        const savedSource = localStorage.getItem("conn_source");
-        if (connEls.source) {
-            connEls.source.value = savedSource || defaultConnSource;
-        }
-        const savedSecure = localStorage.getItem("conn_secure_url");
-        if (connEls.secureUrl) {
-            connEls.secureUrl.value = savedSecure || SECURE_DEFAULT;
-        }
-    } catch (_) {
-        if (connEls.source) connEls.source.value = defaultConnSource;
-    }
-
-    function statusDotClass(status) {
-        if (status === "online" || status === "ble_hband") return "conn-dot green";
-        if (status === "ble_sim" || status === "via_app") return "conn-dot yellow";
-        if (status === "idle" || status === "planned") return "conn-dot blue";
-        return "conn-dot red";
-    }
-
-    function formatAge(sec) {
-        if (sec == null || Number.isNaN(sec)) return "—";
-        if (sec < 60) return `${Math.round(sec)}s`;
-        if (sec < 3600) return `${Math.round(sec / 60)} min`;
-        return `${(sec / 3600).toFixed(1)} h`;
-    }
-
-    function authHeaders() {
-        const h = { Accept: "application/json" };
-        if (apiKey) h["X-API-Key"] = apiKey;
-        return h;
-    }
-
-    async function fetchConnectionStatus(baseUrl) {
-        const root = baseUrl.replace(/\/$/, "");
-        // Preferir /public (sem auth). Fallback para /status (público ou autenticado).
-        const candidates = [
-            `${root}/api/v1/connections/public?online_threshold_sec=${CONN_ONLINE_SEC}`,
-            `${root}/api/v1/connections/status?online_threshold_sec=${CONN_ONLINE_SEC}`,
-        ];
-        let lastErr = null;
-        for (const url of candidates) {
-            try {
-                const res = await fetch(url, { headers: authHeaders() });
-                if (res.ok) return res.json();
-                lastErr = new Error(`HTTP ${res.status}`);
-                lastErr.status = res.status;
-                // 404 → tentar próximo path
-                if (res.status !== 404) break;
-            } catch (e) {
-                lastErr = e;
-            }
-        }
-        throw lastErr || new Error("Falha ao obter status de conexões");
-    }
-
-    async function fetchLatestFallback(baseUrl, patientId) {
-        const url = `${baseUrl.replace(/\/$/, "")}/api/v1/wearables/patient/${encodeURIComponent(patientId)}/latest`;
-        const res = await fetch(url, { headers: authHeaders() });
-        if (res.status === 404) return null;
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-    }
-
-    function synthesizeFromLatest(frame, sourceLabel) {
-        if (!frame) {
-            return {
-                mobile_app: { status: "offline", label: "Sem dados", active_sessions: 0, total_patients: 0, latest: null },
-                device: { status: "planned", label: "Aguardando simulador BLE ou HBand", model_hint: null, pairing_ready: false },
-                sessions: [],
-                source: sourceLabel,
-            };
-        }
-        const ts = frame.timestamp ? new Date(frame.timestamp) : null;
-        const age = ts ? (Date.now() - ts.getTime()) / 1000 : null;
-        let mobile = "offline";
-        if (age != null && age <= CONN_ONLINE_SEC) mobile = "online";
-        else if (age != null && age <= 300) mobile = "idle";
-        const deviceId = frame.device_id || "—";
-        const hr =
-            frame.cleaned_telemetry?.heart_rate_clean ??
-            frame.raw_telemetry?.heart_rate_bpm ??
-            null;
-        const session = {
-            patient_id: frame.patient_id,
-            device_id: deviceId,
-            timestamp: frame.timestamp,
-            age_seconds: age != null ? Math.round(age * 10) / 10 : null,
-            mobile_status: mobile,
-            device_status: deviceId && deviceId !== "—" ? "via_app" : "planned",
-            heart_rate_bpm: hr,
-            samples: 1,
-            source: sourceLabel,
-        };
-        return {
-            mobile_app: {
-                status: mobile,
-                label:
-                    mobile === "online"
-                        ? "App mobile conectado (ingest ativo)"
-                        : mobile === "idle"
-                          ? "App mobile com telemetria recente"
-                          : "Nenhum ingest recente do app",
-                active_sessions: mobile === "online" ? 1 : 0,
-                total_patients: 1,
-                latest: session,
-            },
-            device: {
-                status: session.device_status === "via_app" ? "via_app" : "planned",
-                label:
-                    session.device_status === "via_app"
-                        ? "Device visto só via ingest HTTP (sem BLE)"
-                        : "Aguardando simulador BLE ou HBand",
-                model_hint: deviceId,
-                pairing_ready: false,
-            },
-            sessions: [session],
-            source: sourceLabel,
-        };
-    }
-
-    function mergeConnectionPayloads(parts) {
-        const sessions = [];
-        parts.forEach((p) => {
-            (p.sessions || []).forEach((s) => {
-                sessions.push({ ...s, source: s.source || p.source || "api" });
+    function initBiophysicsCharts() {
+        const ctxWk4 = document.getElementById("chart-wk4");
+        if (ctxWk4 && !chartWk4) {
+            chartWk4 = new Chart(ctxWk4, {
+                type: "line",
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: "Pressão Aórtica P(t) [mmHg]",
+                            borderColor: "#38bdf8",
+                            backgroundColor: "rgba(56, 189, 248, 0.1)",
+                            data: [],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            yAxisID: "yP",
+                        },
+                        {
+                            label: "Fluxo Ejetado Q(t) [mL/s]",
+                            borderColor: "#ec4899",
+                            backgroundColor: "rgba(236, 72, 153, 0.05)",
+                            data: [],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            borderDash: [4, 4],
+                            yAxisID: "yQ",
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: true, title: { display: true, text: "Tempo (s)", color: "#64748b" } },
+                        yP: { position: "left", title: { display: true, text: "P(t) mmHg", color: "#38bdf8" }, min: 40, max: 180 },
+                        yQ: { position: "right", title: { display: true, text: "Q(t) mL/s", color: "#ec4899" }, grid: { drawOnChartArea: false }, min: 0, max: 500 }
+                    },
+                    plugins: {
+                        legend: { labels: { color: "#e2e8f0", font: { family: "Outfit", size: 11 } } }
+                    }
+                }
             });
-        });
-        // dedupe by patient+device keeping freshest
-        const byKey = new Map();
-        sessions.forEach((s) => {
-            const key = `${s.patient_id}::${s.device_id}`;
-            const prev = byKey.get(key);
-            if (!prev || (s.age_seconds ?? 1e12) < (prev.age_seconds ?? 1e12)) {
-                byKey.set(key, s);
-            }
-        });
-        const mergedSessions = Array.from(byKey.values()).sort(
-            (a, b) => (a.age_seconds ?? 1e12) - (b.age_seconds ?? 1e12)
-        );
-        const online = mergedSessions.filter((s) => s.mobile_status === "online");
-        const idle = mergedSessions.filter((s) => s.mobile_status === "idle");
-        const best = online[0] || idle[0] || mergedSessions[0] || null;
-        let mobileStatus = "offline";
-        if (online.length) mobileStatus = "online";
-        else if (idle.length) mobileStatus = "idle";
-        else if (mergedSessions.length) mobileStatus = "offline";
-
-        const rank = ["ble_hband", "ble_sim", "via_app"];
-        let deviceStatus = "planned";
-        for (const wanted of rank) {
-            if (mergedSessions.some((s) => s.device_status === wanted && s.mobile_status !== "offline")) {
-                deviceStatus = wanted;
-                break;
-            }
-        }
-        if (mobileStatus === "offline" && deviceStatus === "planned" && mergedSessions.length) {
-            deviceStatus = "offline";
         }
 
-        return {
-            mobile_app: {
-                status: mobileStatus,
-                label: {
-                    online: "App mobile conectado (ingest ativo)",
-                    idle: "App mobile com telemetria recente",
-                    offline: "Nenhum ingest recente do app",
-                }[mobileStatus],
-                active_sessions: online.length,
-                total_patients: new Set(mergedSessions.map((s) => s.patient_id)).size,
-                latest: best,
-            },
-            device: {
-                status: deviceStatus,
-                label: {
-                    ble_hband: "HBand pareado via BLE (SDK)",
-                    ble_sim: "Device simulado no companion (não é BLE físico)",
-                    via_app: "Device visto só via ingest HTTP (sem BLE)",
-                    planned: "Aguardando simulador BLE ou HBand",
-                    offline: "Device sem telemetria recente",
-                }[deviceStatus],
-                model_hint: best?.device_id || null,
-                pairing_ready: deviceStatus === "ble_sim" || deviceStatus === "ble_hband",
-                ble_physical: deviceStatus === "ble_hband",
-                ble_simulated: deviceStatus === "ble_sim",
-            },
-            sessions: mergedSessions,
-            sources: parts.map((p) => p.source).filter(Boolean),
-        };
-    }
-
-    function setNodeStatus(nodeEl, dotEl, status) {
-        if (nodeEl) nodeEl.setAttribute("data-status", status || "offline");
-        if (dotEl) dotEl.className = statusDotClass(status);
-    }
-
-    function renderConnections(data) {
-        if (!connEls.appLabel) return;
-        const mobile = data.mobile_app || {};
-        const device = data.device || {};
-        const latest = mobile.latest || null;
-
-        connEls.appLabel.textContent = mobile.label || mobile.status || "—";
-        connEls.deviceLabel.textContent = device.label || device.status || "—";
-        setNodeStatus(connEls.nodeApp, connEls.dotApp, mobile.status);
-        setNodeStatus(connEls.nodeDevice, connEls.dotDevice, device.status);
-        setNodeStatus(connEls.nodeApi, connEls.dotApi, "online");
-
-        if (connEls.linkAppApi) {
-            connEls.linkAppApi.classList.toggle("active", mobile.status === "online" || mobile.status === "idle");
-            connEls.linkAppApi.classList.toggle("planned", false);
-        }
-        if (connEls.linkDeviceApp) {
-            const live = ["ble_sim", "ble_hband", "via_app"].includes(device.status);
-            connEls.linkDeviceApp.classList.toggle("active", live && mobile.status !== "offline");
-            connEls.linkDeviceApp.classList.toggle("planned", device.status === "planned");
-        }
-        if (connEls.linkDeviceCaption) {
-            connEls.linkDeviceCaption.textContent = {
-                ble_hband: "BLE HBand",
-                ble_sim: "simulado",
-                via_app: "HTTP",
-                planned: "device → app",
-                offline: "offline",
-            }[device.status] || "device → app";
-        }
-        if (connEls.linkAppCaption) {
-            connEls.linkAppCaption.textContent =
-                mobile.status === "online" ? "ingest" : "HTTPS";
-        }
-
-        const sources = data.sources || [data.source].filter(Boolean);
-        connEls.apiLabel.textContent = sources.length
-            ? `Fonte: ${sources.join(" + ")}`
-            : "API Healthtech";
-        connEls.apiMeta.textContent = API_URL;
-        connEls.appMeta.textContent =
-            mobile.status === "online"
-                ? `Sessões ativas: ${mobile.active_sessions || 0}`
-                : "OkHttp → POST /wearables/ingest";
-        connEls.deviceMeta.textContent = device.model_hint
-            ? `device_id: ${device.model_hint}`
-            : "Protocolo planejado: BLE GATT / HBand SDK";
-
-        if (connEls.statOnline) connEls.statOnline.textContent = String(mobile.active_sessions ?? 0);
-        if (connEls.statPatients) connEls.statPatients.textContent = String(mobile.total_patients ?? 0);
-        if (connEls.statHr) {
-            const hr = latest?.heart_rate_bpm;
-            connEls.statHr.textContent = hr != null ? `${Math.round(hr)} bpm` : "—";
-        }
-        if (connEls.statDevice) connEls.statDevice.textContent = latest?.device_id || device.model_hint || "—";
-        if (connEls.statTs) connEls.statTs.textContent = latest?.timestamp || "—";
-        if (connEls.statAge) connEls.statAge.textContent = formatAge(latest?.age_seconds);
-
-        // Prefer patient filter for table highlight
-        const focusPatient = (connEls.patientId?.value || "").trim();
-        const rows = (data.sessions || []).slice(0, 12);
-        if (connEls.sessionsBody) {
-            if (!rows.length) {
-                connEls.sessionsBody.innerHTML =
-                    '<tr class="empty-row"><td colspan="7">Nenhuma sessão de ingest ainda. Envie telemetria pelo app ou simulador.</td></tr>';
-            } else {
-                connEls.sessionsBody.innerHTML = rows
-                    .map((s) => {
-                        const focus =
-                            focusPatient && s.patient_id === focusPatient
-                                ? ' style="background:rgba(14,165,233,0.08)"'
-                                : "";
-                        return `<tr${focus}>
-                            <td>${s.patient_id || "—"}</td>
-                            <td>${s.device_id || "—"}</td>
-                            <td><span class="pill ${s.mobile_status || "offline"}">${s.mobile_status || "—"}</span></td>
-                            <td><span class="pill ${s.device_status || "planned"}">${s.device_status || "—"}</span></td>
-                            <td>${s.heart_rate_bpm != null ? Math.round(s.heart_rate_bpm) : "—"}</td>
-                            <td>${formatAge(s.age_seconds)}</td>
-                            <td>${s.source || "—"}</td>
-                        </tr>`;
-                    })
-                    .join("");
-            }
-        }
-
-        if (connEls.roadmap) {
-            const items = device.roadmap;
-            if (Array.isArray(items) && items.length && typeof items[0] === "object") {
-                connEls.roadmap.innerHTML = items.map((it) =>
-                    `<li class="${it.done ? "done" : "todo"}">${it.label}</li>`
-                ).join("");
-            } else {
-                connEls.roadmap.innerHTML = `
-                    <li class="done">App envia telemetria via HTTPS (ingest)</li>
-                    <li class="${device.ble_simulated ? "done" : "todo"}">Simulador BLE no companion</li>
-                    <li class="${device.ble_physical ? "done" : "todo"}">Pairing HBand real (SDK + pulseira)</li>
-                    <li class="done">Dashboard distingue simulado vs BLE físico</li>
-                `;
-            }
-        }
-    }
-
-    async function refreshConnections() {
-        if (!connEls.appLabel) return;
-        const source = connEls.source?.value || defaultConnSource;
-        const patientId = (connEls.patientId?.value || "PAT-HBAND-001").trim();
-        const secureUrl = (connEls.secureUrl?.value || SECURE_DEFAULT).trim();
-
-        try {
-            localStorage.setItem("conn_patient_id", patientId);
-            localStorage.setItem("conn_source", source);
-            localStorage.setItem("conn_secure_url", secureUrl);
-        } catch (_) { /* ignore */ }
-
-        if (connEls.pollHint) connEls.pollHint.textContent = "Sincronizando app mobile…";
-        const parts = [];
-        let bridgeLatest = null;
-
-        // 1) Bridge same-origin (preferido em Cloud Run): secure-api via monólito
-        try {
-            const snap = await fetchMobileBridgeSnapshot(patientId);
-            if (snap.connections) {
-                const c = snap.connections;
-                c.source = c.source || "secure-cloud-bridge";
-                parts.push(c);
-            }
-            if (snap.latest) {
-                bridgeLatest = snap.latest;
-                applyMobileIngestToDashboard(snap.latest);
-            }
-            if (snap.errors?.length) {
-                logger.warning("Bridge: " + snap.errors.join("; "));
-            }
-        } catch (bridgeErr) {
-            logger.warning(`Bridge mobile indisponível: ${bridgeErr.message}`);
-        }
-
-        async function loadOne(base, label) {
-            try {
-                const data = await fetchConnectionStatus(base);
-                data.source = label;
-                if (patientId && (!data.sessions || !data.sessions.length)) {
-                    const latest = await fetchLatestFallback(base, patientId);
-                    if (latest) {
-                        if (!bridgeLatest) applyMobileIngestToDashboard(latest);
-                        return synthesizeFromLatest(latest, label);
+        const ctxPareto = document.getElementById("chart-pareto");
+        if (ctxPareto && !chartPareto) {
+            chartPareto = new Chart(ctxPareto, {
+                type: "scatter",
+                data: {
+                    datasets: [
+                        {
+                            label: "Alocações Viáveis",
+                            data: [{ x: 10, y: 35 }, { x: 8, y: 38 }, { x: 12, y: 30 }, { x: 6, y: 40 }],
+                            backgroundColor: "#64748b",
+                        },
+                        {
+                            label: "Equilíbrio de Nash / Fronteira de Pareto",
+                            data: [{ x: 10, y: 35 }],
+                            backgroundColor: "#f59e0b",
+                            pointRadius: 8,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: "Leitos UTI Ocupados", color: "#94a3b8" } },
+                        y: { title: { display: true, text: "Leitos Enfermaria Ocupados", color: "#94a3b8" } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: "#e2e8f0", font: { family: "Outfit", size: 11 } } }
                     }
                 }
-                (data.sessions || []).forEach((s) => {
-                    s.source = s.source || label;
-                });
-                return data;
-            } catch (err) {
-                if (err.status === 404 || err.status === 405) {
-                    try {
-                        const latest = await fetchLatestFallback(base, patientId);
-                        if (latest && !bridgeLatest) applyMobileIngestToDashboard(latest);
-                        return synthesizeFromLatest(latest, label);
-                    } catch (e2) {
-                        logger.warning(`Conexões (${label}): ${e2.message}`);
-                        return synthesizeFromLatest(null, label);
-                    }
-                }
-                logger.warning(`Conexões (${label}): ${err.message}`);
-                return synthesizeFromLatest(null, label);
-            }
-        }
-
-        // 2) Fontes extras conforme seletor (se bridge falhou ou usuário pediu both/local)
-        if (!parts.length || source === "local" || source === "both") {
-            if (source === "local" || source === "both") {
-                parts.push(await loadOne(API_URL, "local"));
-            }
-        }
-        if (!parts.length || source === "secure" || source === "both") {
-            // Cross-origin direto na secure (CORS liberado)
-            if (source === "secure" || source === "both" || !parts.length) {
-                parts.push(await loadOne(secureUrl, "secure-cloud"));
-            }
-        }
-
-        const merged =
-            parts.length === 1
-                ? { ...parts[0], sources: [parts[0].source || "api"] }
-                : mergeConnectionPayloads(parts);
-
-        if (bridgeLatest && merged.mobile_app) {
-            // Garante latest rico no painel
-            const ageSec = bridgeLatest.timestamp
-                ? (Date.now() - new Date(bridgeLatest.timestamp).getTime()) / 1000
-                : null;
-            merged.mobile_app.latest = {
-                ...(merged.mobile_app.latest || {}),
-                patient_id: bridgeLatest.patient_id,
-                device_id: bridgeLatest.device_id,
-                timestamp: bridgeLatest.timestamp,
-                age_seconds: ageSec != null ? Math.round(ageSec * 10) / 10 : null,
-                heart_rate_bpm:
-                    bridgeLatest.cleaned_telemetry?.heart_rate_clean ??
-                    bridgeLatest.raw_telemetry?.heart_rate_bpm,
-                spo2_percent: bridgeLatest.raw_telemetry?.spo2_percent,
-                mobile_status:
-                    ageSec != null && ageSec <= CONN_ONLINE_SEC
-                        ? "online"
-                        : ageSec != null && ageSec <= 300
-                          ? "idle"
-                          : "offline",
-                device_status: "via_app",
-                source: "secure-cloud-bridge",
-            };
-            if (merged.mobile_app.latest.mobile_status === "online") {
-                merged.mobile_app.status = "online";
-                merged.mobile_app.label = "App mobile conectado (ingest ativo)";
-                merged.mobile_app.active_sessions = Math.max(
-                    1,
-                    merged.mobile_app.active_sessions || 0
-                );
-            }
-            if (merged.device) {
-                merged.device.status = "via_app";
-                merged.device.model_hint = bridgeLatest.device_id;
-                merged.device.label = "Device visto via app companion";
-            }
-        }
-
-        if (patientId && merged.sessions?.length) {
-            const focus = merged.sessions.find((s) => s.patient_id === patientId);
-            if (focus && merged.mobile_app && !bridgeLatest) {
-                merged.mobile_app.latest = focus;
-            }
-        }
-
-        renderConnections(merged);
-        if (connEls.pollHint) {
-            const t = new Date().toLocaleTimeString();
-            const live = bridgeLatest ? " · vitais do app" : "";
-            connEls.pollHint.textContent = `Atualizado ${t} · a cada ${CONN_POLL_MS / 1000}s${live}`;
+            });
         }
     }
 
-    if (connEls.refreshBtn) {
-        connEls.refreshBtn.addEventListener("click", () => refreshConnections());
+    async function runWk4Simulation() {
+        const rp = parseFloat(document.getElementById("slider-rp")?.value || "1.0");
+        const c = parseFloat(document.getElementById("slider-c")?.value || "1.2");
+        const zc = parseFloat(document.getElementById("slider-zc")?.value || "0.05");
+        const l = parseFloat(document.getElementById("slider-l")?.value || "0.005");
+        const hr = parseFloat(document.getElementById("slider-hr")?.value || "75");
+        const sv = parseFloat(document.getElementById("slider-sv")?.value || "70");
+
+        try {
+            const headers = { "Content-Type": "application/json" };
+            if (apiKey) headers["X-API-Key"] = apiKey;
+            const resp = await fetch(`${API_URL}/api/hemodynamics/simulate_wk4`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ Rp: rp, C: c, Zc: zc, L: l, hr: hr, sv: sv, duration_s: 2.5, with_baroreflex: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (chartWk4) {
+                chartWk4.data.labels = data.time.map(t => t.toFixed(2));
+                chartWk4.data.datasets[0].data = data.pressure;
+                chartWk4.data.datasets[1].data = data.flow;
+                chartWk4.update();
+            }
+
+            const elPas = document.getElementById("wk4-pas");
+            const elPad = document.getElementById("wk4-pad");
+            const elPam = document.getElementById("wk4-pam");
+            const elPwv = document.getElementById("wk4-pwv");
+            if (elPas) elPas.innerText = `${data.metrics.systolic_bp} mmHg`;
+            if (elPad) elPad.innerText = `${data.metrics.diastolic_bp} mmHg`;
+            if (elPam) elPam.innerText = `${data.metrics.mean_arterial_pressure} mmHg`;
+            if (elPwv) elPwv.innerText = `${data.metrics.pwv_bramwell_hill} m/s`;
+        } catch (err) {
+            console.warn("Simulação WK4 offline:", err);
+        }
     }
-    ["change", "blur"].forEach((ev) => {
-        connEls.source?.addEventListener(ev, () => refreshConnections());
-        connEls.patientId?.addEventListener(ev, () => refreshConnections());
-        connEls.secureUrl?.addEventListener(ev, () => refreshConnections());
+
+    ["slider-rp", "slider-c", "slider-zc", "slider-l", "slider-hr", "slider-sv"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("input", () => {
+                const lblId = id.replace("slider-", "lbl-");
+                const lbl = document.getElementById(lblId);
+                if (lbl) lbl.innerText = el.value;
+                runWk4Simulation();
+            });
+        }
     });
 
-    // Conectar ao WebSocket na inicialização
-    connectWebSocket();
+    const btnCalcTriage = document.getElementById("btn-calc-triage");
+    if (btnCalcTriage) {
+        btnCalcTriage.addEventListener("click", async () => {
+            const icuCap = parseInt(document.getElementById("inp-icu-cap")?.value || "10");
+            const wardCap = parseInt(document.getElementById("inp-ward-cap")?.value || "40");
+            const icuDem = parseInt(document.getElementById("inp-icu-dem")?.value || "14");
+            const critFrac = parseFloat(document.getElementById("inp-crit-frac")?.value || "40") / 100.0;
 
-    // Poll de conexões mobile/device
-    refreshConnections();
-    setInterval(refreshConnections, CONN_POLL_MS);
+            try {
+                const headers = { "Content-Type": "application/json" };
+                if (apiKey) headers["X-API-Key"] = apiKey;
+                const resp = await fetch(`${API_URL}/api/game_theory/solve_triage`, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({ icu_capacity: icuCap, ward_capacity: wardCap, icu_demand: icuDem, ward_demand: 35, high_risk_fraction: critFrac })
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                const badge = document.getElementById("triage-nash-badge");
+                const rec = document.getElementById("triage-recommendation");
+                if (badge) badge.innerText = `Nash: ${data.nash_equilibrium?.strategy || "Alocação Balanceada"}`;
+                if (rec) rec.innerText = data.clinical_recommendation || "Equilíbrio calculado com sucesso.";
+
+                if (chartPareto && data.pareto_frontier) {
+                    chartPareto.data.datasets[1].data = data.pareto_frontier.map(p => ({ x: p.icu_allocated, y: p.ward_allocated }));
+                    chartPareto.update();
+                }
+            } catch (e) {
+                console.warn("Erro ao calcular triagem:", e);
+            }
+        });
+    }
+
+    window.initBiophysicsView = function () {
+        initBiophysicsCharts();
+        runWk4Simulation();
+    };
+
+    const initialTab = urlParams.get("tab");
+    if (initialTab) window.switchTab(initialTab);
+
+    bootstrapDashboard();
 });
 
