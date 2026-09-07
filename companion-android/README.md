@@ -70,8 +70,17 @@ Alertas clínicos na UI são **apoio à decisão**, não protocolo mandatório.
 
 ## BLE
 
-- **Simulador:** fecha o pipeline Device → App → API para o dashboard.
-- **HBand real:** `app/.../ble/HbandSdkTransport.kt` — plugar `VPOperateManager` quando os AARs oficiais existirem. Sem AAR, o app **não** marca `ble_hband`.
+O scan lista **todos** os BLE próximos. A leitura de FC só funciona depois do handshake Veepoo:
+
+`connect → notify OK → senha 0000 → syncPersonInfo → startDetectHeart`
+
+Só o estado `STATE_HEART_NORMAL` com BPM 20–250 é enviado à API. Medição em curso, pulseira fora do pulso ou BPM 0 são ignorados.
+
+1. Aceite Bluetooth + localização.
+2. **Escanear** → pulseiras aparecem no topo (badge “pulseira?”).
+3. Toque na **pulseira**, não em fone/TV.
+4. Vista o device. Se o relógio pedir confirmação, toque nele.
+5. GATT SIG é fallback para bandas que expõem 0x180D (HBand em geral **não** expõe).
 
 ## Build CLI (opcional)
 

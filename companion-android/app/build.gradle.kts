@@ -73,6 +73,11 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            pickFirsts += "META-INF/INDEX.LIST"
+            pickFirsts += "META-INF/io.netty.versions.properties"
+        }
+        jniLibs {
+            pickFirsts += "**/*.so"
         }
     }
 }
@@ -94,4 +99,9 @@ dependencies {
 
     implementation(project(":client"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // HBand / Veepoo SDK (handshake + HR). Sem isto o GATT conecta mas não lê vitais.
+    implementation(fileTree("libs") { include("*.aar") })
+    implementation("no.nordicsemi.android.support.v18:scanner:1.4.2")
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
 }

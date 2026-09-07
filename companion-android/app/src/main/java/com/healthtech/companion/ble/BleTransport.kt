@@ -4,7 +4,7 @@ package com.healthtech.companion.ble
  * Porta BLE do companion.
  *
  * [SimulatedBleTransport] fecha o pipeline Device → App → API sem pulseira.
- * [HbandSdkTransport] é o gancho do SDK real (AARs Veepoo); sem AAR não finge pairing.
+ * [HbandProtocolClient] faz o handshake Veepoo real (AARs em app/libs).
  */
 interface BleTransport {
     val mode: BleMode

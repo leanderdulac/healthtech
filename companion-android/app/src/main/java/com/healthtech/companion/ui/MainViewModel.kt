@@ -3,8 +3,11 @@ package com.healthtech.companion.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.healthtech.companion.ble.BlePermissions
 import com.healthtech.companion.ble.BleTransport
-import com.healthtech.companion.ble.HbandSdkTransport
+import com.healthtech.companion.ble.GattHeartRateClient
+import com.healthtech.companion.ble.HbandProtocolClient
+import com.healthtech.companion.ble.ScannedDevice
 import com.healthtech.companion.ble.SimulatedBleTransport
 import com.healthtech.companion.data.AppPrefs
 import com.healthtech.companion.net.ApiResult
@@ -34,6 +37,13 @@ data class UiState(
     val showKey: Boolean = false,
     val bleSimRunning: Boolean = false,
     val lastSimBpm: Double? = null,
+    val scanning: Boolean = false,
+    val scannedDevices: List<ScannedDevice> = emptyList(),
+    val connectedMac: String? = null,
+    val handshakeReady: Boolean = false,
+    val lastLiveBpm: Int? = null,
+    val lastSpo2: Int? = null,
+    val measuring: Boolean = false,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -53,9 +63,86 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var repository: HealthtechRepository = buildRepo()
     private var outbox: OutboxFlusher = OutboxFlusher(repository)
     private var bleSim: BleTransport? = null
-    private val hbandSdk = HbandSdkTransport { msg ->
-        _state.update { it.copy(statusLine = msg) }
-    }
+    private var gattHr: GattHeartRateClient? = null
+    private val hband = HbandProtocolClient(
+        app,
+        object : HbandProtocolClient.Listener {
+            override fun onScanStarted() {
+                _state.update {
+                    it.copy(scanning = true, scannedDevices = emptyList(), statusLine = "Escaneando BLE…")
+                }
+            }
+
+            override fun onDeviceFound(device: ScannedDevice) {
+                _state.update { s ->
+                    val next = (s.scannedDevices.filterNot { it.mac == device.mac } + device)
+                        .sortedWith(
+                            compareByDescending<ScannedDevice> { it.wearableLikely }
+                                .thenByDescending { it.rssi },
+                        )
+                        .take(24)
+                    s.copy(scannedDevices = next)
+                }
+            }
+
+            override fun onScanFinished() {
+                _state.update {
+                    it.copy(
+                        scanning = false,
+                        statusLine = "Scan ok. Pulseiras no topo — evite fone/TV/caixa.",
+                    )
+                }
+            }
+
+            override fun onStatus(message: String) {
+                _state.update { it.copy(statusLine = message) }
+            }
+
+            override fun onReady(mac: String) {
+                _state.update {
+                    it.copy(
+                        handshakeReady = true,
+                        connectedMac = mac,
+                        deviceId = "HBAND-$mac",
+                        measuring = true,
+                        statusLine = "Handshake ok. Medindo FC…",
+                    )
+                }
+                prefs.deviceId = "HBAND-$mac"
+            }
+
+            override fun onHeartRate(bpm: Int, mac: String, status: String) {
+                ingestLive(bpm, "HBAND-$mac", "ble_hband")
+                _state.update {
+                    it.copy(
+                        lastLiveBpm = bpm,
+                        lastSimBpm = bpm.toDouble(),
+                        heartRateInput = bpm.toString(),
+                        measuring = true,
+                    )
+                }
+            }
+
+            override fun onSpo2(percent: Int, mac: String) {
+                _state.update { it.copy(lastSpo2 = percent, statusLine = "SpO2 $percent%") }
+            }
+
+            override fun onDisconnected(mac: String, reason: String?) {
+                _state.update {
+                    it.copy(
+                        handshakeReady = false,
+                        connectedMac = null,
+                        measuring = false,
+                        statusLine = "Desconectado${reason?.let { r -> ": $r" } ?: ""}",
+                    )
+                }
+            }
+
+            override fun onError(message: String) {
+                _state.update { it.copy(statusLine = message, measuring = false) }
+            }
+        },
+    )
 
     private fun buildRepo(): HealthtechRepository {
         val s = _state.value
@@ -280,6 +367,71 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun startScan() {
+        saveSettings()
+        if (!BlePermissions.granted(getApplication())) {
+            _state.update {
+                it.copy(statusLine = "Permissões Bluetooth/Localização necessárias para o scan.")
+            }
+            return
+        }
+        runCatching { hband.initSdk() }
+        hband.startScan()
+    }
+
+    fun stopScan() {
+        hband.stopScan()
+        _state.update { it.copy(scanning = false) }
+    }
+
+    fun connectDevice(device: ScannedDevice) {
+        saveSettings()
+        hband.stopScan()
+        gattHr?.close()
+        _state.update {
+            it.copy(
+                scanning = false,
+                connectedMac = device.mac,
+                handshakeReady = false,
+                lastLiveBpm = null,
+                statusLine = "Conectando ${device.label}…",
+            )
+        }
+        hband.connect(device.mac, device.name.takeIf { it != "N/A" })
+    }
+
+    fun disconnectDevice() {
+        hband.disconnect()
+        gattHr?.close()
+        _state.update {
+            it.copy(
+                connectedMac = null,
+                handshakeReady = false,
+                measuring = false,
+                statusLine = "Desconectado.",
+            )
+        }
+    }
+
+    fun tryGattFallback() {
+        val mac = _state.value.connectedMac ?: return
+        hband.stopHeart()
+        if (gattHr == null) {
+            gattHr = GattHeartRateClient(
+                getApplication(),
+                onStatus = { msg -> _state.update { it.copy(statusLine = msg) } },
+                onBpm = { bpm, addr ->
+                    ingestLive(bpm, "GATT-$addr", "ble_hband")
+                    _state.update {
+                        it.copy(lastLiveBpm = bpm, heartRateInput = bpm.toString(), measuring = true)
+                    }
+                },
+                onDisconnected = { _state.update { it.copy(measuring = false, handshakeReady = false) } },
+            )
+        }
+        gattHr?.connect(mac)
+    }
+
     fun toggleBleSimulator() {
         saveSettings()
         if (bleSim?.isRunning == true) {
@@ -329,11 +481,42 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun tryHbandSdk() {
-        hbandSdk.start()
+        startScan()
+    }
+
+    private var lastIngestAt = 0L
+
+    private fun ingestLive(bpm: Int, deviceId: String, source: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastIngestAt < 3_000) return
+        lastIngestAt = now
+        val s = _state.value
+        if (s.ingestApiKey.isBlank()) return
+        viewModelScope.launch {
+            val req = WearableIngestRequest(
+                patientId = s.patientId,
+                deviceId = deviceId,
+                heartRate = bpm.toDouble(),
+                spo2 = s.lastSpo2?.toDouble(),
+                filterType = "BMO",
+                ingestSource = source,
+            )
+            when (val r = repository.ingest(req)) {
+                is ApiResult.Success -> _state.update {
+                    it.copy(lastIngest = r.data, statusLine = "FC $bpm bpm → ingest ${r.httpCode}")
+                }
+                is ApiResult.Failure -> {
+                    if (r.isRetryable) outbox.enqueue(req)
+                    _state.update { it.copy(statusLine = failLabel(r)) }
+                }
+            }
+        }
     }
 
     override fun onCleared() {
         bleSim?.stop()
+        hband.disconnect()
+        gattHr?.close()
         super.onCleared()
     }
 

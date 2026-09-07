@@ -19,3 +19,5 @@ out/
 release/
 *.jks
 *.keystore
+
+# AARs oficiais Veepoo em app/libs/ SÃO versionados (handshake HR).

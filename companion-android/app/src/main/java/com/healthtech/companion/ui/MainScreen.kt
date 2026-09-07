@@ -1,5 +1,6 @@
 package com.healthtech.companion.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.healthtech.companion.ble.ScannedDevice
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -239,39 +241,99 @@ private fun BleCard(state: UiState, viewModel: MainViewModel) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "Device (BLE)",
+                "Pulseira BLE",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                if (state.bleSimRunning) {
-                    "Simulador ativo${state.lastSimBpm?.let { " · ${it.toInt()} bpm" } ?: ""}. " +
-                        "O dashboard mostra isto como BLE simulado, não pairing HBand."
-                } else {
-                    "Sem pulseira? Use o simulador para fechar Device → App → API. " +
-                        "HBand real exige AARs Veepoo — o botão SDK não finge conexão."
+                when {
+                    state.lastLiveBpm != null ->
+                        "FC ao vivo ${state.lastLiveBpm} bpm" +
+                            (state.lastSpo2?.let { " · SpO2 $it%" } ?: "")
+                    state.handshakeReady -> "Handshake ok. Medindo…"
+                    state.connectedMac != null -> "Conectado ${state.connectedMac}. Handshake em curso."
+                    else ->
+                        "O scan vê todos os BLE. Conecte na pulseira (nome no topo). " +
+                            "Fone/TV não enviam FC. A leitura só vale após senha 0000 + perfil."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
+                    onClick = { if (state.scanning) viewModel.stopScan() else viewModel.startScan() },
+                    enabled = !state.busy,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (state.scanning) "Parar scan" else "Escanear")
+                }
+                OutlinedButton(
+                    onClick = viewModel::disconnectDevice,
+                    enabled = state.connectedMac != null,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Desconectar")
+                }
+            }
+            if (state.scannedDevices.isNotEmpty()) {
+                Text(
+                    "Toque na pulseira (não no primeiro BLE qualquer):",
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                state.scannedDevices.take(12).forEach { dev ->
+                    DeviceRow(dev, selected = dev.mac == state.connectedMac) {
+                        viewModel.connectDevice(dev)
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = viewModel::tryGattFallback,
+                    enabled = state.connectedMac != null && !state.busy,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("GATT SIG")
+                }
+                OutlinedButton(
                     onClick = viewModel::toggleBleSimulator,
                     enabled = !state.busy,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(if (state.bleSimRunning) "Parar simulador" else "Simular BLE")
-                }
-                OutlinedButton(
-                    onClick = viewModel::tryHbandSdk,
-                    enabled = !state.busy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("HBand SDK")
+                    Text(if (state.bleSimRunning) "Parar sim" else "Simular")
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DeviceRow(device: ScannedDevice, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                device.label + if (device.wearableLikely) "  · pulseira?" else "",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected || device.wearableLikely) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (device.wearableLikely) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+            Text(
+                device.mac,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text("${device.rssi} dBm", style = MaterialTheme.typography.labelSmall)
     }
 }
 
