@@ -1,16 +1,31 @@
 """
-Hemodinâmica — operadores vetoriais (grad, div, curl) para fluxo vascular.
+Módulo de Hemodinâmica Computacional e Física Cardiovascular.
 """
 
+from src.hemodynamics.models import Grid3D, ScalarField3D, VectorField3D, FlowIrregularity
+from src.hemodynamics.operators import VectorCalculus3D
 from src.hemodynamics.analyzer import VascularFlowAnalyzer
-from src.hemodynamics.operators import curl, divergence, gradient, gradient_magnitude
 from src.hemodynamics.simulator import VascularFlowSimulator
+from src.hemodynamics.windkessel import (
+    Windkessel4EParams,
+    Windkessel4ESimulator,
+    BaroreflexParams,
+)
+
+HemodynamicsAnalyzer = VascularFlowAnalyzer
+HemodynamicsSimulator = VascularFlowSimulator
 
 __all__ = [
+    "Grid3D",
+    "ScalarField3D",
+    "VectorField3D",
+    "FlowIrregularity",
+    "VectorCalculus3D",
     "VascularFlowAnalyzer",
     "VascularFlowSimulator",
-    "curl",
-    "divergence",
-    "gradient",
-    "gradient_magnitude",
+    "HemodynamicsAnalyzer",
+    "HemodynamicsSimulator",
+    "Windkessel4EParams",
+    "Windkessel4ESimulator",
+    "BaroreflexParams",
 ]

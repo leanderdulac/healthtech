@@ -77,3 +77,29 @@ def create_grid(
     z = np.linspace(origin[2], origin[2] + (nz - 1) * spacing[2], nz)
     xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
     return Grid3D(x=xx, y=yy, z=zz, spacing=spacing)
+
+
+class VectorCalculus3D:
+    """Interface orientada a objetos para cálculo vetorial 3D."""
+
+    @staticmethod
+    def gradient(scalar: ScalarField3D) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        return gradient(scalar)
+
+    @staticmethod
+    def gradient_magnitude(scalar: ScalarField3D) -> np.ndarray:
+        return gradient_magnitude(scalar)
+
+    @staticmethod
+    def divergence(vector: VectorField3D) -> ScalarField3D:
+        div_vals = divergence(vector)
+        return ScalarField3D(values=div_vals, grid=vector.grid, name=f"div_{vector.name}")
+
+    @staticmethod
+    def curl(vector: VectorField3D) -> VectorField3D:
+        cx, cy, cz = curl(vector)
+        return VectorField3D(fx=cx, fy=cy, fz=cz, grid=vector.grid, name=f"curl_{vector.name}")
+
+    @staticmethod
+    def curl_magnitude(vector: VectorField3D) -> np.ndarray:
+        return curl_magnitude(vector)

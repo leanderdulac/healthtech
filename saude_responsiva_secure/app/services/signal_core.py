@@ -7,52 +7,6 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 
-def _ensure_clinical_path() -> None:
-    """Garante que `src.clinical_intelligence` resolva no monorepo e na imagem Docker.
-
-    Prefere o monorepo (`src/clinical_intelligence`) para o vendor não ficar
-    stale em dev local. `_vendor_src` só entra se a fonte do monorepo não existir
-    (imagem Docker, onde o Dockerfile copia o vendor para `/app/src`).
-    """
-    import sys
-    import types
-    from pathlib import Path
-
-    here = Path(__file__).resolve()
-    candidates: list[Path] = []
-    for i in range(4, 0, -1):
-        try:
-            candidates.append(here.parents[i])
-        except IndexError:
-            continue
-    candidates.extend([Path("/app"), Path.cwd()])
-
-    seen: set[str] = set()
-    for root in candidates:
-        try:
-            root_s = str(root.resolve())
-        except OSError:
-            root_s = str(root)
-        if root_s in seen:
-            continue
-        seen.add(root_s)
-        mono = root / "src" / "clinical_intelligence" / "alert_ingest.py"
-        if mono.is_file():
-            if root_s not in sys.path:
-                sys.path.insert(0, root_s)
-            return
-        vend = root / "_vendor_src" / "clinical_intelligence" / "alert_ingest.py"
-        if vend.is_file():
-            if root_s not in sys.path:
-                sys.path.insert(0, root_s)
-            existing = sys.modules.get("src")
-            if existing is None or not getattr(existing, "__path__", None):
-                pkg = types.ModuleType("src")
-                pkg.__path__ = [str(root / "_vendor_src")]  # type: ignore[attr-defined]
-                sys.modules["src"] = pkg
-            return
-
-
 def _try_parent_bmo():
     try:
         from src.signal_processing import BMOAnalyzer  # type: ignore
@@ -212,33 +166,19 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
         "body_temp_c",
         "steps_drop_pct",
         "sleep_worsen_pct",
-        "hr_baseline_rise",
-        "spo2_drop_points",
-        "pas_rise_mmhg",
-        "pad_rise_mmhg",
-        "pas_drop_mmhg",
-        "glucose_rise_mgdl",
-        "glucose_drop_mgdl",
-        "temp_rise_c",
-        "temp_drop_c",
-        "at_rest",
-        "fasting_or_preprandial",
-        "consecutive_count",
-        "sleep_hours",
-        "steps_drop_consecutive_days",
-        "poor_sleep_nights",
-        "hourly_steps_available",
-        "abrupt_steps_stop",
-        "inactivity_rest_of_active_period",
-        "consciousness_altered",
-        "ingest_source",
     ):
         if payload.get(key) is not None:
             hband_ext[key] = payload[key]
     body_temp = payload.get("body_temp_c")
     try:
-        # PYTHONPATH=/app (Docker) ou monorepo root — ver _ensure_clinical_path()
-        _ensure_clinical_path()
+        # Garantir monorepo no path quando a API secure roda na raiz
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[3]
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+
         from src.clinical_intelligence.alert_ingest import (
             assess_ingest_alerts,
             merge_anomaly_with_alerts,
@@ -264,19 +204,19 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
             "error": str(exc),
         }
 
-    ingest_source = payload.get("ingest_source") or "companion_manual"
     return {
         "patient_id": payload["patient_id"],
         "device_id": payload.get("device_id") or "wrist_wearable",
         "timestamp": payload.get("timestamp") or "",
-        "ingest_source": ingest_source,
+        "received_at": payload.get("received_at") or payload.get("timestamp") or "",
+        "last_seen_local": payload.get("last_seen_local"),
+        "device_time_local": payload.get("device_time_local"),
         "raw_telemetry": {
             "heart_rate_bpm": hr,
             "hrv_rmssd_ms": hrv,
             "skin_temp_celsius": skin,
             "spo2_percent": spo2,
             "activity_level": activity,
-            "ingest_source": ingest_source,
         },
         "cleaned_telemetry": {
             "heart_rate_clean": round(bpm_clean, 2),
