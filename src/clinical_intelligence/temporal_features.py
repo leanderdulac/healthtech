@@ -14,6 +14,8 @@ from src.clinical_intelligence.models import DenoisedSignal, PatientBaseline
 from src.clinical_intelligence.pipeline import ClinicalIntelligencePipeline
 from src.clinical_intelligence.prognostic_engine import PrognosticEngine
 from src.clinical_intelligence.signal_processing import WearableSignalProcessor
+from src.clinical_intelligence.evidence_fusion import EvidenceFusionEngine
+from src.clinical_intelligence.game_theory import GameTheoryAligner
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,7 @@ TEMPORAL_FEATURE_COLUMNS = (
        "artifact_ratio", "trajectory_slope", "persistence"]
     + [f"ghost_{g}" for g in GHOST_NAMES]
     + ["fuzzy_event_prob", "fuzzy_fp_risk", "fuzzy_noise_gate", "fuzzy_persistence"]
+    + ["gt_ama_evasion_risk", "gt_overtreatment_pressure", "gt_discharge_assurance", "gt_team_deadlock_risk"]
 )
 
 HORIZON_NAMES = ["event_6h", "event_24h", "event_72h"]
@@ -63,6 +66,8 @@ class TemporalFeatureBuilder:
         self.fuzzy_engine = FuzzyClinicalEngine()
         self.prognostic = PrognosticEngine()
         self.pipeline = ClinicalIntelligencePipeline()
+        self.fusion = EvidenceFusionEngine()
+        self.game_theory_aligner = GameTheoryAligner()
 
     def _default_horizon_steps(self) -> Dict[str, int]:
         """Converte horas reais em passos temporais conforme subsample."""
@@ -236,8 +241,25 @@ class TemporalFeatureBuilder:
                 baseline=baseline,
             )
 
+            wearable_score = self.prognostic.wearable_risk_score(signals, baseline)
+            fusion_score, _ = self.fusion.fuse(
+                patient_id=baseline.patient_id,
+                wearable_score=wearable_score,
+                ghost_signals=ghosts,
+                fuzzy=fuzzy,
+                baseline=baseline,
+                hemodynamic_score=hemodynamic_score,
+            )
+
+            gt = self.game_theory_aligner.evaluate_dynamics(
+                baseline=baseline,
+                signals=signals,
+                ghost_signals=ghosts,
+                clinical_complexity_score=fusion_score,
+            )
+
             row = self._build_feature_row(
-                vitals_df.iloc[t], signals, ghosts, fuzzy, persistence, baseline,
+                vitals_df.iloc[t], signals, ghosts, fuzzy, gt, persistence, baseline,
             )
 
             for fill_t in range(t, min(t + self.feature_stride, n)):
@@ -292,6 +314,7 @@ class TemporalFeatureBuilder:
         signals: Dict[str, DenoisedSignal],
         ghosts,
         fuzzy,
+        gt,
         persistence: float,
         baseline: PatientBaseline,
     ) -> np.ndarray:
@@ -342,6 +365,16 @@ class TemporalFeatureBuilder:
         vec[idx] = fuzzy.noise_gate
         idx += 1
         vec[idx] = persistence
+        idx += 1
+
+        # Teoria dos Jogos (4 escores)
+        vec[idx] = gt.ama_evasion_risk
+        idx += 1
+        vec[idx] = gt.overtreatment_pressure
+        idx += 1
+        vec[idx] = gt.discharge_assurance
+        idx += 1
+        vec[idx] = gt.team_deadlock_risk
 
         return vec
 

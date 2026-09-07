@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -18,8 +17,9 @@ router = APIRouter(prefix="/api/v1/wearables", tags=["wearables"])
 
 def _with_timestamp(payload: WearableTelemetryRequest) -> Dict[str, Any]:
     data = payload.model_dump()
-    if not data.get("timestamp"):
-        data["timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    from src.ops.timestamps import stamp_ingest
+
+    data.update(stamp_ingest(data.get("timestamp")))
     return data
 
 
@@ -42,6 +42,7 @@ def ingest_wearable_reading(
 
 
 @router.post("/batch-ingest")
+@router.post("/ingest/batch")
 def batch_ingest_wearables(
     batch: WearableBatchIngestRequest,
     request: Request,
@@ -62,6 +63,27 @@ def batch_ingest_wearables(
         "processed_count": len(results),
         "latest_result": results[-1] if results else None,
     }
+
+
+@router.get("/devices")
+def list_wearable_devices(
+    request: Request,
+    q: str = Query(default=""),
+    online: Optional[bool] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=10000),
+    include_latest: bool = Query(default=False),
+    _api_key: str = Depends(require_scope("wearables:read")),
+):
+    """Frota de relógios (payload compacto). Requer wearables:read."""
+    _ = request
+    return telemetry_store.list_devices(
+        q=q,
+        online=online,
+        limit=limit,
+        offset=offset,
+        include_latest=include_latest,
+    )
 
 
 @router.get("/patient/{patient_id}/latest")

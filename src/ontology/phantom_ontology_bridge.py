@@ -147,10 +147,15 @@ class BayesianDiagnosticNetwork:
             if signal_name not in phantom_data:
                 continue
 
-            if signal_name not in thresholds:
-                continue
+            raw_val = phantom_data[signal_name]
+            if isinstance(raw_val, dict):
+                value = float(raw_val.get('estimate', 0.0))
+            else:
+                try:
+                    value = float(raw_val)
+                except (ValueError, TypeError):
+                    continue
 
-            value = phantom_data[signal_name]
             low, high = thresholds[signal_name]
             range_width = high - low
 
@@ -541,7 +546,15 @@ class BayesianDiagnosticNetwork:
             if signal_name not in phantom_data:
                 continue
 
-            value = phantom_data[signal_name]
+            raw_val = phantom_data[signal_name]
+            if isinstance(raw_val, dict):
+                value = float(raw_val.get('estimate', 0.0))
+            else:
+                try:
+                    value = float(raw_val)
+                except (ValueError, TypeError):
+                    continue
+
             entry: dict[str, Any] = {
                 "signal": signal_name,
                 "observed_value": round(value, 4),
@@ -819,7 +832,15 @@ class OntologyEnrichedReport:
         """
         interpretations: list[dict[str, Any]] = []
 
-        for signal_name, value in phantom_data.items():
+        for signal_name, raw_val in phantom_data.items():
+            if isinstance(raw_val, dict):
+                value = float(raw_val.get('estimate', 0.0))
+            else:
+                try:
+                    value = float(raw_val)
+                except (ValueError, TypeError):
+                    continue
+
             entry: dict[str, Any] = {
                 "signal": signal_name,
                 "value": round(value, 4),

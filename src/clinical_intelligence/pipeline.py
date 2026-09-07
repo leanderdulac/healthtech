@@ -19,6 +19,7 @@ from src.clinical_intelligence.models import (
 )
 from src.clinical_intelligence.prognostic_engine import PrognosticEngine
 from src.clinical_intelligence.signal_processing import WearableSignalProcessor
+from src.clinical_intelligence.game_theory import GameTheoryAligner
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class ClinicalIntelligencePipeline:
         self.fuzzy_engine = FuzzyClinicalEngine()
         self.prognostic = PrognosticEngine()
         self.fusion = EvidenceFusionEngine()
+        self.game_theory_aligner = GameTheoryAligner()
 
     def analyze_patient(
         self,
@@ -78,6 +80,13 @@ class ClinicalIntelligencePipeline:
         if ontology_domains is None:
             ontology_domains = self._ontology_from_ghosts(ghosts)
 
+        game_theory = self.game_theory_aligner.evaluate_dynamics(
+            baseline=baseline,
+            signals=signals,
+            ghost_signals=ghosts,
+            clinical_complexity_score=fusion_score,
+        )
+
         return ClinicalIntelligenceResult(
             patient_id=baseline.patient_id,
             scenario=scenario,
@@ -87,6 +96,7 @@ class ClinicalIntelligencePipeline:
             predictions=predictions,
             fusion_score=fusion_score,
             ontology_domains=ontology_domains,
+            game_theory=game_theory,
         )
 
     def analyze_from_profiles(

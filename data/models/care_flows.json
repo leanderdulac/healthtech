@@ -1,0 +1,49 @@
+{
+  "version": "care-flows-2026-08-24",
+  "principle": "Doença isolada não cria alerta. Padrão fisiológico obrigatório.",
+  "programs": [
+    {
+      "id": "has",
+      "diseases": [
+        "hypertension"
+      ],
+      "source": "FLUXO HAS FINAL.pdf"
+    },
+    {
+      "id": "dm",
+      "diseases": [
+        "diabetes",
+        "diabetes_decompensated"
+      ],
+      "source": "FLUXO DM FINAL.pdf"
+    },
+    {
+      "id": "drc",
+      "diseases": [
+        "ckd"
+      ],
+      "source": "FLUXO DRC FINAL.pdf"
+    },
+    {
+      "id": "dpoc",
+      "diseases": [
+        "copd"
+      ],
+      "source": "FLUXO DOENCAS RESP FINAL.pdf"
+    },
+    {
+      "id": "hepatopatia",
+      "diseases": [
+        "liver_failure"
+      ],
+      "source": "FLUXO HEPATOPATIAS FINAL.pdf"
+    },
+    {
+      "id": "obstetrico",
+      "diseases": [
+        "pregnancy"
+      ],
+      "source": "fluxo obstetrico final.pdf"
+    }
+  ]
+}

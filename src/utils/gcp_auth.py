@@ -15,7 +15,7 @@ def get_gcp_credentials(project_id: Optional[str] = None) -> Tuple[Optional[obje
     Retorna uma tupla (credentials, resolved_project_id).
     Em ambientes sem google-auth ou sem login, retorna (None, project_id).
     """
-    target_project = project_id or os.getenv("GCP_PROJECT_ID", "healthtech-gcp-2026")
+    target_project = os.getenv("GCP_PROJECT_ID") or project_id or "healthtech-gcp-2026"
 
     try:
         import google.auth  # type: ignore
@@ -26,7 +26,7 @@ def get_gcp_credentials(project_id: Optional[str] = None) -> Tuple[Optional[obje
 
     try:
         credentials, project = google.auth.default()
-        resolved_project = project or target_project
+        resolved_project = project_id or os.getenv("GCP_PROJECT_ID") or project or target_project
         return credentials, resolved_project
     except Exception as e:
         logger.debug(
