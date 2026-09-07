@@ -1,12 +1,21 @@
 """
 Motor de inteligência clínica preditiva multimodal.
 
-Import lazy: submódulos leves (alert_ingest, rules) não puxam pipeline/torch.
+Filtragem de ruído → sinais fantasmas → lógica fuzzy → fusão de evidências
+→ predição de eventos clínicos com antecedência de horas/dias.
 """
 
-from __future__ import annotations
-
-from typing import Any
+from src.clinical_intelligence.pipeline import ClinicalIntelligencePipeline
+from src.clinical_intelligence.fuzzy_engine import FuzzyClinicalEngine
+from src.clinical_intelligence.ghost_signals import GhostSignalDetector
+from src.clinical_intelligence.signal_processing import WearableSignalProcessor
+from src.clinical_intelligence.alert_matrix_rules import AlertMatrixEngine, VitalSnapshot
+from src.clinical_intelligence.alert_matrix_classifier import AlertMatrixClassifier
+from src.clinical_intelligence.alert_ingest import (
+    assess_ingest_alerts,
+    merge_anomaly_with_alerts,
+)
+from src.clinical_intelligence.care_flows import evaluate_care_flows
 
 __all__ = [
     "ClinicalIntelligencePipeline",
@@ -18,55 +27,20 @@ __all__ = [
     "AlertMatrixClassifier",
     "assess_ingest_alerts",
     "merge_anomaly_with_alerts",
+    "evaluate_care_flows",
 ]
+from src.clinical_intelligence.agents import (
+    SpecialistOpinion,
+    CardiologyAgent,
+    PulmonologyAgent,
+    IntensivistTriageAgent,
+    ClinicalConsensusCoordinator,
+)
 
-_LAZY_ATTRS: dict[str, tuple[str, str]] = {
-    "ClinicalIntelligencePipeline": (
-        "src.clinical_intelligence.pipeline",
-        "ClinicalIntelligencePipeline",
-    ),
-    "FuzzyClinicalEngine": (
-        "src.clinical_intelligence.fuzzy_engine",
-        "FuzzyClinicalEngine",
-    ),
-    "GhostSignalDetector": (
-        "src.clinical_intelligence.ghost_signals",
-        "GhostSignalDetector",
-    ),
-    "WearableSignalProcessor": (
-        "src.clinical_intelligence.signal_processing",
-        "WearableSignalProcessor",
-    ),
-    "AlertMatrixEngine": (
-        "src.clinical_intelligence.alert_matrix_rules",
-        "AlertMatrixEngine",
-    ),
-    "VitalSnapshot": (
-        "src.clinical_intelligence.alert_matrix_rules",
-        "VitalSnapshot",
-    ),
-    "AlertMatrixClassifier": (
-        "src.clinical_intelligence.alert_matrix_classifier",
-        "AlertMatrixClassifier",
-    ),
-    "assess_ingest_alerts": (
-        "src.clinical_intelligence.alert_ingest",
-        "assess_ingest_alerts",
-    ),
-    "merge_anomaly_with_alerts": (
-        "src.clinical_intelligence.alert_ingest",
-        "merge_anomaly_with_alerts",
-    ),
-}
-
-
-def __getattr__(name: str) -> Any:
-    if name in _LAZY_ATTRS:
-        import importlib
-
-        mod_name, attr = _LAZY_ATTRS[name]
-        mod = importlib.import_module(mod_name)
-        value = getattr(mod, attr)
-        globals()[name] = value
-        return value
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+__all__ += [
+    "SpecialistOpinion",
+    "CardiologyAgent",
+    "PulmonologyAgent",
+    "IntensivistTriageAgent",
+    "ClinicalConsensusCoordinator",
+]

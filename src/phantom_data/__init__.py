@@ -1,9 +1,5 @@
 """
-Módulo de Dados Fantasmas (Phantom Data)
-
-Este módulo expõe as classes e métodos responsáveis por realizar inferência
-de estados fisiológicos latentes ("phantom data") a partir de observáveis
-de wearables, bem como análise de HRV (Variabilidade da Frequência Cardíaca).
+Módulo de Inferência de Dados Fantasmas e Espaço de Estados.
 """
 
 from src.phantom_data.state_space_model import (
@@ -16,9 +12,8 @@ from src.phantom_data.phantom_inference_engine import (
     PhantomDataEngine,
     BatchPhantomProcessor,
 )
-from src.phantom_data.hrv_analysis import (
-    HRVAnalyzer,
-)
+from src.phantom_data.hrv_analysis import HRVAnalyzer
+from src.phantom_data.adaptive_ukf import AdaptiveUnscentedKalmanFilter
 
 __all__ = [
     "ExtendedKalmanFilter",
@@ -28,4 +23,5 @@ __all__ = [
     "PhantomDataEngine",
     "BatchPhantomProcessor",
     "HRVAnalyzer",
+    "AdaptiveUnscentedKalmanFilter",
 ]

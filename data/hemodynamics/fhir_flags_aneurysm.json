@@ -5,7 +5,7 @@
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-e04ecb1f4130",
+        "id": "HEMO-7c720b019990",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -59,15 +59,15 @@
           "reference": "Patient/PAT-HEMO-ANEU"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.320006",
-          "end": "2026-07-04T21:39:08.320006"
+          "start": "2026-08-19T02:56:57.811937",
+          "end": "2026-08-19T02:56:57.811937"
         }
       }
     },
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-944e602c42cc",
+        "id": "HEMO-3b526bd76085",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -121,15 +121,15 @@
           "reference": "Patient/PAT-HEMO-ANEU"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.320006",
-          "end": "2026-07-04T21:39:08.320006"
+          "start": "2026-08-19T02:56:57.811937",
+          "end": "2026-08-19T02:56:57.811937"
         }
       }
     },
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-c85a8a2b2b7b",
+        "id": "HEMO-c4c9b1552dbf",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -183,15 +183,15 @@
           "reference": "Patient/PAT-HEMO-ANEU"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.320006",
-          "end": "2026-07-04T21:39:08.320006"
+          "start": "2026-08-19T02:56:57.811937",
+          "end": "2026-08-19T02:56:57.811937"
         }
       }
     },
     {
       "resource": {
         "resourceType": "Flag",
-        "id": "HEMO-ee9eb36b3c03",
+        "id": "HEMO-0dc4628208fc",
         "meta": {
           "profile": [
             "http://healthtech.local/fhir/StructureDefinition/HealthtechClinicalAlert"
@@ -245,8 +245,8 @@
           "reference": "Patient/PAT-HEMO-ANEU"
         },
         "period": {
-          "start": "2026-07-04T21:39:08.320006",
-          "end": "2026-07-04T21:39:08.320006"
+          "start": "2026-08-19T02:56:57.811937",
+          "end": "2026-08-19T02:56:57.811937"
         }
       }
     }

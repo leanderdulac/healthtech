@@ -58,7 +58,8 @@ class VertexTCNEndpointManager:
 
         if sequence is None:
             import numpy as np
-            n_features = 24
+            from src.clinical_intelligence.temporal_features import TEMPORAL_FEATURE_COLUMNS
+            n_features = len(TEMPORAL_FEATURE_COLUMNS)
             sequence = np.random.randn(32, n_features).tolist()
 
         result = predictor.predict([{"sequence": sequence}])
