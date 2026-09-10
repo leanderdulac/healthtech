@@ -27,6 +27,10 @@ VENDOR_FILES = (
     "alert_matrix_rules.py",
     "alert_matrix_classifier.py",
     "alert_matrix_dataset.py",
+    "next2u_bases.py",
+    "next2u_context.py",
+    "next2u_promotion.py",
+    "care_flows.py",
 )
 
 VENDOR_ROOT_INIT = '''"""Subset de clinical_intelligence embutido na imagem secure.
