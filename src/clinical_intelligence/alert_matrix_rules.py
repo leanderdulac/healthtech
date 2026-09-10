@@ -296,3 +296,31 @@ class AlertMatrixEngine:
                 v.steps_drop_pct is not None and 20 <= v.steps_drop_pct < 40,
             ]
         )
+
+
+# --- decision support (required by classifier / ingest / tests) ---
+CLINICAL_DECISION_SUPPORT: Dict[str, Any] = {
+    "kind": "decision_support",
+    "not_a_diagnosis": True,
+    "not_a_mandatory_protocol": True,
+    "disclaimer": (
+        "Apoio à decisão clínica. Cruzamentos de wearable não confirmam "
+        "diagnóstico (infecção, desidratação, queda ou outro). Linhas de "
+        "enfermeira/ACS são orientação operacional — não substituem protocolo "
+        "institucional, avaliação presencial nem conduta médica."
+    ),
+}
+
+
+def with_decision_support(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Anexa o aviso de apoio à decisão a um dict de alerta."""
+    out = dict(payload)
+    out["decision_support"] = dict(CLINICAL_DECISION_SUPPORT)
+    care = out.get("care_line")
+    if isinstance(care, dict) and care.get("mandatory") is None:
+        care = dict(care)
+        care["mandatory"] = False
+        care["protocol_binding"] = False
+        care["kind"] = care.get("kind") or "operational_guidance"
+        out["care_line"] = care
+    return out
