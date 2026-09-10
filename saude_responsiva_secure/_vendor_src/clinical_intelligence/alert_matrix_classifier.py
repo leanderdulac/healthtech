@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
@@ -39,6 +39,11 @@ from src.clinical_intelligence.alert_matrix_rules import (
     rules_catalog,
     with_decision_support,
 )
+from src.clinical_intelligence.next2u_context import (
+    RULE_TO_NEXT2U,
+    PatientContext,
+    context_features,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +56,7 @@ class AlertMatrixClassifier:
     def __init__(self):
         self.scaler = StandardScaler()
         self.severity_encoder = LabelEncoder()
-        self.severity_clf: Optional[GradientBoostingClassifier] = None
+        self.severity_clf: Optional[HistGradientBoostingClassifier] = None
         self.fp_clf: Optional[RandomForestClassifier] = None
         self.alert_clf: Optional[RandomForestClassifier] = None
         self.feature_columns = list(FEATURE_COLUMNS)
@@ -84,10 +89,10 @@ class AlertMatrixClassifier:
         Xtr = self.scaler.transform(X_train)
         Xte = self.scaler.transform(X_test)
 
-        self.severity_clf = GradientBoostingClassifier(
-            n_estimators=120,
-            max_depth=4,
+        self.severity_clf = HistGradientBoostingClassifier(
+            max_depth=6,
             learning_rate=0.08,
+            max_iter=300,
             random_state=random_state,
         )
         self.severity_clf.fit(Xtr, ysev_tr)
@@ -188,6 +193,7 @@ class AlertMatrixClassifier:
         fp_suppress_threshold: float = 0.55,
         alert_threshold: float = 0.80,
         source_meta: Optional[Dict[str, Any]] = None,
+        context: Optional[PatientContext] = None,
     ) -> Dict[str, Any]:
         """
         Inferência combinada regras + ML + discrepância amostra↔alerta.
@@ -197,7 +203,7 @@ class AlertMatrixClassifier:
         - Discrepância (ex. crise hipertensiva com FC 78–90 estável) → suprimir FP
         """
         meta = source_meta or {}
-        rule_result: AlertMatrixResult = self.engine.evaluate(vitals)
+        rule_result: AlertMatrixResult = self.engine.evaluate(vitals, context=context)
         feats = vitals.to_feature_dict()
         # features de discrepância para ML (se modelo treinado com elas)
         from src.clinical_intelligence.alert_discrepancy import discrepancy_feature_flags
@@ -207,7 +213,12 @@ class AlertMatrixClassifier:
             bp_source=str(meta.get("bp_source", "unknown")),
             glucose_source=str(meta.get("glucose_source", "unknown")),
         )
-        feats_ml = {**feats, **disc_flags}
+        profile_id = RULE_TO_NEXT2U.get(rule_result.primary_rule_id or "", (1, 1))[0]
+        feats_ml = {
+            **feats,
+            **disc_flags,
+            **context_features(context, profile_id=profile_id),
+        }
         # predizer só com colunas conhecidas do modelo
         ml_input = {c: feats_ml.get(c, feats.get(c, 0.0)) for c in self.feature_columns}
         ml = self.predict_features(ml_input) if self.severity_clf else {
@@ -293,6 +304,13 @@ class AlertMatrixClassifier:
             "ml": ml,
             "vitals": feats,
             "source_meta": meta,
+            "next2u_id": rule_result.next2u_id,
+            "stars": rule_result.stars,
+            "risk_band": rule_result.risk_band,
+            "hospitalization_score": rule_result.hospitalization_score,
+            "care_pathway": rule_result.care_pathway,
+            "disease_concordant": rule_result.disease_concordant,
+            "med_concordant": rule_result.med_concordant,
         }
 
         # Gate de discrepância amostra ↔ alerta (caso UI: crise + FC estável)
