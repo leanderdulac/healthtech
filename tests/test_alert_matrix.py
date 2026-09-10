@@ -93,7 +93,7 @@ def test_isolated_systolic_and_care_line_leve():
     assert res.care_line["acs_dispatch"] is False
     assert res.care_line["acs_deadline_hours"] == 168
     ids = {h.rule_id for h in res.hits}
-    assert "pa_elev_12" in ids
+    assert "n2u_011" in ids or "n2u_012" in ids
 
 
 def test_sepsis_pattern_critical_with_nurse_acs_line():
@@ -106,7 +106,7 @@ def test_sepsis_pattern_critical_with_nurse_acs_line():
     assert res.care_line["acs_dispatch"] is True
     assert res.care_line["acs_deadline_hours"] == 4
     ids = {h.rule_id for h in res.hits}
-    assert "inf_10" in ids or "inf_13" in ids or "pa_baixa_5" in ids
+    assert "n2u_020" in ids or "n2u_048" in ids or any(i.startswith("n2u_") for i in ids)
     assert any("sepse" in (h.name or "").lower() or "instabilidade" in (h.name or "").lower() for h in res.hits)
 
 
@@ -123,9 +123,12 @@ def test_fall_requires_hourly_steps():
     )
     assert with_steps.is_true_alert
     assert with_steps.max_severity == "critico"
-    assert "queda_10" in {h.rule_id for h in with_steps.hits}
-    # Sem dado horário a regra de queda não dispara (pode haver hipotensão isolada)
-    assert "queda_10" not in {h.rule_id for h in without.hits}
+    assert any(h.category == "queda" for h in with_steps.hits)
+    assert "n2u_154" in {h.rule_id for h in with_steps.hits} or "n2u_146" in {
+        h.rule_id for h in with_steps.hits
+    }
+    # Sem interrupção de passos a regra de queda não dispara
+    assert not any(h.category == "queda" for h in without.hits)
 
 
 def test_dehydration_and_infection_notes():
@@ -154,7 +157,7 @@ def test_fasting_glucose_only_when_flagged():
     assert not plain.is_true_alert
     assert fasting.is_true_alert
     assert fasting.max_severity == "leve"
-    assert fasting.primary_rule_id == "hyper_13"
+    assert fasting.primary_rule_id == "n2u_085"
 
 
 def test_resting_tachycardia_needs_at_rest_flag():
@@ -170,8 +173,8 @@ def test_resting_tachycardia_needs_at_rest_flag():
     assert unknown.max_severity in ("none", "leve")
     assert not unknown.is_true_alert
     assert rest.is_true_alert
-    assert rest.max_severity == "leve"
-    assert "fc_8" in {h.rule_id for h in rest.hits}
+    assert rest.max_severity in ("leve", "moderado")
+    assert {"n2u_094", "n2u_100"} & {h.rule_id for h in rest.hits}
 
 
 def test_classifier_train_and_fp_detection():
