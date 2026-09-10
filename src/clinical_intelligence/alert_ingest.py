@@ -330,7 +330,11 @@ def assess_ingest_alerts(
             "risk_band": rule.risk_band,
             "hospitalization_score": rule.hospitalization_score,
             "care_pathway": rule.care_pathway,
+            "care_line": rule.care_line,
+            "clinical_notes": list(rule.clinical_notes or []),
         }
+        from src.clinical_intelligence.alert_matrix_rules import with_decision_support
+        full = with_decision_support(full)
         full = _apply_discrepancy(full, vitals, meta)
 
     from src.clinical_intelligence.care_flows import apply_care_flow_overlay, evaluate_care_flows
@@ -358,6 +362,9 @@ def assess_ingest_alerts(
         "suppressed_alert_name": full.get("suppressed_alert_name"),
         "engine": "alert_matrix_ml" if clf is not None else "alert_matrix_rules",
         "matrix_version": "next2u-158-971-2026-08-16",
+        "care_line": full.get("care_line"),
+        "decision_support": full.get("decision_support"),
+        "clinical_notes": full.get("clinical_notes") or [],
         "staff_only": {
             "next2u_id": full.get("next2u_id"),
             "stars": full.get("stars") or 0,

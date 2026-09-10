@@ -47,6 +47,32 @@ class VitalSnapshot:
     steps_drop_days: int = 0
     steps_interrupted: bool = False
     no_steps_rest_of_active: bool = False
+    # Aliases / campos legados (matriz pré-Next2U e dataset antigo)
+    at_rest: Optional[bool] = None
+    fasting_or_preprandial: bool = False
+    hourly_steps_available: bool = False
+    abrupt_steps_stop: bool = False
+    consecutive_count: Optional[int] = None
+    hr_drop_from_baseline: Optional[float] = None
+    pas_drop_mmhg: Optional[float] = None
+    inactivity_rest_of_active_period: bool = False
+
+    def __post_init__(self) -> None:
+        if self.at_rest is not None:
+            self.rest = bool(self.at_rest)
+        if self.fasting_or_preprandial:
+            self.fasting = True
+        if self.hourly_steps_available and self.abrupt_steps_stop:
+            self.steps_interrupted = True
+        if self.inactivity_rest_of_active_period:
+            self.no_steps_rest_of_active = True
+        if self.consecutive_count is not None:
+            self.consecutive_valid = int(self.consecutive_count)
+        if self.hr_drop_from_baseline is not None and self.hr_baseline_rise is None:
+            self.hr_baseline_rise = -float(self.hr_drop_from_baseline)
+        if self.pas_drop_mmhg is not None and self.pas is not None and self.pas_basal is None:
+            # sintetiza basal para pas_drop() legado
+            self.pas_basal = float(self.pas) + float(self.pas_drop_mmhg)
 
     def pas_rise(self) -> Optional[float]:
         if self.pas is None or self.pas_basal is None:
@@ -141,11 +167,13 @@ class AlertMatrixResult:
     care_pathway: Optional[Dict[str, Any]] = None
     disease_concordant: bool = False
     med_concordant: bool = False
+    care_line: Optional[Dict[str, Any]] = None
+    clinical_notes: List[str] = field(default_factory=list)
 
     SEVERITY_RANK = {"none": 0, "leve": 1, "moderado": 2, "critico": 3}
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "hits": [h.to_dict() for h in self.hits],
             "max_severity": self.max_severity,
             "is_true_alert": self.is_true_alert,
@@ -160,7 +188,10 @@ class AlertMatrixResult:
             "care_pathway": self.care_pathway,
             "disease_concordant": self.disease_concordant,
             "med_concordant": self.med_concordant,
+            "care_line": self.care_line,
+            "clinical_notes": list(self.clinical_notes),
         }
+        return with_decision_support(payload)
 
 
 def _in(v: Optional[float], lo: float, hi: float) -> bool:
@@ -258,6 +289,8 @@ class AlertMatrixEngine:
                         else ""
                     )
                 ),
+                care_line=None,
+                clinical_notes=[],
             )
             if context is not None:
                 from src.clinical_intelligence.next2u_promotion import apply_next2u
@@ -276,6 +309,8 @@ class AlertMatrixEngine:
             primary_rule_id=best.rule_id,
             explanation=f"{len(hits)} regra(s); principal={best.rule_id} ({best.severity})",
             stars=rank.get(best.severity, 0),
+            care_line=care_line_for(best.severity),
+            clinical_notes=_clinical_notes_for(hits),
         )
         if context is not None:
             from src.clinical_intelligence.next2u_promotion import apply_next2u
@@ -296,3 +331,125 @@ class AlertMatrixEngine:
                 v.steps_drop_pct is not None and 20 <= v.steps_drop_pct < 40,
             ]
         )
+
+
+
+CARE_LINES: Dict[str, Dict[str, Any]] = {
+    "leve": {
+        "priority_stars": 1,
+        "priority_label": "★",
+        "severity": "leve",
+        "nurse": (
+            "Manter o paciente sob vigilância ampliada na plataforma, "
+            "acompanhando mais de perto as próximas medições e a evolução dos dados."
+        ),
+        "acs": (
+            "Sem acionamento programado do ACS nesta classificação. "
+            "Realizar visita domiciliar no prazo máximo de 1 semana."
+        ),
+        "acs_dispatch": False,
+        "acs_deadline_hours": 168,
+        "acs_deadline_label": "1 semana",
+    },
+    "moderado": {
+        "priority_stars": 2,
+        "priority_label": "★★",
+        "severity": "moderado",
+        "nurse": (
+            "Enviar mensagem ao paciente e ao cuidador, perguntando se o paciente "
+            "apresenta algum tipo de sintoma ou se está se sentindo bem. "
+            "Ordenar ao ACS que realize visita domiciliar em até 48 horas."
+        ),
+        "acs": "Realizar a visita domiciliar no prazo máximo de 48 horas.",
+        "acs_dispatch": True,
+        "acs_deadline_hours": 48,
+        "acs_deadline_label": "48 horas",
+    },
+    "critico": {
+        "priority_stars": 3,
+        "priority_label": "★★★",
+        "severity": "critico",
+        "nurse": (
+            "Contatar o paciente e o cuidador, perguntando se o paciente "
+            "apresenta algum tipo de sintoma ou se está se sentindo bem. "
+            "Ordenar ao ACS que vá até a residência do paciente, confira os dados "
+            "vitais e conclua a visita em até 4 horas."
+        ),
+        "acs": (
+            "Ir até a residência do paciente, conferir os dados vitais e "
+            "concluir a visita no mesmo dia do alerta."
+        ),
+        "acs_dispatch": True,
+        "acs_deadline_hours": 4,
+        "acs_deadline_label": "4 horas / mesmo dia",
+    },
+}
+
+CATEGORY_NOTES: Dict[str, str] = {
+    "infeccao": (
+        "Os dados do device sinalizam possível deterioração, mas não confirmam "
+        "nem diferenciam pneumonia, ITU ou sepse; correlacionar com sintomas, "
+        "avaliação clínica e exames quando indicados."
+    ),
+    "desidratacao": (
+        "O device não mede hidratação diretamente; os cruzamentos indicam "
+        "possível desidratação ou hipovolemia e exigem confirmação clínica."
+    ),
+    "queda": (
+        "Sem detecção validada de impacto, a matriz indica possível queda ou "
+        "evento agudo pela mudança de atividade e dos sinais fisiológicos; "
+        "confirmar com o paciente, cuidador ou ACS. Regras com interrupção "
+        "abrupta aplicam-se quando houver dado horário de passos."
+    ),
+}
+
+
+def care_line_for(severity: str) -> Optional[Dict[str, Any]]:
+    """Linha de cuidado da enfermeira e do ACS para a classificação."""
+    line = CARE_LINES.get(severity)
+    if not line:
+        return None
+    out = dict(line)
+    out["mandatory"] = False
+    out["protocol_binding"] = False
+    out["kind"] = "operational_guidance"
+    return out
+
+
+def _clinical_notes_for(hits: List[AlertHit]) -> List[str]:
+    notes: List[str] = []
+    seen = set()
+    for h in hits:
+        note = CATEGORY_NOTES.get(h.category)
+        if note and h.category not in seen:
+            notes.append(note)
+            seen.add(h.category)
+    return notes
+
+
+# --- decision support (required by classifier / ingest / tests) ---
+CLINICAL_DECISION_SUPPORT: Dict[str, Any] = {
+    "kind": "decision_support",
+    "not_a_diagnosis": True,
+    "not_a_mandatory_protocol": True,
+    "disclaimer": (
+        "Apoio à decisão clínica. Cruzamentos de wearable não confirmam "
+        "diagnóstico (infecção, desidratação, queda ou outro). Linhas de "
+        "enfermeira/ACS são orientação operacional — não substituem protocolo "
+        "institucional, avaliação presencial nem conduta médica."
+    ),
+}
+
+
+def with_decision_support(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Anexa o aviso de apoio à decisão a um dict de alerta."""
+    out = dict(payload)
+    out["decision_support"] = dict(CLINICAL_DECISION_SUPPORT)
+    care = out.get("care_line")
+    if isinstance(care, dict) and care.get("mandatory") is None:
+        care = dict(care)
+        care["mandatory"] = False
+        care["protocol_binding"] = False
+        care["kind"] = care.get("kind") or "operational_guidance"
+        out["care_line"] = care
+    return out
