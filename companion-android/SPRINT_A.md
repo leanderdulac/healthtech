@@ -8,18 +8,30 @@ Contrato: [`docs/openapi/hband-wearable.yaml`](../docs/openapi/hband-wearable.ya
 Cliente HTTP: [`client/`](client/) (módulo Gradle `:client`)  
 BLE: [`app/src/main/java/com/healthtech/companion/ble/`](app/src/main/java/com/healthtech/companion/ble/)
 
+O módulo Gradle histórico `:sprint-a` (v3.1.0) foi unificado em `:app` + `:client`.
+Os AARs Veepoo vivem em [`app/libs/`](app/libs/). `SprintAActivityNotes.kt` foi
+removido (era só pseudo-código).
+
 ---
 
 ## Critério de pronto (DoD)
 
-- [ ] Demo/app compila com AARs oficiais Veepoo
-- [ ] Scan BLE + connect + `confirmDevicePwd("0000")` + `syncPersonInfo`
-- [ ] `startDetectHeart` → callback com BPM no logcat
-- [x] Simulador BLE → ingest `ingest_source=ble_sim` → **200**
+Legenda: **código** = implementado no repo; **device** = falta provar com pulseira
+física / API real neste ambiente.
+
+- [x] Demo/app **código**: AARs oficiais Veepoo em `app/libs/` (vpprotocol + vpbluetooth)
+      e `implementation(fileTree("libs"))`. Assemble local ainda depende do Android SDK.
+- [x] Scan BLE + connect + `confirmDevicePwd("0000")` + `syncPersonInfo` — **código**
+      em `HbandProtocolClient` (UI lista MACs). **Device:** handshake num VE30/HBand.
+- [x] `startDetectHeart` → callback BPM — **código** (`STATE_HEART_NORMAL` 20–250).
+      **Device:** logcat/UI com pulseira no pulso.
+- [x] Simulador BLE → ingest `ingest_source=ble_sim` → **200** (caminho HTTP; precisa API + key)
 - [ ] `HbandSdkTransport` + AARs Veepoo → ingest `ingest_source=ble_hband` → **200**
-- [x] `HealthtechRepository.ingest` → **200** com `heart_rate` + `device_id`
-- [ ] 401/403 exibidos na UI (chave inválida / escopo)
-- [ ] `patient_id` estável (`PAT-HBAND-001` em debug)
+      — **código** (`ingestLive` + `TelemetryDispatch`); **device** não exercitado aqui.
+- [x] `HealthtechRepository.ingest` → **código** com `heart_rate` + `device_id` (`HBAND-{MAC}`)
+- [x] 401/403 exibidos na UI (card dedicado + `AuthUiMessages`) — **código**;
+      **device/API:** precisa chave inválida contra o server.
+- [x] `patient_id` estável (`PAT-HBAND-001` em debug via BuildConfig / `local.properties`)
 
 ---
 
@@ -27,7 +39,8 @@ BLE: [`app/src/main/java/com/healthtech/companion/ble/`](app/src/main/java/com/h
 
 ```
 Application
-  └─ HbandConnectionManager.init()
+  └─ CompanionSession (dono único do HbandProtocolClient)
+       └─ Ve30TelemetryService (foreground; mesmo session, sem 2º manager)
 UI Scan
   └─ startScanDevice → lista MACs
   └─ connectDevice(mac)
@@ -35,10 +48,12 @@ UI Scan
             └─ confirmDevicePwd
                  └─ syncPersonInfo
                       └─ startDetectHeart
-                           └─ onHeartData → ApiClient.ingest
+                           └─ onHeartData → TelemetryDispatch → Api.ingest
+                      └─ (Sprint B) stopDetect* → readOriginData3 → batch-ingest → startDetectHeart
 ```
 
 **Proibido:** chamar `startDetectHeart` e `readOriginData*` ao mesmo tempo.
+O botão **Histórico flash** pausa a FC, lê OriginData3 e retoma.
 
 ---
 
@@ -46,10 +61,10 @@ UI Scan
 
 | SDK | JSON ingest |
 |-----|-------------|
-| `HeartData.data` (BPM) | `heart_rate` |
-| MAC do device | `device_id` (`HBAND-` + MAC) |
+| `HeartData.data` (BPM) | `heart_rate` — só se 20–250; **sem default 72** |
+| MAC do device | `device_id` (`HBAND-` + MAC; prefixo legado `VE30-` é reescrito) |
 | ISO-8601 now | `timestamp` (opcional) |
-| BuildConfig | `patient_id` |
+| BuildConfig | `patient_id` (`PAT-HBAND-001` debug) |
 
 Headers:
 
@@ -79,13 +94,14 @@ Exemplo body:
 1. Android Studio → Empty Activity, `minSdk 26`, `targetSdk 34`, Kotlin.
 2. Copiar AARs do HBandSDK (`vpbluetooth`, `vpprotocol`, gson, …) para `app/libs/`.
 3. `implementation(fileTree("libs") { include("*.aar", "*.jar") })`.
-4. Manifest: `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`, `INTERNET`; service Bluetooth do SDK.
+4. Manifest: `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`, `INTERNET`; service Bluetooth do SDK
+   + `Ve30TelemetryService` (`foregroundServiceType=connectedDevice`).
 
 ### A2 — Config e rede (sem BLE)
 
-1. Implementar `HealthtechApiClient` (stub em `sprint-a/.../net/`).
-2. Teste unitário/manual: POST com BPM fake → 200.
-3. Simular chave errada → 401 e mensagem na UI.
+1. Cliente HTTP: módulo `:client` (`HealthtechRepository`), não o stub `HealthtechApiClient`.
+2. Teste unitário/manual: POST com BPM fake → 200 (`Smoke 78`).
+3. Simular chave errada → 401 e card vermelho na UI.
 
 ```bash
 # validação server-side (monorepo)
@@ -94,21 +110,22 @@ python run_online_smoke.py --skip-vertex
 
 ### A3 — Conexão BLE (com device)
 
-1. Preencher `HbandConnectionManager` com `VPOperateManager` (ver comentários no stub).
-2. UI: lista de scan + botão Conectar.
-3. Fluxo serial: connect → pwd → personInfo → cache de `FunctionDeviceSupportData`.
+1. `HbandProtocolClient` com `VPOperateManager`.
+2. UI: lista de scan + toque para conectar (não só o último MAC).
+3. Fluxo serial: connect → pwd → personInfo → `startDetectHeart`.
 
 ### A4 — Heart detect + ingest
 
-1. `HbandRealtimeCollector.startHeart()`.
-2. No listener, debounce 2–5 s e chamar `api.ingestRealtime(...)`.
+1. Após `onReady`, `startDetectHeart`.
+2. No listener, debounce 3 s e `TelemetryDispatch.buildRealtime` (pula se não houver FC real).
 3. Logar `response.code` e trecho do body (`anomaly_detection` no full).
 
 ### A5 — Hardening mínimo
 
 1. Não logar API key.
-2. Reconnect: `registerConnectStatusListener` + fila de 1 POST pendente.
-3. Documentar SKU/firmware testado no PR.
+2. Reconnect: `registerConnectStatusListener` + outbox para POST retryable.
+3. Foreground service após ready; para no disconnect/destroy.
+4. `stopAllSensors` para HR + SpO2 + temp + PA + HRV.
 
 ---
 
@@ -127,9 +144,9 @@ variável de ambiente). **Nunca** commite chaves no repositório.
 
 ## Fora do Sprint A (próximos)
 
-- SpO2 / temp / BP (Sprint B)
-- OriginData3 batch + outbox Room (Sprint B)
-- PPG + BMO (Sprint C)
+- SpO2 / temp / BP **em tempo real** (serial; hoje só OriginData3 no botão histórico)
+- Outbox Room + WorkManager (hoje: fila em memória)
+- PPG + BMO (Sprint C) — buffer ordenado já existe (`PpgBuffer`)
 - LGPD unlink / secrets encrypted (Sprint D)
 
 ---

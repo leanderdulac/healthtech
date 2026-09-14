@@ -20,8 +20,8 @@ class MainActivity : ComponentActivity() {
 
     private val blePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
-    ) { result ->
-        if (result.values.all { it }) {
+    ) { _ ->
+        if (BlePermissions.bleGranted(this)) {
             viewModel.startScan()
         }
     }
