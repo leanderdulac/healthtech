@@ -7,7 +7,6 @@ import android.util.Log
 import com.healthtech.companion.telemetry.OriginVitalSample
 import com.inuker.bluetooth.library.Code
 import com.inuker.bluetooth.library.Constants
-import com.inuker.bluetooth.library.connect.response.BleWriteResponse
 import com.inuker.bluetooth.library.model.BleGattProfile
 import com.inuker.bluetooth.library.search.SearchResult
 import com.inuker.bluetooth.library.search.response.SearchResponse
@@ -19,7 +18,6 @@ import com.veepoo.protocol.listener.base.INotifyResponse
 import com.veepoo.protocol.listener.data.ICustomSettingDataListener
 import com.veepoo.protocol.listener.data.IDeviceFuctionDataListener
 import com.veepoo.protocol.listener.data.IHeartDataListener
-import com.veepoo.protocol.listener.data.IHrvDetectListener
 import com.veepoo.protocol.listener.data.IOriginData3Listener
 import com.veepoo.protocol.listener.data.IPersonInfoDataListener
 import com.veepoo.protocol.listener.data.IPwdDataListener
@@ -45,7 +43,6 @@ import com.veepoo.protocol.model.enums.EHeartStatus
 import com.veepoo.protocol.model.enums.EOprateStauts
 import com.veepoo.protocol.model.enums.EPwdStatus
 import com.veepoo.protocol.model.enums.ESex
-import com.veepoo.protocol.model.enums.HrvDetectState
 import com.veepoo.protocol.model.settings.CustomSettingData
 
 /**
@@ -96,12 +93,6 @@ class HbandProtocolClient(
     private val writeAck = IBleWriteResponse { code ->
         if (code != Code.REQUEST_SUCCESS) {
             Log.w(TAG, "write code=$code (${Code.toString(code)})")
-        }
-    }
-
-    private val inukerAck = BleWriteResponse { code ->
-        if (code != Code.REQUEST_SUCCESS) {
-            Log.w(TAG, "inuker write code=$code")
         }
     }
 
@@ -455,16 +446,7 @@ class HbandProtocolClient(
         runCatching { manager.stopDetectSPO2H(writeAck, ISpo2hDataListener { }) }
         runCatching { manager.stopDetectTempture(writeAck, ITemptureDetectDataListener { }) }
         runCatching { manager.stopDetectBP(writeAck, EBPDetectModel.DETECT_MODEL_PUBLIC) }
-        runCatching {
-            manager.stopDetectHrv(
-                inukerAck,
-                object : IHrvDetectListener {
-                    override fun onHrvDetect(hrv: Int) = Unit
-                    override fun onDetectFailed(detectState: HrvDetectState?) = Unit
-                    override fun onDetectStop() = Unit
-                },
-            )
-        }
+        // stopDetectHrv exige IHrvDetectListener compilado com Kotlin 2.1; o módulo está em 1.9.
         spo2Running = false
     }
 

@@ -101,9 +101,7 @@ fun MainScreen(viewModel: MainViewModel) {
         ) {
             StatusCard(state)
 
-            if (!state.authError.isNullOrBlank()) {
-                AuthErrorCard(state.authError)
-            }
+            state.authError?.takeIf { it.isNotBlank() }?.let { AuthErrorCard(it) }
 
             ConfigCard(state, viewModel)
 

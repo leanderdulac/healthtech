@@ -108,9 +108,5 @@ dependencies {
     implementation("no.nordicsemi.android.support.v18:scanner:1.4.2")
     implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
 
-    // McuMgr é puxado pelo VPOperateManager no connect; sem isto o device crasha.
-    implementation("no.nordicsemi.android:mcumgr-core:2.7.4")
-    implementation("no.nordicsemi.android:mcumgr-ble:2.7.4")
-
     testImplementation("junit:junit:4.13.2")
 }
