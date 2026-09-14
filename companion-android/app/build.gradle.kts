@@ -21,8 +21,8 @@ android {
         applicationId = "com.healthtech.companion"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0-mvp"
+        versionCode = 2
+        versionName = "1.1.0"
 
         // Default de debug = emulador → host. Produção: local.properties.
         buildConfigField(
@@ -70,6 +70,9 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -104,4 +107,10 @@ dependencies {
     implementation(fileTree("libs") { include("*.aar") })
     implementation("no.nordicsemi.android.support.v18:scanner:1.4.2")
     implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+
+    // McuMgr é puxado pelo VPOperateManager no connect; sem isto o device crasha.
+    implementation("no.nordicsemi.android:mcumgr-core:2.7.4")
+    implementation("no.nordicsemi.android:mcumgr-ble:2.7.4")
+
+    testImplementation("junit:junit:4.13.2")
 }

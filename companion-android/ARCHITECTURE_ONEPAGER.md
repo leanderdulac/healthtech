@@ -103,29 +103,17 @@ Scan → Pairing → Live vitals (HR) → badge “enviado 200”
 ## 4. Módulos do app
 
 ```
-app/
+app/                         # Compose + BLE Veepoo
 ├── ble/
-│   ├── HbandConnectionManager   # scan/connect/pwd/personInfo/reconnect
-│   ├── HbandRealtimeCollector   # HR / SpO2 / temp / BP / PPG
-│   └── HbandHistorySync         # OriginData3, sleep, sport (B)
-├── net/
-│   ├── HealthtechApiClient      # OkHttp + timeouts + X-API-Key
-│   └── Dtos                     # espelha OpenAPI (WearableIngestRequest…)
-├── queue/
-│   ├── OutboxStore              # Room: pending → sending → sent | dead
-│   └── OutboxWorker             # WorkManager: flush batch sob rede
-├── domain/
-│   ├── PatientSession           # patient_id estável
-│   └── DeviceProfile            # MAC, firmware, origin_protocol_version
-├── security/
-│   └── SecretStore              # EncryptedSharedPreferences / Keystore
-└── ui/
-    ├── ScanScreen
-    ├── LiveVitalsScreen
-    └── SyncStatusScreen
+│   ├── CompanionSession         # dono único do rádio (Application)
+│   ├── HbandProtocolClient      # scan/connect/pwd/personInfo/HR/OriginData3
+│   └── OriginDataMapper         # SDK → OriginVitalSample
+├── service/Ve30TelemetryService # foreground; mesmo session
+└── ui/MainScreen + MainViewModel
+client/                      # Retrofit + DTOs + outbox + TelemetryDispatch
 ```
 
-Stubs já no repo: `sprint-a/.../ble/*`, `net/HealthtechApiClient.kt`, `net/Dtos.kt`.
+O módulo `:sprint-a` foi unificado aqui. HTTP: `:client`. BLE: `HbandProtocolClient`.
 
 ---
 
