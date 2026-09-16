@@ -12,7 +12,7 @@ from src.ops.gcp_billing_sim import LEDGER_DASHBOARD, WEEKLY_CREDIT_BRL, write_l
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Ledger de faturamento Google Cloud")
-    parser.add_argument("--as-of", default="2026-08-24", help="Data de corte YYYY-MM-DD")
+    parser.add_argument("--as-of", default="2026-08-31", help="Data de corte YYYY-MM-DD")
     args = parser.parse_args()
     as_of = date.fromisoformat(args.as_of)
     ledger = write_ledger(as_of=as_of)

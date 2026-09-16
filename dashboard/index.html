@@ -811,26 +811,26 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                         <div class="gcp-banner warn">
                             <span class="material-icons-round">payments</span>
                             <div>
-                                <strong>PIX Next2U Saúde — orçamento de nuvem e tokens</strong>
-                                <div id="gcp-countdown">03/08 R$ -- · 10/08 R$ -- · 17/08 R$ -- · 24/08 R$ --</div>
-                                extrato local: 03/08 R$ -- (R$ -- Ultra + R$ -- nuvem), 10/08 R$ -- 17/08 R$ -- Hoje R$ -- (R$ -- Ultra + R$ -- nuvem).
+                                <strong>PIX Next2U Saúde — treino do modelo (valor semanal/semana)</strong>
+                                <div id="gcp-countdown">03/08 R$ -- · 10/08 R$ -- · 17/08 R$ -- · 24/08 R$ -- · 31/08 R$ --</div>
+                                03/08 R$ -- = R$ -- treino + R$ -- Gemini Ultra. 24/08 R$ -- = R$ -- treino + R$ -- Gemini Ultra. Todo PIX de R$ -- (17/08 e 31/08) é treino do modelo e custos correlatos. 10/08 R$ -- é complemento de treino.
                             </div>
                         </div>
                         <div class="gcp-kpis">
                             <div class="gcp-card">
-                                <div class="label">PIX Next2U 03–17/08 (nuvem)</div>
+                                <div class="label">PIX Next2U 03–24/08 (já queimado)</div>
                                 <div class="value" id="gcp-kpi-spent">—</div>
-                                <div class="hint">Inclui Ultra 03/08 (R$ --) + nuvem já queimada</div>
+                                <div class="hint">Treino já queimado + Ultra 03/08 (R$ --) e 24/08 (R$ --)</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Today so far</div>
                                 <div class="value due" id="gcp-kpi-today">—</div>
-                                <div class="hint">Redeploy Cloud Run + fluxos clínicos</div>
+                                <div class="hint">Custos correlatos de treino desta segunda</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Available balance</div>
                                 <div class="value pos" id="gcp-kpi-balance">—</div>
-                                <div class="hint">Após PIX R$ -- − Ultra R$ -- − uso de hoje</div>
+                                <div class="hint">Após PIX 31/08 R$ -- (treino) − uso de hoje</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Credit today (Next2U)</div>
@@ -853,7 +853,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
 
                     <div id="gcp-panel-reports" class="gcp-panel">
                         <div class="gcp-filters">
-                            <span class="gcp-chip">Time range: Aug 3 – 24, 2026</span>
+                            <span class="gcp-chip">Time range: Aug 3 – 31, 2026</span>
                             <span class="gcp-chip">Group by: Service</span>
                             <span class="gcp-chip">Project: healthtech-gcp-2026</span>
                             <span class="gcp-chip">Location: us-central1</span>
@@ -932,17 +932,17 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                     <div id="gcp-panel-budgets" class="gcp-panel">
                         <div class="gcp-card" style="margin-bottom:16px">
                             <div class="label">Budget</div>
-                            <div style="font-size:16px;margin:4px 0" id="gcp-budget-name">HealthTech weekly compute &amp; tokens</div>
+                            <div style="font-size:16px;margin:4px 0" id="gcp-budget-name">Saúde Responsiva — treino do modelo (R$ --/semana)</div>
                             <div id="gcp-budget-amount">—</div>
                             <div class="gcp-budget-bar" id="gcp-budget-bar"><span id="gcp-budget-fill"></span></div>
                             <div class="hint" id="gcp-budget-pct">—</div>
-                            <div class="hint">Ultra: R$ -- em 03/08 + R$ -- em 24/08. Nuvem desta semana: R$ -- (alertas 50/90/100%).</div>
+                            <div class="hint">Gemini Ultra: R$ -- em 03/08 + R$ -- em 24/08. Treino desta semana: R$ -- (31/08). Alertas 50/90/100%.</div>
                         </div>
                         <div class="gcp-card">
-                            <div class="label">August ceiling (4 Mondays)</div>
+                            <div class="label">August ceiling (5 Mondays)</div>
                             <div id="gcp-budget-month">—</div>
                             <div class="gcp-budget-bar"><span id="gcp-budget-month-fill"></span></div>
-                            <div class="hint">Teto agosto = soma dos PIX Next2U de nuvem (-- + -- + -- + --)</div>
+                            <div class="hint">Teto agosto = -- (treino -- + Ultra 780) + -- + -- + -- (treino -- + Ultra 800) + --</div>
                         </div>
                     </div>
                 </div>
@@ -951,7 +951,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
     </div>
 
     <!-- Script da Aplicação -->
-    <script src="app.js?v=20260824j"></script>
-    <script src="gcp-billing.js?v=20260824g"></script
+    <script src="app.js?v=20260831a"></script>
+    <script src="gcp-billing.js?v=20260831b"></script>
 </body>
 </html>
