@@ -5,6 +5,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **Vendor `src.ops` na imagem secure** — `timestamps`, `patients_routes`, `operational_patients`, `live_devices`, `device_registry` em `_vendor_src/` (ingest + GET `/api/v1/patients`; `--check` pega drift). Sem billing / live_watch_bridge.
 - **Caminho crítico vs laboratório** — `docs/CRITICAL_PATH.md`, marker pytest `critical`/`research`, CI exige `pytest -m critical` + vendor sync
 - **Vendor sync** — `scripts/sync_secure_vendor.py` (imagem secure não fica com regras stale)
 - **Companion Android MVP** — módulo Gradle `:client` (única fonte Retrofit), app Compose, outbox, **simulador BLE** (`ingest_source=ble_sim`) e gancho HBand SDK que não finge pairing
