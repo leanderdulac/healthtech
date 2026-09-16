@@ -13,6 +13,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 - **Apoio à decisão** — `decision_support` em alertas; linhas ACS/enfermeira marcadas `mandatory: false`
 
 ### Changed
+- **Deploy Cloud SQL (secure)** — `APP_MODE=secure` agora passa `--add-cloudsql-instances` quando `DATABASE_URL` está definido (mesmo comportamento do modo full; evita 503 em `GET /api/v1/patients` por socket Unix não montado)
 - Pesos `.pkl`/`.pt`/`.joblib` e `data/chroma_db/` deixam de ser versionados
 - Companion não embute URL de produção nem chave de teste no APK (default debug `http://10.0.2.2:8080`)
 - CSP path-aware (API `default-src 'none'`; dashboard/docs permitem Chart.js/fonts)
