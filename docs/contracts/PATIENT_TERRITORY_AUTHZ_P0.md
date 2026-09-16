@@ -60,7 +60,7 @@ O paciente **pode continuar cadastrado** no Core; cadastro ≠ autorização.
 
 ## 4. O que este contrato NÃO faz
 
-- Não cria endpoint novo.
+- Não cria endpoint novo (a enumeração autorizada **estende** `GET /api/v1/patients` — ver [AUTHORIZED_PATIENT_ENUMERATION_P0.md](./AUTHORIZED_PATIENT_ENUMERATION_P0.md)).
 - Não define APIs de escrita/admin de território (podem existir depois; a semântica dos GETs permanece).
 - Não autentica profissionais (isso é Identity/Next2U + IdP).
 - Não autoriza por si só: o BFF ainda exige sessão + binding + assignment + interseção territorial.
