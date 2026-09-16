@@ -178,7 +178,15 @@ def check_patient_authorization(
 
     allowed = settings.get_allowed_patients()
     if allowed:
+        if allowed & {"*", "ALL", "all"}:
+            return True
         return target_patient_id in allowed
+    if settings.is_production:
+        logger.warning(
+            "IDOR: ALLOWED_PATIENT_IDS não configurado em produção — "
+            "negando acesso cross-patient para chave não-admin."
+        )
+        return False
     return True
 
 

@@ -190,15 +190,26 @@ def list_devices(
     limit: int = 200,
     offset: int = 0,
     include_latest: bool = False,
+    patient_id: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Lista a frota.
+
+    `patient_id` restringe o conjunto **antes** de limit/offset e de `counts`.
+    Sem `patient_id`, `counts` descrevem a frota (não são metadados autorizados
+    por Patient). Com `patient_id`, `counts` pertencem só àquele Patient e
+    `coverage` = `patient` (conjunto completo conhecido para o id).
+    """
     limit = max(1, min(int(limit), 500))
     offset = max(0, int(offset))
     needle = (q or "").strip().lower()
+    wanted_patient = (patient_id or "").strip() or None
     with _lock:
         _load_unlocked()
         now = _now()
         rows = [_refresh_online(row, now=now) for row in _devices.values()]
         _flush_unlocked()
+    if wanted_patient:
+        rows = [row for row in rows if str(row.get("patient_id") or "") == wanted_patient]
     if needle:
         rows = [
             row
@@ -221,12 +232,16 @@ def list_devices(
         if include_latest and row.get("latest"):
             item["latest"] = row["latest"]
         out_rows.append(item)
-    return {
+    payload: Dict[str, Any] = {
         "counts": {"total": total, "online": online_count, "offline": max(0, total - online_count)},
         "limit": limit,
         "offset": offset,
         "devices": out_rows,
+        "coverage": "patient" if wanted_patient else "fleet",
     }
+    if wanted_patient:
+        payload["patient_id"] = wanted_patient
+    return payload
 
 
 def get_device(device_id: str) -> Optional[Dict[str, Any]]:
