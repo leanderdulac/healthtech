@@ -545,17 +545,32 @@ def list_wearable_devices(
     limit: int = Query(default=200, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=10000),
     include_latest: bool = Query(default=False),
+    patient_id: Optional[str] = Query(
+        default=None,
+        description="Se informado, restringe a frota a esse Patient antes da paginação.",
+    ),
     _api_key: str = Depends(require_scope("wearables:read")),
 ):
     """Frota de relógios (payload compacto)."""
+    from src.security.auth import check_patient_authorization
     from src.ops.device_registry import list_devices as fleet_list
 
+    wanted = (patient_id or "").strip() or None
+    if wanted and not check_patient_authorization(_api_key, wanted):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Acesso proibido. A chave fornecida não tem autorização "
+                f"para os dados do paciente '{wanted}'."
+            ),
+        )
     return fleet_list(
         q=q,
         online=online,
         limit=limit,
         offset=offset,
         include_latest=include_latest,
+        patient_id=wanted,
     )
 
 
