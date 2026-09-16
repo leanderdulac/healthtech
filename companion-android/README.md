@@ -9,7 +9,7 @@ companion-android/
 ├── app/                    ← UI Compose + simulador BLE + gancho HBand SDK
 ├── client/                 ← biblioteca Gradle (Retrofit, DTOs, outbox)
 ├── postman/                ← collections HTTP
-├── sprint-a/               ← ponteiro histórico (código vive em app/ e client/)
+├── (histórico sprint-a/)   ← unificado em app/ + client/; ver SPRINT_A.md
 └── docs → ../docs/openapi/hband-wearable.yaml
 ```
 
@@ -64,7 +64,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 | **Simular BLE** | HR periódico com `ingest_source=ble_sim` (não é pulseira física) |
 | **HBand SDK** | Gancho Veepoo — recusa fingir pairing se os AARs não estão no APK |
 | **Latest / History** | `GET .../patient/{id}/latest` e `/history` |
-| **Outbox flush** | enfileira + `batch-ingest` se N>1 |
+| **Histórico flash** | Pausa FC, lê OriginData3, `POST /batch-ingest` (Sprint B) |
 
 Alertas clínicos na UI são **apoio à decisão**, não protocolo mandatório.
 
