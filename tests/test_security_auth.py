@@ -82,6 +82,11 @@ def test_idor_fail_closed_in_production_without_whitelist(monkeypatch):
         check_patient_authorization("ht_ingest_real_configured_secret_value", "PAT-Z")
         is False
     )
+    monkeypatch.setenv("ALLOWED_PATIENT_IDS", "*")
+    assert (
+        check_patient_authorization("ht_ingest_real_configured_secret_value", "PAT-ANY")
+        is True
+    )
 
 
 def test_validate_secret_salt_weak_in_production(monkeypatch):

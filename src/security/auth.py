@@ -257,6 +257,8 @@ def check_patient_authorization(provided_key: Optional[str], target_patient_id: 
     allowed_raw = os.getenv("ALLOWED_PATIENT_IDS", "").strip()
     if allowed_raw:
         allowed = {p.strip() for p in allowed_raw.split(",") if p.strip()}
+        if allowed & {"*", "ALL", "all"}:
+            return True
         return target_patient_id in allowed
 
     # Fail-open só em development (UX de demo). Em production exige whitelist ou admin.

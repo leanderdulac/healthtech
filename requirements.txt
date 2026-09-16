@@ -36,6 +36,7 @@ pydantic>=2.9.0
 pydantic-settings>=2.1.0
 slowapi>=0.1.9
 sqlalchemy>=2.0.35,<2.1.0
+psycopg2-binary>=2.9.9,<3
 
 # GCP (opcional em runtime local)
 google-cloud-aiplatform>=1.30.0
