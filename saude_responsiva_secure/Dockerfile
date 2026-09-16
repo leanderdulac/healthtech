@@ -27,11 +27,16 @@ ENV PYTHONPATH=/app
 
 COPY --chown=appuser:appuser app/ /app/app/
 COPY --chown=appuser:appuser requirements.txt /app/
-# Matriz de alertas clínicos (regras) — necessário para clinical_alerts no ingest
+# Subset gerado por scripts/sync_secure_vendor.py (não o monorepo inteiro):
+#   clinical_intelligence — matriz de alertas no ingest
+#   ops — timestamps, patients_routes, operational_patients, live_devices, device_registry
 # Fonte local: _vendor_src/ (evita sombrear monorepo `src/` no PYTHONPATH do host)
 COPY --chown=appuser:appuser _vendor_src/ /app/src/
 
 USER appuser
+
+# Falha o build se o vendor não incluir o src.ops usado em ingest + /patients.
+RUN python -c "from src.ops.timestamps import stamp_ingest; from src.ops.patients_routes import router; assert stamp_ingest and router.routes"
 
 EXPOSE 8080
 

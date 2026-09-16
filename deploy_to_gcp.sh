@@ -189,7 +189,7 @@ fi
 
 echo "Compilando imagem Docker e enviando para o Google Cloud Run..."
 if [[ "$APP_MODE" == "secure" ]]; then
-  echo "Sincronizando vendor clinical_intelligence → ${SOURCE_DIR}/_vendor_src/"
+  echo "Sincronizando vendor clinical_intelligence + ops → ${SOURCE_DIR}/_vendor_src/"
   python3 scripts/sync_secure_vendor.py
   python3 scripts/sync_secure_vendor.py --check
   # Imagem enxuta a partir de saude_responsiva_secure/Dockerfile

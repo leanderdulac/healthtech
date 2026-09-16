@@ -36,6 +36,9 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements-dev.txt
 
+      - name: Check secure vendor sync
+        run: python scripts/sync_secure_vendor.py --check
+
       - name: Run Core Test Suite
         env:
           TESTING: "1"
