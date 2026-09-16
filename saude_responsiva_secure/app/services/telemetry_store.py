@@ -49,6 +49,7 @@ def list_devices(
     limit: int = 200,
     offset: int = 0,
     include_latest: bool = False,
+    patient_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Última leitura por device_id (frota, payload compacto)."""
     try:
@@ -60,6 +61,7 @@ def list_devices(
             limit=limit,
             offset=offset,
             include_latest=include_latest,
+            patient_id=patient_id,
         )
     except Exception:
         pass
@@ -98,6 +100,9 @@ def list_devices(
         if include_latest:
             row["latest"] = frame
         rows.append(row)
+    wanted_patient = (patient_id or "").strip() or None
+    if wanted_patient:
+        rows = [row for row in rows if str(row.get("patient_id") or "") == wanted_patient]
     rows.sort(key=lambda row: str(row.get("last_seen") or ""), reverse=True)
     rows.sort(key=lambda row: 0 if row.get("online") else 1)
     if online is True:
@@ -115,12 +120,16 @@ def list_devices(
     total = len(rows)
     online_count = sum(1 for row in rows if row.get("online"))
     page = rows[max(0, offset) : max(0, offset) + max(1, min(limit, 500))]
-    return {
+    payload: Dict[str, Any] = {
         "counts": {"total": total, "online": online_count, "offline": max(0, total - online_count)},
         "limit": limit,
         "offset": offset,
         "devices": page,
+        "coverage": "patient" if wanted_patient else "fleet",
     }
+    if wanted_patient:
+        payload["patient_id"] = wanted_patient
+    return payload
 
 
 def anonymize_patient(patient_id: str) -> bool:

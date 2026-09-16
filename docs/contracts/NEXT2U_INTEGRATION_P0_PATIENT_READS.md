@@ -36,9 +36,12 @@ in_scope(professional, patient):
 
 ## Listagem
 
+Capacidade server-side canônica: [AUTHORIZED_PATIENT_ENUMERATION_P0.md](./AUTHORIZED_PATIENT_ENUMERATION_P0.md).
+
 - **Nunca** expor `total`/lista global do Core ao browser.
-- Calcular `allowed` = pacientes com `territory_ok` ∩ assignment; paginar `allowed`; `total` = |allowed|.
-- Detalhe/latest/devices: se não `in_scope` → **404** (preferido).
+- Calcular `allowed` no **Core**: território definido ∩ escopos do assignment enviados como `territory` / `municipality_id`+`ubs_id`; paginar `allowed`; `total` = \|allowed\|.
+- O BFF **não** filtra a página recebida e **não** varre offsets globais.
+- Detalhe/latest: se não `in_scope` → **404** (preferido). Devices do Patient: `GET /api/v1/wearables/devices?patient_id=` (`coverage=patient`).
 
 ## Identity (Next2U)
 
@@ -51,4 +54,4 @@ in_scope(professional, patient):
 1. Território nos GETs Patient → **CONFIRMED** (ver PATIENT_TERRITORY_AUTHZ_P0.md §2)  
 2. `ubs_id` ≡ `health_unit_id` → **CONFIRMED** (ver §3)
 
-Implementar HANDOFF P0 com estas duas confirmações; remover “CORRECTION REQUIRED” / “BACKEND CONTRACT REQUIRED” para P09 nestes dois pontos.
+Implementar HANDOFF P0 com estas duas confirmações **e** a enumeração autorizada em AUTHORIZED_PATIENT_ENUMERATION_P0.md; remover “CORRECTION REQUIRED” / “BACKEND CONTRACT REQUIRED” para P09 / gate #30 nestes pontos.
