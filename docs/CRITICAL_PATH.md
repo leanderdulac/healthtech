@@ -26,7 +26,7 @@ HBand ou simulador BLE
 | Companion | `companion-android/app` + `companion-android/client` |
 | Dashboard conexões | `dashboard/index.html` + `dashboard/app.js` |
 | Testes | `pytest -m critical` |
-| Vendor da imagem secure | `python scripts/sync_secure_vendor.py` |
+| Vendor da imagem secure | `python scripts/sync_secure_vendor.py` (`clinical_intelligence` + `ops`: timestamps, patients_routes, operational_patients, live_devices, device_registry) |
 
 ## Laboratório (não bloqueia o produto)
 
