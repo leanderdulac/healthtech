@@ -41,7 +41,8 @@ saude_responsiva_secure/
 | Autorização | Escopos `wearables:write`, `wearables:read`, `admin` |
 | Anti-IDOR | `ALLOWED_PATIENT_IDS` + `require_patient_access` |
 | Rate limit | janela deslizante por path/chave (`RATE_LIMIT_INGEST` default 300/min) |
-| Clinical alerts | subset gerado por `scripts/sync_secure_vendor.py` (`_vendor_src/`) |
+| Clinical alerts | subset `clinical_intelligence` via `scripts/sync_secure_vendor.py` (`_vendor_src/`) |
+| Cadastro operacional | subset `ops`: `timestamps`, `patients_routes`, `operational_patients`, `live_devices`, `device_registry` (sem billing / live_watch_bridge) |
 | Headers | HSTS, CSP, nosniff, X-Frame-Options, Referrer-Policy |
 | Auditoria | Middleware JSON com `X-Request-ID` e chave mascarada |
 | Validação | Pydantic v2 (limites fisiológicos, patient_id sanitizado) |
@@ -88,6 +89,8 @@ docker run --rm -p 8080:8080 \
 | POST | `/api/v1/wearables/batch-ingest` | `wearables:write` |
 | GET | `/api/v1/wearables/patient/{id}/latest` | `wearables:read` + paciente |
 | GET | `/api/v1/wearables/patient/{id}/history` | `wearables:read` + paciente |
+| GET | `/api/v1/patients` | `wearables:read` (authz **antes** de LIMIT/OFFSET; fail-closed sem restrição) |
+| GET | `/api/v1/patients/{id}` | `wearables:read` + paciente |
 | POST | `/api/v1/signal/bmo-analysis` | `wearables:read` |
 | POST | `/api/v1/signal/bmo-denoise` | `wearables:write` |
 | POST | `/api/v1/signal/hrv/bmo-metrics` | `wearables:read` |
