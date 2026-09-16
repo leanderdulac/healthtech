@@ -188,6 +188,14 @@ else
 fi
 
 echo "Compilando imagem Docker e enviando para o Google Cloud Run..."
+# Cloud SQL unix socket: both APP_MODE=secure and full must pass
+# --add-cloudsql-instances when DATABASE_URL is set (default instance
+# ${GCP_PROJECT_ID}:us-central1:healthtech-pg). Omitting this on secure
+# left run.googleapis.com/cloudsql unset and GET /api/v1/patients 503'd.
+SQL_FLAG=()
+if [[ -n "$DATABASE_URL" ]]; then
+  SQL_FLAG=(--add-cloudsql-instances "$CLOUDSQL_INSTANCE")
+fi
 if [[ "$APP_MODE" == "secure" ]]; then
   echo "Sincronizando vendor clinical_intelligence + ops → ${SOURCE_DIR}/_vendor_src/"
   python3 scripts/sync_secure_vendor.py
@@ -200,16 +208,13 @@ if [[ "$APP_MODE" == "secure" ]]; then
       --platform managed \
       $AUTH_FLAG \
       --set-env-vars "$ENV_VARS" \
+      "${SQL_FLAG[@]}" \
       --port 8080 \
       --memory "$MEMORY" \
       --cpu "$CPU" \
       --project="$GCP_PROJECT_ID"
 else
   # Monólito full a partir do Dockerfile raiz (APP_MODE=full)
-  SQL_FLAG=()
-  if [[ -n "$DATABASE_URL" ]]; then
-    SQL_FLAG=(--add-cloudsql-instances "$CLOUDSQL_INSTANCE")
-  fi
   gcloud run deploy "$SERVICE_NAME" \
       --quiet \
       --source "$SOURCE_DIR" \
