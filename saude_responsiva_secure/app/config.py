@@ -96,7 +96,10 @@ class Settings(BaseSettings):
         raw = (self.allowed_patient_ids or "").strip()
         if not raw:
             return set()
-        return {p.strip() for p in raw.split(",") if p.strip()}
+        allowed = {p.strip() for p in raw.split(",") if p.strip()}
+        if allowed & {"*", "ALL", "all"}:
+            return set()
+        return allowed
 
 
 @lru_cache

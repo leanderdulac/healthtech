@@ -172,7 +172,9 @@ class SearchQuery(BaseModel):
     n_results: int = 3
 
 
+from src.ops.patients_routes import router as patients_router
 
+app.include_router(patients_router)
 
 
 @app.get("/api/health")

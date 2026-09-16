@@ -3,9 +3,19 @@
 
 #include .gitignore
 
+.venv/
 .venv313/
+node_modules/
+next2u-web/node_modules/
+next2u-web/.next/
+companion-android/
 data/models/_pre_v1_backup/
 data/models/v1/
 data/models/language_v1/train.log
 data/models/temporal_v1_train.log
-companion-android/
+data/chroma_db/
+data/lakehouse/
+data/lake/
+__pycache__/
+**/*.pyc
+
