@@ -23,6 +23,7 @@ RATE_LIMITS = {
     "/api/v1/wearables/ingest": 60,
     "/api/v1/wearables/batch-ingest": 30,
     "/api/v1/wearables/patient": 60,
+    "/api/v1/patients": 60,
     "/api/v1/admin": 10,
     "default": 120,
 }

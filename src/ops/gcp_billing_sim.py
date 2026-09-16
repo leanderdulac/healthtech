@@ -3,7 +3,7 @@ Faturamento Google Cloud alinhado ao uso real do HealthTech.
 
 Créditos de nuvem/tokens vêm de PIX da NEXT2U SAUDE LTDA (extrato C6
 25/06–24/08/2026, exportado 24/08 às 12:38), mais o aporte de R$ 4.800
-informado em 24/08 (não constava nesse recorte das 12:38).
+informado em 24/08 e a entrada semanal de R$ 4.000 em 31/08.
 
 Os SKUs espelham Cloud Run, Vertex (IF + TCN), BigQuery, GCS, Cloud Build,
 Artifact Registry, Logging, Gemini (tokens de RAG/SLM) e Gemini Ultra.
@@ -22,8 +22,13 @@ from zoneinfo import ZoneInfo
 TZ = ZoneInfo("America/Sao_Paulo")
 FX_USD_BRL = 5.42
 WEEKLY_CREDIT_BRL = 4000.00
-AS_OF_DEFAULT = date(2026, 8, 24)
-GEMINI_ULTRA_BRL = 779.90
+WEEKLY_TRAINING_BRL = 4000.00
+AS_OF_DEFAULT = date(2026, 8, 31)
+GEMINI_ULTRA_AUG3_BRL = 780.00
+GEMINI_ULTRA_AUG24_BRL = 800.00
+# Compat: SKU Gemini Ultra usa o valor de 03/08 como referência de preço.
+GEMINI_ULTRA_BRL = GEMINI_ULTRA_AUG3_BRL
+TRAINING_PURPOSE = "treino do modelo e custos correlatos"
 
 
 def _fmt_brl(amount: float) -> str:
@@ -31,8 +36,9 @@ def _fmt_brl(amount: float) -> str:
     return f"R$ {formatted}"
 
 
-# PIX NEXT2U SAUDE LTDA no extrato C6 (lançamento / valor).
-# R$ 4.800 em 24/08: informado pelo titular; o export de 12:38 ainda não trazia.
+# PIX NEXT2U SAUDE LTDA. Valor macro de R$ 4.000 = treino do modelo e custos correlatos.
+# R$ 4.780 em 03/08 = R$ 4.000 treino + R$ 780 Gemini Ultra.
+# R$ 4.800 em 24/08 = R$ 4.000 treino + R$ 800 Gemini Ultra.
 CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
     {
         "date": "2026-08-03",
@@ -42,13 +48,15 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
         "source": "extrato_c6",
         "document": "PIX-20260803-4780",
         "description": (
-            "PIX Next2U Saúde Ltda — R$ 4.780,00 (nuvem/tokens "
-            f"{_fmt_brl(4780.00 - GEMINI_ULTRA_BRL)} + "
-            f"assinatura Gemini Ultra {_fmt_brl(GEMINI_ULTRA_BRL)})."
+            "PIX Next2U Saúde Ltda — R$ 4.780,00 "
+            f"({_fmt_brl(WEEKLY_TRAINING_BRL)} {TRAINING_PURPOSE} + "
+            f"{_fmt_brl(GEMINI_ULTRA_AUG3_BRL)} Gemini Ultra)."
         ),
         "allocation": {
-            "cloud_tokens_brl": round(4780.00 - GEMINI_ULTRA_BRL, 2),
-            "gemini_ultra_brl": GEMINI_ULTRA_BRL,
+            "cloud_tokens_brl": WEEKLY_TRAINING_BRL,
+            "training_brl": WEEKLY_TRAINING_BRL,
+            "gemini_ultra_brl": GEMINI_ULTRA_AUG3_BRL,
+            "purpose": TRAINING_PURPOSE,
         },
     },
     {
@@ -58,7 +66,16 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
         "status": "posted",
         "source": "extrato_c6",
         "document": "PIX-20260810-2000",
-        "description": "PIX Next2U Saúde Ltda — complemento semanal (R$ 2.000,00)",
+        "description": (
+            "PIX Next2U Saúde Ltda — complemento de "
+            f"{TRAINING_PURPOSE} (R$ 2.000,00)."
+        ),
+        "allocation": {
+            "cloud_tokens_brl": 2000.00,
+            "training_brl": 2000.00,
+            "gemini_ultra_brl": 0.0,
+            "purpose": TRAINING_PURPOSE,
+        },
     },
     {
         "date": "2026-08-17",
@@ -67,7 +84,16 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
         "status": "posted",
         "source": "extrato_c6",
         "document": "PIX-20260817-4000",
-        "description": "PIX Next2U Saúde Ltda — processamento e tokens (R$ 4.000,00)",
+        "description": (
+            "PIX Next2U Saúde Ltda — R$ 4.000,00 "
+            f"({TRAINING_PURPOSE})."
+        ),
+        "allocation": {
+            "cloud_tokens_brl": WEEKLY_TRAINING_BRL,
+            "training_brl": WEEKLY_TRAINING_BRL,
+            "gemini_ultra_brl": 0.0,
+            "purpose": TRAINING_PURPOSE,
+        },
     },
     {
         "date": "2026-08-24",
@@ -77,21 +103,40 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
         "source": "titular_2026-08-24",
         "document": "PIX-20260824-4800",
         "description": (
-            "PIX Next2U Saúde Ltda — R$ 4.800,00 (nuvem/tokens "
-            f"{_fmt_brl(4800.00 - GEMINI_ULTRA_BRL)} + "
-            f"assinatura Gemini Ultra {_fmt_brl(GEMINI_ULTRA_BRL)}). "
-            "Não constava no extrato C6 de 12:38."
+            "PIX Next2U Saúde Ltda — R$ 4.800,00 "
+            f"({_fmt_brl(WEEKLY_TRAINING_BRL)} {TRAINING_PURPOSE} + "
+            f"{_fmt_brl(GEMINI_ULTRA_AUG24_BRL)} Gemini Ultra)."
         ),
         "allocation": {
-            "cloud_tokens_brl": round(4800.00 - GEMINI_ULTRA_BRL, 2),
-            "gemini_ultra_brl": GEMINI_ULTRA_BRL,
+            "cloud_tokens_brl": WEEKLY_TRAINING_BRL,
+            "training_brl": WEEKLY_TRAINING_BRL,
+            "gemini_ultra_brl": GEMINI_ULTRA_AUG24_BRL,
+            "purpose": TRAINING_PURPOSE,
+        },
+    },
+    {
+        "date": "2026-08-31",
+        "amount_brl": 4000.00,
+        "payer": "NEXT2U SAUDE LTDA",
+        "status": "posted",
+        "source": "titular_2026-08-31",
+        "document": "PIX-20260831-4000",
+        "description": (
+            "PIX Next2U Saúde Ltda — R$ 4.000,00 "
+            f"({TRAINING_PURPOSE})."
+        ),
+        "allocation": {
+            "cloud_tokens_brl": WEEKLY_TRAINING_BRL,
+            "training_brl": WEEKLY_TRAINING_BRL,
+            "gemini_ultra_brl": 0.0,
+            "purpose": TRAINING_PURPOSE,
         },
     },
 )
 
 GEMINI_ULTRA_CHARGES: Tuple[Tuple[date, float], ...] = (
-    (date(2026, 8, 3), GEMINI_ULTRA_BRL),
-    (date(2026, 8, 24), GEMINI_ULTRA_BRL),
+    (date(2026, 8, 3), GEMINI_ULTRA_AUG3_BRL),
+    (date(2026, 8, 24), GEMINI_ULTRA_AUG24_BRL),
 )
 
 BILLING_ACCOUNT_ID = "01A37F-2C9E14-8B03D1"
@@ -147,7 +192,7 @@ SKUS: Dict[str, Sku] = {
 
 # Picos alinhados ao git log / deploys reais.
 ENGINEERING_EVENTS: Tuple[Tuple[str, str, str, Dict[str, float]], ...] = (
-    ("2026-08-03", "subscription", f"Assinatura Gemini Ultra ({_fmt_brl(GEMINI_ULTRA_BRL)} dos R$ 4.780,00)", {}),
+    ("2026-08-03", "subscription", f"Assinatura Gemini Ultra ({_fmt_brl(GEMINI_ULTRA_AUG3_BRL)} dos R$ 4.780,00)", {}),
     ("2026-08-03", "platform", "Arquitetura Do Caos à Precisão", {"run_cpu": 1.4, "build": 2.0, "log": 1.3}),
     ("2026-08-04", "platform", "BMO/VMO e signal processing", {"run_cpu": 1.2, "vtx_pred": 1.4, "gem_in": 1.5}),
     ("2026-08-05", "platform", "Cloud Run inicial, LGPD e matriz de alertas", {"build": 8.0, "run_cpu": 2.2, "ar": 1.8, "log": 2.0}),
@@ -161,7 +206,8 @@ ENGINEERING_EVENTS: Tuple[Tuple[str, str, str, Dict[str, float]], ...] = (
     ("2026-08-22", "platform", "Companion VE30 Veepoo SDK", {"run_req": 1.5, "log": 1.2}),
     ("2026-08-24", "platform", "Redeploy Cloud Run (CSP + app.js)", {"build": 5.5, "run_cpu": 1.7, "ar": 1.4, "log": 1.6}),
     ("2026-08-24", "database", "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest", {"bq_scan": 2.8, "gem_in": 2.4, "gem_out": 2.1, "run_req": 1.3}),
-    ("2026-08-24", "subscription", f"Assinatura Gemini Ultra ({_fmt_brl(GEMINI_ULTRA_BRL)} dos R$ 4.800,00)", {}),
+    ("2026-08-24", "subscription", f"Assinatura Gemini Ultra ({_fmt_brl(GEMINI_ULTRA_AUG24_BRL)} dos R$ 4.800,00)", {}),
+    ("2026-08-29", "ai_train", "Temporal v1 e Language v1 (BioBERTpt) no RAG", {"vtx_train": 6.0, "gcs": 2.0, "gem_in": 1.8, "build": 2.5}),
 )
 
 
@@ -357,12 +403,16 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
     return {
         "meta": {
             "disclaimer": (
-                "Orçamento: PIX Next2U Saúde 03/08 R$ 4.780 "
-                f"({_fmt_brl(GEMINI_ULTRA_BRL)} Gemini Ultra + "
-                f"{_fmt_brl(4780.00 - GEMINI_ULTRA_BRL)} nuvem), "
-                "10/08 R$ 2.000, 17/08 R$ 4.000 e 24/08 R$ 4.800 "
-                f"({_fmt_brl(GEMINI_ULTRA_BRL)} Gemini Ultra + "
-                f"{_fmt_brl(4800.00 - GEMINI_ULTRA_BRL)} nuvem)."
+                "PIX Next2U Saúde: 03/08 R$ 4.780 "
+                f"({_fmt_brl(WEEKLY_TRAINING_BRL)} {TRAINING_PURPOSE} + "
+                f"{_fmt_brl(GEMINI_ULTRA_AUG3_BRL)} Gemini Ultra); "
+                "10/08 R$ 2.000 (complemento de treino); "
+                f"17/08 R$ 4.000 ({TRAINING_PURPOSE}); "
+                "24/08 R$ 4.800 "
+                f"({_fmt_brl(WEEKLY_TRAINING_BRL)} {TRAINING_PURPOSE} + "
+                f"{_fmt_brl(GEMINI_ULTRA_AUG24_BRL)} Gemini Ultra); "
+                f"31/08 R$ 4.000 ({TRAINING_PURPOSE}). "
+                "Todo PIX no valor macro de R$ 4.000 é treino do modelo e custos correlatos."
             ),
             "as_of": today.isoformat(),
             "timezone": "America/Sao_Paulo",
@@ -375,7 +425,7 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             "project_number": PROJECT_NUMBER,
             "project_name": PROJECT_NAME,
             "location": LOCATION,
-            "budget_name": "HealthTech weekly compute & tokens (Next2U Saúde)",
+            "budget_name": "Saúde Responsiva — treino do modelo (R$ 4.000/semana)",
             "next_credit_at": None,
             "bank_statement": "C6 Bank · 25/06/2026–24/08/2026 · export 24/08/2026 12:38",
         },

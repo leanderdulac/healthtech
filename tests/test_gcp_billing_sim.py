@@ -2,15 +2,46 @@
 
 from datetime import date
 
-from src.ops.gcp_billing_sim import CLOUD_BUDGET_CREDITS, GEMINI_ULTRA_BRL, build_ledger, write_ledger
+from src.ops.gcp_billing_sim import (
+    CLOUD_BUDGET_CREDITS,
+    GEMINI_ULTRA_AUG3_BRL,
+    GEMINI_ULTRA_AUG24_BRL,
+    TRAINING_PURPOSE,
+    WEEKLY_TRAINING_BRL,
+    build_ledger,
+    write_ledger,
+)
 
 
-def test_cloud_budget_matches_c6_pix_and_today_4800():
+def test_cloud_budget_matches_c6_pix_and_weekly_credits():
     amounts = {c["date"]: c["amount_brl"] for c in CLOUD_BUDGET_CREDITS}
     assert amounts["2026-08-03"] == 4780
     assert amounts["2026-08-10"] == 2000
     assert amounts["2026-08-17"] == 4000
     assert amounts["2026-08-24"] == 4800
+    assert amounts["2026-08-31"] == 4000
+
+
+def test_4780_and_4800_split_ultra_from_training():
+    by_date = {c["date"]: c for c in CLOUD_BUDGET_CREDITS}
+    aug3 = by_date["2026-08-03"]["allocation"]
+    aug24 = by_date["2026-08-24"]["allocation"]
+    assert aug3["gemini_ultra_brl"] == 780
+    assert aug3["training_brl"] == 4000
+    assert aug3["gemini_ultra_brl"] + aug3["training_brl"] == 4780
+    assert aug24["gemini_ultra_brl"] == 800
+    assert aug24["training_brl"] == 4000
+    assert aug24["gemini_ultra_brl"] + aug24["training_brl"] == 4800
+    assert GEMINI_ULTRA_AUG3_BRL == 780
+    assert GEMINI_ULTRA_AUG24_BRL == 800
+
+
+def test_macro_4000_is_always_model_training():
+    for credit in CLOUD_BUDGET_CREDITS:
+        alloc = credit["allocation"]
+        if credit["amount_brl"] == WEEKLY_TRAINING_BRL or alloc.get("training_brl") == WEEKLY_TRAINING_BRL:
+            assert alloc["purpose"] == TRAINING_PURPOSE
+            assert alloc["training_brl"] == WEEKLY_TRAINING_BRL
 
 
 def test_prior_weeks_consume_exact_pix_total():
@@ -23,36 +54,35 @@ def test_prior_weeks_consume_exact_pix_total():
 
 def test_today_4800_covers_morning_spend():
     ledger = build_ledger(as_of=date(2026, 8, 24))
-    cloud_today = round(4800.00 - GEMINI_ULTRA_BRL, 2)
-    ultra_total = round(GEMINI_ULTRA_BRL * 2, 2)
-    assert ledger["kpis"]["spent_today_brl"] > GEMINI_ULTRA_BRL
+    ultra_total = round(GEMINI_ULTRA_AUG3_BRL + GEMINI_ULTRA_AUG24_BRL, 2)
+    assert ledger["kpis"]["spent_today_brl"] > GEMINI_ULTRA_AUG24_BRL
     assert ledger["kpis"]["gemini_ultra_brl"] == ultra_total
-    assert ledger["kpis"]["gemini_ultra_today_brl"] == GEMINI_ULTRA_BRL
-    assert ledger["kpis"]["cloud_from_today_credit_brl"] == cloud_today
+    assert ledger["kpis"]["gemini_ultra_today_brl"] == GEMINI_ULTRA_AUG24_BRL
+    assert ledger["kpis"]["cloud_from_today_credit_brl"] == WEEKLY_TRAINING_BRL
     assert ledger["kpis"]["balance_brl"] == round(
         15580 - ledger["kpis"]["spent_to_date_brl"], 2
     )
     assert ledger["kpis"]["balance_brl"] > 0
     today_credit = [c for c in ledger["credits"] if c["date"] == "2026-08-24"]
     assert today_credit[0]["amount_brl"] == 4800
-    assert today_credit[0]["allocation"]["gemini_ultra_brl"] == GEMINI_ULTRA_BRL
+    assert today_credit[0]["allocation"]["gemini_ultra_brl"] == GEMINI_ULTRA_AUG24_BRL
+    assert today_credit[0]["allocation"]["training_brl"] == WEEKLY_TRAINING_BRL
     today = next(d for d in ledger["daily"] if d["date"] == "2026-08-24")
     ultra = next(i for i in today["items"] if i["sku_key"] == "gem_ultra")
-    assert ultra["cost_brl"] == GEMINI_ULTRA_BRL
+    assert ultra["cost_brl"] == GEMINI_ULTRA_AUG24_BRL
     assert ultra["service"] == "Google One"
 
 
 def test_aug3_4780_includes_gemini_ultra():
     ledger = build_ledger(as_of=date(2026, 8, 24))
-    cloud_aug3 = round(4780.00 - GEMINI_ULTRA_BRL, 2)
     credit = next(c for c in ledger["credits"] if c["date"] == "2026-08-03")
-    assert credit["allocation"]["gemini_ultra_brl"] == GEMINI_ULTRA_BRL
-    assert credit["allocation"]["cloud_tokens_brl"] == cloud_aug3
+    assert credit["allocation"]["gemini_ultra_brl"] == GEMINI_ULTRA_AUG3_BRL
+    assert credit["allocation"]["training_brl"] == WEEKLY_TRAINING_BRL
     day = next(d for d in ledger["daily"] if d["date"] == "2026-08-03")
     ultra = next(i for i in day["items"] if i["sku_key"] == "gem_ultra")
-    assert ultra["cost_brl"] == GEMINI_ULTRA_BRL
+    assert ultra["cost_brl"] == GEMINI_ULTRA_AUG3_BRL
     google_one = next(s for s in ledger["by_service"] if s["service"] == "Google One")
-    assert google_one["cost_brl"] == round(GEMINI_ULTRA_BRL * 2, 2)
+    assert google_one["cost_brl"] == round(GEMINI_ULTRA_AUG3_BRL + GEMINI_ULTRA_AUG24_BRL, 2)
 
 
 def test_skus_match_real_project_services():
@@ -63,6 +93,30 @@ def test_skus_match_real_project_services():
     assert "BigQuery" in services
     vertex = next(s for s in ledger["by_service"] if s["service"] == "Vertex AI")
     assert vertex["cost_brl"] > 7000
+
+
+def test_aug31_weekly_4000_is_posted():
+    ledger = build_ledger(as_of=date(2026, 8, 31))
+    credit = next(c for c in ledger["credits"] if c["date"] == "2026-08-31")
+    assert credit["amount_brl"] == 4000
+    assert credit["allocation"]["training_brl"] == 4000
+    assert credit["allocation"]["gemini_ultra_brl"] == 0
+    assert credit["allocation"]["purpose"] == TRAINING_PURPOSE
+    assert TRAINING_PURPOSE in credit["description"]
+    assert ledger["kpis"]["credits_today_brl"] == 4000
+    assert ledger["kpis"]["credits_posted_brl"] == 19580
+    assert ledger["kpis"]["credits_prior_brl"] == 15580
+    assert ledger["kpis"]["gemini_ultra_today_brl"] == 0
+    assert ledger["meta"]["as_of"] == "2026-08-31"
+
+
+def test_disclaimer_states_ultra_and_training_split():
+    ledger = build_ledger(as_of=date(2026, 8, 31))
+    text = ledger["meta"]["disclaimer"]
+    assert "R$ 780,00 Gemini Ultra" in text
+    assert "R$ 800,00 Gemini Ultra" in text
+    assert TRAINING_PURPOSE in text
+    assert "valor macro de R$ 4.000" in text
 
 
 def test_other_next2u_pix_not_in_cloud_budget():
@@ -81,9 +135,10 @@ def test_other_next2u_pix_not_in_cloud_budget():
 
 
 def test_write_ledger_roundtrip():
-    ledger = write_ledger(as_of=date(2026, 8, 24))
+    ledger = write_ledger(as_of=date(2026, 8, 31))
     assert ledger["meta"]["project_id"] == "healthtech-gcp-2026"
     assert ledger["invoices"][-1]["status"] == "open"
+    assert ledger["invoices"][-1]["credit_brl"] == 4000
     assert ledger["invoices"][0]["credit_brl"] == 4780
 
 

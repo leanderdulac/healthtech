@@ -526,6 +526,11 @@ def ingest_wearable_batch(
     }
 
 
+from src.ops.patients_routes import router as patients_router
+
+app.include_router(patients_router)
+
+
 @app.get("/api/v1/ops/dashboard-bootstrap")
 def dashboard_bootstrap():
     """Injeta a chave de leitura no dashboard."""

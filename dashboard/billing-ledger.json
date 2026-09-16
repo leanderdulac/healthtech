@@ -1,7 +1,7 @@
 {
   "meta": {
-    "disclaimer": "Orçamento: PIX Next2U Saúde 03/08 R$ 4.780 (R$ 779,90 Gemini Ultra + R$ 4.000,10 nuvem), 10/08 R$ 2.000, 17/08 R$ 4.000 e 24/08 R$ 4.800 (R$ 779,90 Gemini Ultra + R$ 4.020,10 nuvem).",
-    "as_of": "2026-08-24",
+    "disclaimer": "PIX Next2U Saúde: 03/08 R$ 4.780 (R$ 4.000,00 treino do modelo e custos correlatos + R$ 780,00 Gemini Ultra); 10/08 R$ 2.000 (complemento de treino); 17/08 R$ 4.000 (treino do modelo e custos correlatos); 24/08 R$ 4.800 (R$ 4.000,00 treino do modelo e custos correlatos + R$ 800,00 Gemini Ultra); 31/08 R$ 4.000 (treino do modelo e custos correlatos). Todo PIX no valor macro de R$ 4.000 é treino do modelo e custos correlatos.",
+    "as_of": "2026-08-31",
     "timezone": "America/Sao_Paulo",
     "currency": "BRL",
     "fx_usd_brl": 5.42,
@@ -12,24 +12,24 @@
     "project_number": "5794833455",
     "project_name": "healthtech-responsive",
     "location": "us-central1",
-    "budget_name": "HealthTech weekly compute & tokens (Next2U Saúde)",
+    "budget_name": "Saúde Responsiva — treino do modelo (R$ 4.000/semana)",
     "next_credit_at": null,
     "bank_statement": "C6 Bank · 25/06/2026–24/08/2026 · export 24/08/2026 12:38"
   },
   "kpis": {
-    "credits_posted_brl": 15580.0,
+    "credits_posted_brl": 19580.0,
     "credits_scheduled_brl": 0.0,
-    "credits_prior_brl": 10780.0,
-    "credits_today_brl": 4800.0,
-    "spent_to_date_brl": 12002.28,
-    "spent_last_3_weeks_brl": 10780.0,
-    "spent_today_brl": 1222.28,
-    "gemini_ultra_brl": 1559.8,
-    "gemini_ultra_today_brl": 779.9,
-    "cloud_from_today_credit_brl": 4020.1,
-    "balance_brl": 3577.72,
-    "forecast_week_brl": 8555.96,
-    "mtd_brl": 12002.28
+    "credits_prior_brl": 15580.0,
+    "credits_today_brl": 4000.0,
+    "spent_to_date_brl": 15881.52,
+    "spent_last_3_weeks_brl": 15580.0,
+    "spent_today_brl": 301.52,
+    "gemini_ultra_brl": 1580.0,
+    "gemini_ultra_today_brl": 0.0,
+    "cloud_from_today_credit_brl": 4000.0,
+    "balance_brl": 3698.48,
+    "forecast_week_brl": 2110.64,
+    "mtd_brl": 15881.52
   },
   "credits": [
     {
@@ -39,10 +39,12 @@
       "status": "posted",
       "source": "extrato_c6",
       "document": "PIX-20260803-4780",
-      "description": "PIX Next2U Saúde Ltda — R$ 4.780,00 (nuvem/tokens R$ 4.000,10 + assinatura Gemini Ultra R$ 779,90).",
+      "description": "PIX Next2U Saúde Ltda — R$ 4.780,00 (R$ 4.000,00 treino do modelo e custos correlatos + R$ 780,00 Gemini Ultra).",
       "allocation": {
-        "cloud_tokens_brl": 4000.1,
-        "gemini_ultra_brl": 779.9
+        "cloud_tokens_brl": 4000.0,
+        "training_brl": 4000.0,
+        "gemini_ultra_brl": 780.0,
+        "purpose": "treino do modelo e custos correlatos"
       },
       "posted_at": "2026-08-03T10:15:00-03:00",
       "kind": "cloud_budget"
@@ -54,7 +56,13 @@
       "status": "posted",
       "source": "extrato_c6",
       "document": "PIX-20260810-2000",
-      "description": "PIX Next2U Saúde Ltda — complemento semanal (R$ 2.000,00)",
+      "description": "PIX Next2U Saúde Ltda — complemento de treino do modelo e custos correlatos (R$ 2.000,00).",
+      "allocation": {
+        "cloud_tokens_brl": 2000.0,
+        "training_brl": 2000.0,
+        "gemini_ultra_brl": 0.0,
+        "purpose": "treino do modelo e custos correlatos"
+      },
       "posted_at": "2026-08-10T10:15:00-03:00",
       "kind": "cloud_budget"
     },
@@ -65,7 +73,13 @@
       "status": "posted",
       "source": "extrato_c6",
       "document": "PIX-20260817-4000",
-      "description": "PIX Next2U Saúde Ltda — processamento e tokens (R$ 4.000,00)",
+      "description": "PIX Next2U Saúde Ltda — R$ 4.000,00 (treino do modelo e custos correlatos).",
+      "allocation": {
+        "cloud_tokens_brl": 4000.0,
+        "training_brl": 4000.0,
+        "gemini_ultra_brl": 0.0,
+        "purpose": "treino do modelo e custos correlatos"
+      },
       "posted_at": "2026-08-17T10:15:00-03:00",
       "kind": "cloud_budget"
     },
@@ -76,19 +90,38 @@
       "status": "posted",
       "source": "titular_2026-08-24",
       "document": "PIX-20260824-4800",
-      "description": "PIX Next2U Saúde Ltda — R$ 4.800,00 (nuvem/tokens R$ 4.020,10 + assinatura Gemini Ultra R$ 779,90). Não constava no extrato C6 de 12:38.",
+      "description": "PIX Next2U Saúde Ltda — R$ 4.800,00 (R$ 4.000,00 treino do modelo e custos correlatos + R$ 800,00 Gemini Ultra).",
       "allocation": {
-        "cloud_tokens_brl": 4020.1,
-        "gemini_ultra_brl": 779.9
+        "cloud_tokens_brl": 4000.0,
+        "training_brl": 4000.0,
+        "gemini_ultra_brl": 800.0,
+        "purpose": "treino do modelo e custos correlatos"
       },
       "posted_at": "2026-08-24T10:15:00-03:00",
+      "kind": "cloud_budget"
+    },
+    {
+      "date": "2026-08-31",
+      "amount_brl": 4000.0,
+      "payer": "NEXT2U SAUDE LTDA",
+      "status": "posted",
+      "source": "titular_2026-08-31",
+      "document": "PIX-20260831-4000",
+      "description": "PIX Next2U Saúde Ltda — R$ 4.000,00 (treino do modelo e custos correlatos).",
+      "allocation": {
+        "cloud_tokens_brl": 4000.0,
+        "training_brl": 4000.0,
+        "gemini_ultra_brl": 0.0,
+        "purpose": "treino do modelo e custos correlatos"
+      },
+      "posted_at": "2026-08-31T10:15:00-03:00",
       "kind": "cloud_budget"
     }
   ],
   "daily": [
     {
       "date": "2026-08-03",
-      "total_brl": 1182.93,
+      "total_brl": 1202.53,
       "items": [
         {
           "service": "Cloud Run",
@@ -98,7 +131,7 @@
           "usage": 50230.59741,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 9.6063,
+          "cost_brl": 10.0712,
           "color": "#4285F4"
         },
         {
@@ -109,7 +142,7 @@
           "usage": 104670.717082,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 2.0852,
+          "cost_brl": 2.1861,
           "color": "#4285F4"
         },
         {
@@ -120,7 +153,7 @@
           "usage": 15983.837389,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.051,
+          "cost_brl": 0.0535,
           "color": "#4285F4"
         },
         {
@@ -131,7 +164,7 @@
           "usage": 48.060856,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.3768,
+          "cost_brl": 152.4123,
           "color": "#EA4335"
         },
         {
@@ -142,7 +175,7 @@
           "usage": 37243.675679,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.4749,
+          "cost_brl": 0.4979,
           "color": "#EA4335"
         },
         {
@@ -153,7 +186,7 @@
           "usage": 39250.659158,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 109.4694,
+          "cost_brl": 114.7671,
           "color": "#9334E6"
         },
         {
@@ -164,7 +197,7 @@
           "usage": 11248.574474,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 125.4883,
+          "cost_brl": 131.5613,
           "color": "#9334E6"
         },
         {
@@ -175,7 +208,7 @@
           "usage": 0.043334,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 2.1581,
+          "cost_brl": 2.2626,
           "color": "#34A853"
         },
         {
@@ -186,7 +219,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -197,7 +230,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -208,7 +241,7 @@
           "usage": 1.324116,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.5275,
+          "cost_brl": 0.553,
           "color": "#FBBC04"
         },
         {
@@ -219,7 +252,7 @@
           "usage": 38.698487,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.9868,
+          "cost_brl": 1.0346,
           "color": "#00ACC1"
         },
         {
@@ -230,7 +263,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -241,7 +274,7 @@
           "usage": 1.585779,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 6.3182,
+          "cost_brl": 6.624,
           "color": "#FF6D01"
         },
         {
@@ -251,15 +284,15 @@
           "sku_key": "gem_ultra",
           "usage": 1.0,
           "unit": "month",
-          "unit_price_usd": 143.892989,
-          "cost_brl": 779.9,
+          "unit_price_usd": 143.911439,
+          "cost_brl": 780.0,
           "color": "#9334E6"
         }
       ],
       "events": [
         {
           "kind": "subscription",
-          "title": "Assinatura Gemini Ultra (R$ 779,90 dos R$ 4.780,00)"
+          "title": "Assinatura Gemini Ultra (R$ 780,00 dos R$ 4.780,00)"
         },
         {
           "kind": "platform",
@@ -267,13 +300,13 @@
         },
         {
           "kind": "subscription",
-          "title": "Assinatura Gemini Ultra (R$ 779,90)"
+          "title": "Assinatura Gemini Ultra (R$ 780,00)"
         }
       ]
     },
     {
       "date": "2026-08-04",
-      "total_brl": 525.34,
+      "total_brl": 550.76,
       "items": [
         {
           "service": "Cloud Run",
@@ -283,7 +316,7 @@
           "usage": 45441.895014,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 8.6905,
+          "cost_brl": 9.1111,
           "color": "#4285F4"
         },
         {
@@ -294,7 +327,7 @@
           "usage": 78164.20126,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.5571,
+          "cost_brl": 1.6325,
           "color": "#4285F4"
         },
         {
@@ -305,7 +338,7 @@
           "usage": 31883.587638,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.1016,
+          "cost_brl": 0.1065,
           "color": "#4285F4"
         },
         {
@@ -316,7 +349,7 @@
           "usage": 47.976207,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.1208,
+          "cost_brl": 152.144,
           "color": "#EA4335"
         },
         {
@@ -327,7 +360,7 @@
           "usage": 41497.058168,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.5291,
+          "cost_brl": 0.5547,
           "color": "#EA4335"
         },
         {
@@ -338,7 +371,7 @@
           "usage": 73938.074509,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 206.2119,
+          "cost_brl": 216.1915,
           "color": "#9334E6"
         },
         {
@@ -349,7 +382,7 @@
           "usage": 14207.169516,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 158.4941,
+          "cost_brl": 166.1645,
           "color": "#9334E6"
         },
         {
@@ -360,7 +393,7 @@
           "usage": 0.020341,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.0131,
+          "cost_brl": 1.0621,
           "color": "#34A853"
         },
         {
@@ -371,7 +404,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -382,7 +415,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -393,7 +426,7 @@
           "usage": 0.902043,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.3595,
+          "cost_brl": 0.3769,
           "color": "#FBBC04"
         },
         {
@@ -404,7 +437,7 @@
           "usage": 3.061984,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.0781,
+          "cost_brl": 0.0818,
           "color": "#00ACC1"
         },
         {
@@ -415,7 +448,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -426,7 +459,7 @@
           "usage": 0.677343,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 2.6987,
+          "cost_brl": 2.8293,
           "color": "#FF6D01"
         }
       ],
@@ -439,7 +472,7 @@
     },
     {
       "date": "2026-08-05",
-      "total_brl": 464.34,
+      "total_brl": 486.81,
       "items": [
         {
           "service": "Cloud Run",
@@ -449,7 +482,7 @@
           "usage": 74778.202046,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 14.3008,
+          "cost_brl": 14.9929,
           "color": "#4285F4"
         },
         {
@@ -460,7 +493,7 @@
           "usage": 99158.109983,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.9754,
+          "cost_brl": 2.071,
           "color": "#4285F4"
         },
         {
@@ -471,7 +504,7 @@
           "usage": 14966.067481,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0476,
+          "cost_brl": 0.0499,
           "color": "#4285F4"
         },
         {
@@ -482,7 +515,7 @@
           "usage": 48.13979,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.6156,
+          "cost_brl": 152.6626,
           "color": "#EA4335"
         },
         {
@@ -493,7 +526,7 @@
           "usage": 17273.968462,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.2202,
+          "cost_brl": 0.2309,
           "color": "#EA4335"
         },
         {
@@ -504,7 +537,7 @@
           "usage": 48137.508196,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 134.2547,
+          "cost_brl": 140.7519,
           "color": "#9334E6"
         },
         {
@@ -515,7 +548,7 @@
           "usage": 13794.679488,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 153.8924,
+          "cost_brl": 161.34,
           "color": "#9334E6"
         },
         {
@@ -526,7 +559,7 @@
           "usage": 0.012599,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 0.6275,
+          "cost_brl": 0.6579,
           "color": "#34A853"
         },
         {
@@ -537,7 +570,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -548,7 +581,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -559,7 +592,7 @@
           "usage": 1.648115,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.6566,
+          "cost_brl": 0.6884,
           "color": "#FBBC04"
         },
         {
@@ -570,7 +603,7 @@
           "usage": 149.032638,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 3.8002,
+          "cost_brl": 3.9841,
           "color": "#00ACC1"
         },
         {
@@ -581,7 +614,7 @@
           "usage": 0.476667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.3799,
+          "cost_brl": 0.3983,
           "color": "#5F6368"
         },
         {
@@ -592,7 +625,7 @@
           "usage": 2.06992,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 8.2471,
+          "cost_brl": 8.6462,
           "color": "#FF6D01"
         }
       ],
@@ -605,7 +638,7 @@
     },
     {
       "date": "2026-08-06",
-      "total_brl": 625.15,
+      "total_brl": 655.41,
       "items": [
         {
           "service": "Cloud Run",
@@ -615,7 +648,7 @@
           "usage": 22950.509294,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.3892,
+          "cost_brl": 4.6016,
           "color": "#4285F4"
         },
         {
@@ -626,7 +659,7 @@
           "usage": 95651.277617,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.9055,
+          "cost_brl": 1.9978,
           "color": "#4285F4"
         },
         {
@@ -637,7 +670,7 @@
           "usage": 18146.462749,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0578,
+          "cost_brl": 0.0606,
           "color": "#4285F4"
         },
         {
@@ -648,7 +681,7 @@
           "usage": 48.1938,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.779,
+          "cost_brl": 152.834,
           "color": "#EA4335"
         },
         {
@@ -659,7 +692,7 @@
           "usage": 27.625,
           "unit": "node-hours",
           "unit_price_usd": 0.95,
-          "cost_brl": 209.1238,
+          "cost_brl": 219.2443,
           "color": "#EA4335"
         },
         {
@@ -670,7 +703,7 @@
           "usage": 49585.194767,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.6322,
+          "cost_brl": 0.6628,
           "color": "#EA4335"
         },
         {
@@ -681,7 +714,7 @@
           "usage": 38987.427099,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 108.7351,
+          "cost_brl": 113.9974,
           "color": "#9334E6"
         },
         {
@@ -692,7 +725,7 @@
           "usage": 13263.325578,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 147.9647,
+          "cost_brl": 155.1254,
           "color": "#9334E6"
         },
         {
@@ -703,7 +736,7 @@
           "usage": 0.022643,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.1276,
+          "cost_brl": 1.1822,
           "color": "#34A853"
         },
         {
@@ -714,7 +747,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -725,7 +758,7 @@
           "usage": 3.38,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.5387,
+          "cost_brl": 0.5648,
           "color": "#FBBC04"
         },
         {
@@ -736,7 +769,7 @@
           "usage": 1.544721,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.6154,
+          "cost_brl": 0.6452,
           "color": "#FBBC04"
         },
         {
@@ -747,7 +780,7 @@
           "usage": 78.63833,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 2.0052,
+          "cost_brl": 2.1023,
           "color": "#00ACC1"
         },
         {
@@ -758,7 +791,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -769,7 +802,7 @@
           "usage": 0.506302,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 2.0173,
+          "cost_brl": 2.1149,
           "color": "#FF6D01"
         }
       ],
@@ -782,7 +815,7 @@
     },
     {
       "date": "2026-08-07",
-      "total_brl": 517.44,
+      "total_brl": 542.49,
       "items": [
         {
           "service": "Cloud Run",
@@ -792,7 +825,7 @@
           "usage": 25390.581753,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.8558,
+          "cost_brl": 5.0908,
           "color": "#4285F4"
         },
         {
@@ -803,7 +836,7 @@
           "usage": 97221.731373,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.9368,
+          "cost_brl": 2.0306,
           "color": "#4285F4"
         },
         {
@@ -814,7 +847,7 @@
           "usage": 32377.705477,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.1032,
+          "cost_brl": 0.1082,
           "color": "#4285F4"
         },
         {
@@ -825,7 +858,7 @@
           "usage": 47.903645,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.9013,
+          "cost_brl": 151.9138,
           "color": "#EA4335"
         },
         {
@@ -836,7 +869,7 @@
           "usage": 29835.561689,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.3803,
+          "cost_brl": 0.3987,
           "color": "#EA4335"
         },
         {
@@ -847,7 +880,7 @@
           "usage": 66373.545603,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 185.1146,
+          "cost_brl": 194.0732,
           "color": "#9334E6"
         },
         {
@@ -858,7 +891,7 @@
           "usage": 15711.951831,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 175.2814,
+          "cost_brl": 183.7641,
           "color": "#9334E6"
         },
         {
@@ -869,7 +902,7 @@
           "usage": 0.039464,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.9654,
+          "cost_brl": 2.0605,
           "color": "#34A853"
         },
         {
@@ -880,7 +913,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -891,7 +924,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -902,7 +935,7 @@
           "usage": 1.825291,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.7273,
+          "cost_brl": 0.7625,
           "color": "#FBBC04"
         },
         {
@@ -913,7 +946,7 @@
           "usage": 4.243801,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.1082,
+          "cost_brl": 0.1134,
           "color": "#00ACC1"
         },
         {
@@ -924,7 +957,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -935,7 +968,7 @@
           "usage": 0.397551,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 1.584,
+          "cost_brl": 1.6607,
           "color": "#FF6D01"
         }
       ],
@@ -943,7 +976,7 @@
     },
     {
       "date": "2026-08-08",
-      "total_brl": 320.7,
+      "total_brl": 336.22,
       "items": [
         {
           "service": "Cloud Run",
@@ -953,7 +986,7 @@
           "usage": 20607.670134,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 3.941,
+          "cost_brl": 4.1318,
           "color": "#4285F4"
         },
         {
@@ -964,7 +997,7 @@
           "usage": 108293.595323,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 2.1574,
+          "cost_brl": 2.2618,
           "color": "#4285F4"
         },
         {
@@ -975,7 +1008,7 @@
           "usage": 6088.94013,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0194,
+          "cost_brl": 0.0203,
           "color": "#4285F4"
         },
         {
@@ -986,7 +1019,7 @@
           "usage": 47.761217,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.4706,
+          "cost_brl": 151.4622,
           "color": "#EA4335"
         },
         {
@@ -997,7 +1030,7 @@
           "usage": 8837.566191,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.1126,
+          "cost_brl": 0.1181,
           "color": "#EA4335"
         },
         {
@@ -1008,7 +1041,7 @@
           "usage": 28183.644439,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 78.6037,
+          "cost_brl": 82.4077,
           "color": "#9334E6"
         },
         {
@@ -1019,7 +1052,7 @@
           "usage": 7740.396933,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 86.3512,
+          "cost_brl": 90.5302,
           "color": "#9334E6"
         },
         {
@@ -1030,7 +1063,7 @@
           "usage": 0.035003,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.7432,
+          "cost_brl": 1.8276,
           "color": "#34A853"
         },
         {
@@ -1041,7 +1074,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -1052,7 +1085,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -1063,7 +1096,7 @@
           "usage": 2.070174,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.8248,
+          "cost_brl": 0.8647,
           "color": "#FBBC04"
         },
         {
@@ -1074,7 +1107,7 @@
           "usage": 1.125445,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.0287,
+          "cost_brl": 0.0301,
           "color": "#00ACC1"
         },
         {
@@ -1085,7 +1118,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -1096,7 +1129,7 @@
           "usage": 0.491497,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 1.9583,
+          "cost_brl": 2.0531,
           "color": "#FF6D01"
         }
       ],
@@ -1104,7 +1137,7 @@
     },
     {
       "date": "2026-08-09",
-      "total_brl": 548.65,
+      "total_brl": 575.21,
       "items": [
         {
           "service": "Cloud Run",
@@ -1114,7 +1147,7 @@
           "usage": 25715.402264,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.918,
+          "cost_brl": 5.156,
           "color": "#4285F4"
         },
         {
@@ -1125,7 +1158,7 @@
           "usage": 78381.348096,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.5615,
+          "cost_brl": 1.6371,
           "color": "#4285F4"
         },
         {
@@ -1136,7 +1169,7 @@
           "usage": 12641.741177,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0403,
+          "cost_brl": 0.0422,
           "color": "#4285F4"
         },
         {
@@ -1147,7 +1180,7 @@
           "usage": 48.251426,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.9533,
+          "cost_brl": 153.0167,
           "color": "#EA4335"
         },
         {
@@ -1158,7 +1191,7 @@
           "usage": 30.6,
           "unit": "node-hours",
           "unit_price_usd": 0.95,
-          "cost_brl": 231.6448,
+          "cost_brl": 242.8553,
           "color": "#EA4335"
         },
         {
@@ -1169,7 +1202,7 @@
           "usage": 13621.326792,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.1736,
+          "cost_brl": 0.182,
           "color": "#EA4335"
         },
         {
@@ -1180,7 +1213,7 @@
           "usage": 31050.361633,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 86.5988,
+          "cost_brl": 90.7898,
           "color": "#9334E6"
         },
         {
@@ -1191,7 +1224,7 @@
           "usage": 6337.659363,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 70.7025,
+          "cost_brl": 74.1242,
           "color": "#9334E6"
         },
         {
@@ -1202,7 +1235,7 @@
           "usage": 0.016494,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 0.8214,
+          "cost_brl": 0.8612,
           "color": "#34A853"
         },
         {
@@ -1213,7 +1246,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -1224,7 +1257,7 @@
           "usage": 3.02,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.4813,
+          "cost_brl": 0.5046,
           "color": "#FBBC04"
         },
         {
@@ -1235,7 +1268,7 @@
           "usage": 1.829295,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.7288,
+          "cost_brl": 0.7641,
           "color": "#FBBC04"
         },
         {
@@ -1246,7 +1279,7 @@
           "usage": 109.294477,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 2.7869,
+          "cost_brl": 2.9218,
           "color": "#00ACC1"
         },
         {
@@ -1257,7 +1290,7 @@
           "usage": 0.566667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.4515,
+          "cost_brl": 0.4734,
           "color": "#5F6368"
         },
         {
@@ -1268,7 +1301,7 @@
           "usage": 0.424781,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 1.6925,
+          "cost_brl": 1.7744,
           "color": "#FF6D01"
         }
       ],
@@ -1281,7 +1314,7 @@
     },
     {
       "date": "2026-08-10",
-      "total_brl": 462.55,
+      "total_brl": 484.93,
       "items": [
         {
           "service": "Cloud Run",
@@ -1291,7 +1324,7 @@
           "usage": 49617.068704,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 9.489,
+          "cost_brl": 9.9482,
           "color": "#4285F4"
         },
         {
@@ -1302,7 +1335,7 @@
           "usage": 70065.831104,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.3958,
+          "cost_brl": 1.4634,
           "color": "#4285F4"
         },
         {
@@ -1313,7 +1346,7 @@
           "usage": 17983.477649,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0573,
+          "cost_brl": 0.0601,
           "color": "#4285F4"
         },
         {
@@ -1324,7 +1357,7 @@
           "usage": 47.739196,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.404,
+          "cost_brl": 151.3924,
           "color": "#EA4335"
         },
         {
@@ -1335,7 +1368,7 @@
           "usage": 51769.136153,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.66,
+          "cost_brl": 0.6919,
           "color": "#EA4335"
         },
         {
@@ -1346,7 +1379,7 @@
           "usage": 49369.445774,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 137.6904,
+          "cost_brl": 144.3539,
           "color": "#9334E6"
         },
         {
@@ -1357,7 +1390,7 @@
           "usage": 14485.511345,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 161.5993,
+          "cost_brl": 169.42,
           "color": "#9334E6"
         },
         {
@@ -1368,7 +1401,7 @@
           "usage": 0.025724,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.2811,
+          "cost_brl": 1.3431,
           "color": "#34A853"
         },
         {
@@ -1379,7 +1412,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -1390,7 +1423,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -1401,7 +1434,7 @@
           "usage": 2.217024,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.8833,
+          "cost_brl": 0.926,
           "color": "#FBBC04"
         },
         {
@@ -1412,7 +1445,7 @@
           "usage": 6.93742,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.1769,
+          "cost_brl": 0.1854,
           "color": "#00ACC1"
         },
         {
@@ -1423,7 +1456,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -1434,7 +1467,7 @@
           "usage": 1.110359,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 4.424,
+          "cost_brl": 4.6381,
           "color": "#FF6D01"
         }
       ],
@@ -1447,7 +1480,7 @@
     },
     {
       "date": "2026-08-11",
-      "total_brl": 448.88,
+      "total_brl": 470.6,
       "items": [
         {
           "service": "Cloud Run",
@@ -1457,7 +1490,7 @@
           "usage": 25175.431365,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.8146,
+          "cost_brl": 5.0476,
           "color": "#4285F4"
         },
         {
@@ -1468,7 +1501,7 @@
           "usage": 93063.903074,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.8539,
+          "cost_brl": 1.9437,
           "color": "#4285F4"
         },
         {
@@ -1479,7 +1512,7 @@
           "usage": 31086.157005,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0991,
+          "cost_brl": 0.1039,
           "color": "#4285F4"
         },
         {
@@ -1490,7 +1523,7 @@
           "usage": 47.714155,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.3281,
+          "cost_brl": 151.3129,
           "color": "#EA4335"
         },
         {
@@ -1501,7 +1534,7 @@
           "usage": 33803.159382,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.4309,
+          "cost_brl": 0.4518,
           "color": "#EA4335"
         },
         {
@@ -1512,7 +1545,7 @@
           "usage": 56808.390392,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 158.4375,
+          "cost_brl": 166.1051,
           "color": "#9334E6"
         },
         {
@@ -1523,7 +1556,7 @@
           "usage": 11961.518058,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 133.4418,
+          "cost_brl": 139.8997,
           "color": "#9334E6"
         },
         {
@@ -1534,7 +1567,7 @@
           "usage": 0.040628,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 2.0234,
+          "cost_brl": 2.1214,
           "color": "#34A853"
         },
         {
@@ -1545,7 +1578,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -1556,7 +1589,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -1567,7 +1600,7 @@
           "usage": 2.256217,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.8989,
+          "cost_brl": 0.9424,
           "color": "#FBBC04"
         },
         {
@@ -1578,7 +1611,7 @@
           "usage": 5.102201,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.1301,
+          "cost_brl": 0.1364,
           "color": "#00ACC1"
         },
         {
@@ -1589,7 +1622,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -1600,7 +1633,7 @@
           "usage": 0.485661,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 1.9349,
+          "cost_brl": 2.0286,
           "color": "#FF6D01"
         }
       ],
@@ -1608,7 +1641,7 @@
     },
     {
       "date": "2026-08-12",
-      "total_brl": 418.39,
+      "total_brl": 438.63,
       "items": [
         {
           "service": "Cloud Run",
@@ -1618,7 +1651,7 @@
           "usage": 23324.662117,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.4608,
+          "cost_brl": 4.6766,
           "color": "#4285F4"
         },
         {
@@ -1629,7 +1662,7 @@
           "usage": 103585.782189,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 2.0636,
+          "cost_brl": 2.1634,
           "color": "#4285F4"
         },
         {
@@ -1640,7 +1673,7 @@
           "usage": 13541.5524,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0432,
+          "cost_brl": 0.0453,
           "color": "#4285F4"
         },
         {
@@ -1651,7 +1684,7 @@
           "usage": 48.209898,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.8277,
+          "cost_brl": 152.885,
           "color": "#EA4335"
         },
         {
@@ -1662,7 +1695,7 @@
           "usage": 16849.774776,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.2148,
+          "cost_brl": 0.2252,
           "color": "#EA4335"
         },
         {
@@ -1673,7 +1706,7 @@
           "usage": 40836.931665,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 113.8935,
+          "cost_brl": 119.4054,
           "color": "#9334E6"
         },
         {
@@ -1684,7 +1717,7 @@
           "usage": 13114.621554,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 146.3057,
+          "cost_brl": 153.3861,
           "color": "#9334E6"
         },
         {
@@ -1695,7 +1728,7 @@
           "usage": 0.031012,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.5445,
+          "cost_brl": 1.6192,
           "color": "#34A853"
         },
         {
@@ -1706,7 +1739,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -1717,7 +1750,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -1728,7 +1761,7 @@
           "usage": 2.088055,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.832,
+          "cost_brl": 0.8723,
           "color": "#FBBC04"
         },
         {
@@ -1739,7 +1772,7 @@
           "usage": 4.450967,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.1135,
+          "cost_brl": 0.119,
           "color": "#00ACC1"
         },
         {
@@ -1750,7 +1783,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -1761,7 +1794,7 @@
           "usage": 0.65261,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 2.6002,
+          "cost_brl": 2.726,
           "color": "#FF6D01"
         }
       ],
@@ -1769,7 +1802,7 @@
     },
     {
       "date": "2026-08-13",
-      "total_brl": 478.19,
+      "total_brl": 501.34,
       "items": [
         {
           "service": "Cloud Run",
@@ -1779,7 +1812,7 @@
           "usage": 19329.626863,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 3.6967,
+          "cost_brl": 3.8756,
           "color": "#4285F4"
         },
         {
@@ -1790,7 +1823,7 @@
           "usage": 95707.591676,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.9066,
+          "cost_brl": 1.9988,
           "color": "#4285F4"
         },
         {
@@ -1801,7 +1834,7 @@
           "usage": 15570.503511,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0497,
+          "cost_brl": 0.0521,
           "color": "#4285F4"
         },
         {
@@ -1812,7 +1845,7 @@
           "usage": 48.027526,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.2761,
+          "cost_brl": 152.3067,
           "color": "#EA4335"
         },
         {
@@ -1823,7 +1856,7 @@
           "usage": 38077.934104,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.4855,
+          "cost_brl": 0.509,
           "color": "#EA4335"
         },
         {
@@ -1834,7 +1867,7 @@
           "usage": 53758.941542,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 149.9327,
+          "cost_brl": 157.1887,
           "color": "#9334E6"
         },
         {
@@ -1845,7 +1878,7 @@
           "usage": 15456.433936,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 172.4308,
+          "cost_brl": 180.7756,
           "color": "#9334E6"
         },
         {
@@ -1856,7 +1889,7 @@
           "usage": 0.031403,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.564,
+          "cost_brl": 1.6397,
           "color": "#34A853"
         },
         {
@@ -1867,7 +1900,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -1878,7 +1911,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -1889,7 +1922,7 @@
           "usage": 1.299138,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.5177,
+          "cost_brl": 0.5427,
           "color": "#FBBC04"
         },
         {
@@ -1900,7 +1933,7 @@
           "usage": 2.90467,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.0741,
+          "cost_brl": 0.0777,
           "color": "#00ACC1"
         },
         {
@@ -1911,7 +1944,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -1922,7 +1955,7 @@
           "usage": 0.44554,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 1.7751,
+          "cost_brl": 1.861,
           "color": "#FF6D01"
         }
       ],
@@ -1930,7 +1963,7 @@
     },
     {
       "date": "2026-08-14",
-      "total_brl": 431.14,
+      "total_brl": 452.0,
       "items": [
         {
           "service": "Cloud Run",
@@ -1940,7 +1973,7 @@
           "usage": 22402.94335,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.2845,
+          "cost_brl": 4.4918,
           "color": "#4285F4"
         },
         {
@@ -1951,7 +1984,7 @@
           "usage": 106731.015499,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 2.1262,
+          "cost_brl": 2.2291,
           "color": "#4285F4"
         },
         {
@@ -1962,7 +1995,7 @@
           "usage": 29688.256405,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0947,
+          "cost_brl": 0.0993,
           "color": "#4285F4"
         },
         {
@@ -1973,7 +2006,7 @@
           "usage": 48.20413,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.8102,
+          "cost_brl": 152.8667,
           "color": "#EA4335"
         },
         {
@@ -1984,7 +2017,7 @@
           "usage": 20937.5816,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.267,
+          "cost_brl": 0.2799,
           "color": "#EA4335"
         },
         {
@@ -1995,7 +2028,7 @@
           "usage": 40742.440159,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 113.6299,
+          "cost_brl": 119.129,
           "color": "#9334E6"
         },
         {
@@ -2006,7 +2039,7 @@
           "usage": 14240.098641,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 158.8615,
+          "cost_brl": 166.5496,
           "color": "#9334E6"
         },
         {
@@ -2017,7 +2050,7 @@
           "usage": 0.025408,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.2654,
+          "cost_brl": 1.3266,
           "color": "#34A853"
         },
         {
@@ -2028,7 +2061,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -2039,7 +2072,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -2050,7 +2083,7 @@
           "usage": 1.71207,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.6822,
+          "cost_brl": 0.7152,
           "color": "#FBBC04"
         },
         {
@@ -2061,7 +2094,7 @@
           "usage": 6.999366,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.1785,
+          "cost_brl": 0.1871,
           "color": "#00ACC1"
         },
         {
@@ -2072,7 +2105,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -2083,7 +2116,7 @@
           "usage": 0.866495,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 3.4523,
+          "cost_brl": 3.6194,
           "color": "#FF6D01"
         }
       ],
@@ -2091,7 +2124,7 @@
     },
     {
       "date": "2026-08-15",
-      "total_brl": 313.52,
+      "total_brl": 328.69,
       "items": [
         {
           "service": "Cloud Run",
@@ -2101,7 +2134,7 @@
           "usage": 23175.145572,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.4321,
+          "cost_brl": 4.6466,
           "color": "#4285F4"
         },
         {
@@ -2112,7 +2145,7 @@
           "usage": 78005.647913,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.554,
+          "cost_brl": 1.6292,
           "color": "#4285F4"
         },
         {
@@ -2123,7 +2156,7 @@
           "usage": 12658.770283,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0403,
+          "cost_brl": 0.0422,
           "color": "#4285F4"
         },
         {
@@ -2134,7 +2167,7 @@
           "usage": 47.778491,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.5228,
+          "cost_brl": 151.5169,
           "color": "#EA4335"
         },
         {
@@ -2145,7 +2178,7 @@
           "usage": 26438.102241,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.3371,
+          "cost_brl": 0.3534,
           "color": "#EA4335"
         },
         {
@@ -2156,7 +2189,7 @@
           "usage": 30612.013642,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 85.3764,
+          "cost_brl": 89.5081,
           "color": "#9334E6"
         },
         {
@@ -2167,7 +2200,7 @@
           "usage": 6483.413938,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 72.3284,
+          "cost_brl": 75.8288,
           "color": "#9334E6"
         },
         {
@@ -2178,7 +2211,7 @@
           "usage": 0.03071,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.5295,
+          "cost_brl": 1.6035,
           "color": "#34A853"
         },
         {
@@ -2189,7 +2222,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -2200,7 +2233,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -2211,7 +2244,7 @@
           "usage": 0.977195,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.3893,
+          "cost_brl": 0.4082,
           "color": "#FBBC04"
         },
         {
@@ -2222,7 +2255,7 @@
           "usage": 0.420732,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.0107,
+          "cost_brl": 0.0113,
           "color": "#00ACC1"
         },
         {
@@ -2233,7 +2266,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -2244,7 +2277,7 @@
           "usage": 0.630678,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 2.5127,
+          "cost_brl": 2.6343,
           "color": "#FF6D01"
         }
       ],
@@ -2252,7 +2285,7 @@
     },
     {
       "date": "2026-08-16",
-      "total_brl": 318.39,
+      "total_brl": 333.8,
       "items": [
         {
           "service": "Cloud Run",
@@ -2262,7 +2295,7 @@
           "usage": 21967.040424,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.2011,
+          "cost_brl": 4.4044,
           "color": "#4285F4"
         },
         {
@@ -2273,7 +2306,7 @@
           "usage": 99718.886369,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.9865,
+          "cost_brl": 2.0827,
           "color": "#4285F4"
         },
         {
@@ -2284,7 +2317,7 @@
           "usage": 12747.390195,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0406,
+          "cost_brl": 0.0425,
           "color": "#4285F4"
         },
         {
@@ -2295,7 +2328,7 @@
           "usage": 47.838962,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.7056,
+          "cost_brl": 151.7087,
           "color": "#EA4335"
         },
         {
@@ -2306,7 +2339,7 @@
           "usage": 14173.257876,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.1807,
+          "cost_brl": 0.1894,
           "color": "#EA4335"
         },
         {
@@ -2317,7 +2350,7 @@
           "usage": 31910.519349,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 88.9979,
+          "cost_brl": 93.305,
           "color": "#9334E6"
         },
         {
@@ -2328,7 +2361,7 @@
           "usage": 6576.119774,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 73.3627,
+          "cost_brl": 76.9131,
           "color": "#9334E6"
         },
         {
@@ -2339,7 +2372,7 @@
           "usage": 0.015582,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 0.776,
+          "cost_brl": 0.8135,
           "color": "#34A853"
         },
         {
@@ -2350,7 +2383,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -2361,7 +2394,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -2372,7 +2405,7 @@
           "usage": 1.853286,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.7383,
+          "cost_brl": 0.7741,
           "color": "#FBBC04"
         },
         {
@@ -2383,7 +2416,7 @@
           "usage": 0.804254,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.0204,
+          "cost_brl": 0.0214,
           "color": "#00ACC1"
         },
         {
@@ -2394,7 +2427,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -2405,7 +2438,7 @@
           "usage": 0.727301,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 2.8978,
+          "cost_brl": 3.038,
           "color": "#FF6D01"
         }
       ],
@@ -2413,7 +2446,7 @@
     },
     {
       "date": "2026-08-17",
-      "total_brl": 504.91,
+      "total_brl": 529.35,
       "items": [
         {
           "service": "Cloud Run",
@@ -2423,7 +2456,7 @@
           "usage": 19678.390312,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 3.7634,
+          "cost_brl": 3.9456,
           "color": "#4285F4"
         },
         {
@@ -2434,7 +2467,7 @@
           "usage": 109463.874781,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 2.1806,
+          "cost_brl": 2.2861,
           "color": "#4285F4"
         },
         {
@@ -2445,7 +2478,7 @@
           "usage": 27215.07081,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0867,
+          "cost_brl": 0.0909,
           "color": "#4285F4"
         },
         {
@@ -2456,7 +2489,7 @@
           "usage": 47.92041,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.9521,
+          "cost_brl": 151.967,
           "color": "#EA4335"
         },
         {
@@ -2467,7 +2500,7 @@
           "usage": 51936.676569,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.6622,
+          "cost_brl": 0.6942,
           "color": "#EA4335"
         },
         {
@@ -2478,7 +2511,7 @@
           "usage": 69235.551452,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 193.0966,
+          "cost_brl": 202.4415,
           "color": "#9334E6"
         },
         {
@@ -2489,7 +2522,7 @@
           "usage": 13856.99319,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 154.5876,
+          "cost_brl": 162.0689,
           "color": "#9334E6"
         },
         {
@@ -2500,7 +2533,7 @@
           "usage": 0.017254,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 0.8593,
+          "cost_brl": 0.9009,
           "color": "#34A853"
         },
         {
@@ -2511,7 +2544,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -2522,7 +2555,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -2533,7 +2566,7 @@
           "usage": 1.389123,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.5535,
+          "cost_brl": 0.5803,
           "color": "#FBBC04"
         },
         {
@@ -2544,7 +2577,7 @@
           "usage": 6.727744,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.1716,
+          "cost_brl": 0.1799,
           "color": "#00ACC1"
         },
         {
@@ -2555,7 +2588,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -2566,7 +2599,7 @@
           "usage": 0.882181,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 3.5148,
+          "cost_brl": 3.6849,
           "color": "#FF6D01"
         }
       ],
@@ -2574,7 +2607,7 @@
     },
     {
       "date": "2026-08-18",
-      "total_brl": 453.0,
+      "total_brl": 474.93,
       "items": [
         {
           "service": "Cloud Run",
@@ -2584,7 +2617,7 @@
           "usage": 57540.984655,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 11.0043,
+          "cost_brl": 11.5369,
           "color": "#4285F4"
         },
         {
@@ -2595,7 +2628,7 @@
           "usage": 82782.9487,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.6491,
+          "cost_brl": 1.7289,
           "color": "#4285F4"
         },
         {
@@ -2606,7 +2639,7 @@
           "usage": 20812.974589,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0663,
+          "cost_brl": 0.0695,
           "color": "#4285F4"
         },
         {
@@ -2617,7 +2650,7 @@
           "usage": 47.750499,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.4381,
+          "cost_brl": 151.4282,
           "color": "#EA4335"
         },
         {
@@ -2628,7 +2661,7 @@
           "usage": 33909.584908,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.4324,
+          "cost_brl": 0.4533,
           "color": "#EA4335"
         },
         {
@@ -2639,7 +2672,7 @@
           "usage": 55223.087946,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 154.0162,
+          "cost_brl": 161.4698,
           "color": "#9334E6"
         },
         {
@@ -2650,7 +2683,7 @@
           "usage": 11855.879977,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 132.2633,
+          "cost_brl": 138.6642,
           "color": "#9334E6"
         },
         {
@@ -2661,7 +2694,7 @@
           "usage": 0.025141,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.2522,
+          "cost_brl": 1.3128,
           "color": "#34A853"
         },
         {
@@ -2672,7 +2705,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -2683,7 +2716,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -2694,7 +2727,7 @@
           "usage": 0.890085,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.3546,
+          "cost_brl": 0.3718,
           "color": "#FBBC04"
         },
         {
@@ -2705,7 +2738,7 @@
           "usage": 70.030685,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 1.7857,
+          "cost_brl": 1.8721,
           "color": "#00ACC1"
         },
         {
@@ -2716,7 +2749,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -2727,7 +2760,7 @@
           "usage": 1.319169,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 5.2558,
+          "cost_brl": 5.5102,
           "color": "#FF6D01"
         }
       ],
@@ -2740,7 +2773,7 @@
     },
     {
       "date": "2026-08-19",
-      "total_brl": 498.18,
+      "total_brl": 522.28,
       "items": [
         {
           "service": "Cloud Run",
@@ -2750,7 +2783,7 @@
           "usage": 64523.817326,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 12.3399,
+          "cost_brl": 12.9371,
           "color": "#4285F4"
         },
         {
@@ -2761,7 +2794,7 @@
           "usage": 78742.444908,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.5687,
+          "cost_brl": 1.6446,
           "color": "#4285F4"
         },
         {
@@ -2772,7 +2805,7 @@
           "usage": 45868.211487,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.1461,
+          "cost_brl": 0.1532,
           "color": "#4285F4"
         },
         {
@@ -2783,7 +2816,7 @@
           "usage": 47.749986,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.4364,
+          "cost_brl": 151.4265,
           "color": "#EA4335"
         },
         {
@@ -2794,7 +2827,7 @@
           "usage": 18845.960196,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.2402,
+          "cost_brl": 0.2519,
           "color": "#EA4335"
         },
         {
@@ -2805,7 +2838,7 @@
           "usage": 69898.048241,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 194.9444,
+          "cost_brl": 204.3787,
           "color": "#9334E6"
         },
         {
@@ -2816,7 +2849,7 @@
           "usage": 12405.483257,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 138.3946,
+          "cost_brl": 145.0923,
           "color": "#9334E6"
         },
         {
@@ -2827,7 +2860,7 @@
           "usage": 0.03128,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.5578,
+          "cost_brl": 1.6332,
           "color": "#34A853"
         },
         {
@@ -2838,7 +2871,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -2849,7 +2882,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -2860,7 +2893,7 @@
           "usage": 1.166304,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.4647,
+          "cost_brl": 0.4872,
           "color": "#FBBC04"
         },
         {
@@ -2871,7 +2904,7 @@
           "usage": 44.888454,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 1.1446,
+          "cost_brl": 1.1999,
           "color": "#00ACC1"
         },
         {
@@ -2882,7 +2915,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -2893,7 +2926,7 @@
           "usage": 0.615575,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 2.4526,
+          "cost_brl": 2.5713,
           "color": "#FF6D01"
         }
       ],
@@ -2906,7 +2939,7 @@
     },
     {
       "date": "2026-08-20",
-      "total_brl": 490.68,
+      "total_brl": 514.43,
       "items": [
         {
           "service": "Cloud Run",
@@ -2916,7 +2949,7 @@
           "usage": 20503.275124,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 3.9212,
+          "cost_brl": 4.111,
           "color": "#4285F4"
         },
         {
@@ -2927,7 +2960,7 @@
           "usage": 83526.349015,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.664,
+          "cost_brl": 1.7445,
           "color": "#4285F4"
         },
         {
@@ -2938,7 +2971,7 @@
           "usage": 30896.127026,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0985,
+          "cost_brl": 0.1033,
           "color": "#4285F4"
         },
         {
@@ -2949,7 +2982,7 @@
           "usage": 47.883027,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.839,
+          "cost_brl": 151.8485,
           "color": "#EA4335"
         },
         {
@@ -2960,7 +2993,7 @@
           "usage": 22140.346671,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.2823,
+          "cost_brl": 0.2959,
           "color": "#EA4335"
         },
         {
@@ -2971,7 +3004,7 @@
           "usage": 64508.287389,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 179.9124,
+          "cost_brl": 188.6193,
           "color": "#9334E6"
         },
         {
@@ -2982,7 +3015,7 @@
           "usage": 13910.203476,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 155.1812,
+          "cost_brl": 162.6912,
           "color": "#9334E6"
         },
         {
@@ -2993,7 +3026,7 @@
           "usage": 0.01221,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 0.6081,
+          "cost_brl": 0.6375,
           "color": "#34A853"
         },
         {
@@ -3004,7 +3037,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -3015,7 +3048,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -3026,7 +3059,7 @@
           "usage": 1.852183,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.7379,
+          "cost_brl": 0.7736,
           "color": "#FBBC04"
         },
         {
@@ -3037,7 +3070,7 @@
           "usage": 4.211075,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.1073,
+          "cost_brl": 0.1125,
           "color": "#00ACC1"
         },
         {
@@ -3048,7 +3081,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -3059,7 +3092,7 @@
           "usage": 0.71434,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 2.8462,
+          "cost_brl": 2.9839,
           "color": "#FF6D01"
         }
       ],
@@ -3067,7 +3100,7 @@
     },
     {
       "date": "2026-08-21",
-      "total_brl": 1138.13,
+      "total_brl": 1193.21,
       "items": [
         {
           "service": "Cloud Run",
@@ -3077,7 +3110,7 @@
           "usage": 25717.009289,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.9183,
+          "cost_brl": 5.1563,
           "color": "#4285F4"
         },
         {
@@ -3088,7 +3121,7 @@
           "usage": 96051.462019,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.9135,
+          "cost_brl": 2.0061,
           "color": "#4285F4"
         },
         {
@@ -3099,7 +3132,7 @@
           "usage": 25705.904,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0819,
+          "cost_brl": 0.0859,
           "color": "#4285F4"
         },
         {
@@ -3110,7 +3143,7 @@
           "usage": 48.194002,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.7796,
+          "cost_brl": 152.8346,
           "color": "#EA4335"
         },
         {
@@ -3121,7 +3154,7 @@
           "usage": 57.375,
           "unit": "node-hours",
           "unit_price_usd": 0.95,
-          "cost_brl": 434.3341,
+          "cost_brl": 455.3537,
           "color": "#EA4335"
         },
         {
@@ -3132,7 +3165,7 @@
           "usage": 29131.475081,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.3714,
+          "cost_brl": 0.3893,
           "color": "#EA4335"
         },
         {
@@ -3143,7 +3176,7 @@
           "usage": 105005.838329,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 292.8594,
+          "cost_brl": 307.0323,
           "color": "#9334E6"
         },
         {
@@ -3154,7 +3187,7 @@
           "usage": 20641.081576,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 230.2703,
+          "cost_brl": 241.4143,
           "color": "#9334E6"
         },
         {
@@ -3165,7 +3198,7 @@
           "usage": 0.47035,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 23.4249,
+          "cost_brl": 24.5586,
           "color": "#34A853"
         },
         {
@@ -3176,7 +3209,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -3187,7 +3220,7 @@
           "usage": 5.27,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.8399,
+          "cost_brl": 0.8806,
           "color": "#FBBC04"
         },
         {
@@ -3198,7 +3231,7 @@
           "usage": 1.445491,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.5759,
+          "cost_brl": 0.6037,
           "color": "#FBBC04"
         },
         {
@@ -3209,7 +3242,7 @@
           "usage": 7.445873,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.1898,
+          "cost_brl": 0.199,
           "color": "#00ACC1"
         },
         {
@@ -3220,7 +3253,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -3231,7 +3264,7 @@
           "usage": 0.579279,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 2.3079,
+          "cost_brl": 2.4196,
           "color": "#FF6D01"
         }
       ],
@@ -3248,7 +3281,7 @@
     },
     {
       "date": "2026-08-22",
-      "total_brl": 316.85,
+      "total_brl": 332.19,
       "items": [
         {
           "service": "Cloud Run",
@@ -3258,7 +3291,7 @@
           "usage": 23486.462879,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 4.4916,
+          "cost_brl": 4.709,
           "color": "#4285F4"
         },
         {
@@ -3269,7 +3302,7 @@
           "usage": 72993.579619,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.4542,
+          "cost_brl": 1.5246,
           "color": "#4285F4"
         },
         {
@@ -3280,7 +3313,7 @@
           "usage": 29080.398434,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0926,
+          "cost_brl": 0.0971,
           "color": "#4285F4"
         },
         {
@@ -3291,7 +3324,7 @@
           "usage": 48.075786,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 145.4221,
+          "cost_brl": 152.4598,
           "color": "#EA4335"
         },
         {
@@ -3302,7 +3335,7 @@
           "usage": 14512.592205,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.1851,
+          "cost_brl": 0.1941,
           "color": "#EA4335"
         },
         {
@@ -3313,7 +3346,7 @@
           "usage": 35805.181223,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 99.8599,
+          "cost_brl": 104.6927,
           "color": "#9334E6"
         },
         {
@@ -3324,7 +3357,7 @@
           "usage": 5291.75256,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 59.0344,
+          "cost_brl": 61.8913,
           "color": "#9334E6"
         },
         {
@@ -3335,7 +3368,7 @@
           "usage": 0.013576,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 0.6761,
+          "cost_brl": 0.7089,
           "color": "#34A853"
         },
         {
@@ -3346,7 +3379,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -3357,7 +3390,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -3368,7 +3401,7 @@
           "usage": 0.842625,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.3358,
+          "cost_brl": 0.352,
           "color": "#FBBC04"
         },
         {
@@ -3379,7 +3412,7 @@
           "usage": 0.969216,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.0247,
+          "cost_brl": 0.0259,
           "color": "#00ACC1"
         },
         {
@@ -3390,7 +3423,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -3401,7 +3434,7 @@
           "usage": 1.201916,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 4.7888,
+          "cost_brl": 5.0205,
           "color": "#FF6D01"
         }
       ],
@@ -3414,7 +3447,7 @@
     },
     {
       "date": "2026-08-23",
-      "total_brl": 322.64,
+      "total_brl": 338.25,
       "items": [
         {
           "service": "Cloud Run",
@@ -3424,7 +3457,7 @@
           "usage": 20318.812984,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 3.8959,
+          "cost_brl": 4.074,
           "color": "#4285F4"
         },
         {
@@ -3435,7 +3468,7 @@
           "usage": 88768.141432,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 1.7684,
+          "cost_brl": 1.8539,
           "color": "#4285F4"
         },
         {
@@ -3446,7 +3479,7 @@
           "usage": 14182.620576,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0451,
+          "cost_brl": 0.0473,
           "color": "#4285F4"
         },
         {
@@ -3457,7 +3490,7 @@
           "usage": 47.831752,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 144.6839,
+          "cost_brl": 151.6859,
           "color": "#EA4335"
         },
         {
@@ -3468,7 +3501,7 @@
           "usage": 10731.43227,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.1369,
+          "cost_brl": 0.1435,
           "color": "#EA4335"
         },
         {
@@ -3479,7 +3512,7 @@
           "usage": 28270.386616,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 78.8455,
+          "cost_brl": 82.6613,
           "color": "#9334E6"
         },
         {
@@ -3490,7 +3523,7 @@
           "usage": 7936.510421,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 88.5391,
+          "cost_brl": 92.8239,
           "color": "#9334E6"
         },
         {
@@ -3501,7 +3534,7 @@
           "usage": 0.036023,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 1.7941,
+          "cost_brl": 1.8809,
           "color": "#34A853"
         },
         {
@@ -3512,7 +3545,7 @@
           "usage": 0.613333,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.0978,
+          "cost_brl": 0.1025,
           "color": "#34A853"
         },
         {
@@ -3523,7 +3556,7 @@
           "usage": 1.4,
           "unit": "GiB-month",
           "unit_price_usd": 0.02,
-          "cost_brl": 0.2232,
+          "cost_brl": 0.234,
           "color": "#FBBC04"
         },
         {
@@ -3534,7 +3567,7 @@
           "usage": 1.447573,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.5768,
+          "cost_brl": 0.6047,
           "color": "#FBBC04"
         },
         {
@@ -3545,7 +3578,7 @@
           "usage": 0.538793,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 0.0137,
+          "cost_brl": 0.0143,
           "color": "#00ACC1"
         },
         {
@@ -3556,7 +3589,7 @@
           "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.1647,
+          "cost_brl": 0.1726,
           "color": "#5F6368"
         },
         {
@@ -3567,7 +3600,7 @@
           "usage": 0.466469,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 1.8585,
+          "cost_brl": 1.9484,
           "color": "#FF6D01"
         }
       ],
@@ -3575,7 +3608,7 @@
     },
     {
       "date": "2026-08-24",
-      "total_brl": 1222.28,
+      "total_brl": 1481.86,
       "items": [
         {
           "service": "Cloud Run",
@@ -3585,7 +3618,7 @@
           "usage": 56706.877781,
           "unit": "vCPU-seconds",
           "unit_price_usd": 2.4e-05,
-          "cost_brl": 7.3764,
+          "cost_brl": 11.3697,
           "color": "#4285F4"
         },
         {
@@ -3596,7 +3629,7 @@
           "usage": 70328.429788,
           "unit": "GiB-seconds",
           "unit_price_usd": 2.5e-06,
-          "cost_brl": 0.9529,
+          "cost_brl": 1.4688,
           "color": "#4285F4"
         },
         {
@@ -3607,7 +3640,7 @@
           "usage": 31045.818998,
           "unit": "count",
           "unit_price_usd": 4e-07,
-          "cost_brl": 0.0673,
+          "cost_brl": 0.1037,
           "color": "#4285F4"
         },
         {
@@ -3618,7 +3651,7 @@
           "usage": 47.915235,
           "unit": "node-hours",
           "unit_price_usd": 0.3796,
-          "cost_brl": 98.5823,
+          "cost_brl": 151.9505,
           "color": "#EA4335"
         },
         {
@@ -3629,7 +3662,7 @@
           "usage": 38227.144549,
           "unit": "count",
           "unit_price_usd": 1.6e-06,
-          "cost_brl": 0.3315,
+          "cost_brl": 0.511,
           "color": "#EA4335"
         },
         {
@@ -3640,7 +3673,7 @@
           "usage": 96198.438795,
           "unit": "1k tokens",
           "unit_price_usd": 0.00035,
-          "cost_brl": 182.4884,
+          "cost_brl": 281.2798,
           "color": "#9334E6"
         },
         {
@@ -3651,7 +3684,7 @@
           "usage": 18049.916056,
           "unit": "1k tokens",
           "unit_price_usd": 0.0014,
-          "cost_brl": 136.9628,
+          "cost_brl": 211.1086,
           "color": "#9334E6"
         },
         {
@@ -3662,7 +3695,1178 @@
           "usage": 0.255162,
           "unit": "TiB",
           "unit_price_usd": 6.25,
-          "cost_brl": 8.6436,
+          "cost_brl": 13.3229,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1025,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.234,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.530915,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.6395,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 101.225835,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 2.7062,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.416667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.348,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 1.607725,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 6.7155,
+          "color": "#FF6D01"
+        },
+        {
+          "service": "Google One",
+          "sku": "Gemini Ultra subscription (monthly)",
+          "sku_id": "G1U8-ULTRA-001A",
+          "sku_key": "gem_ultra",
+          "usage": 1.0,
+          "unit": "month",
+          "unit_price_usd": 147.601476,
+          "cost_brl": 800.0,
+          "color": "#9334E6"
+        }
+      ],
+      "events": [
+        {
+          "kind": "platform",
+          "title": "Redeploy Cloud Run (CSP + app.js)"
+        },
+        {
+          "kind": "database",
+          "title": "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest"
+        },
+        {
+          "kind": "subscription",
+          "title": "Assinatura Gemini Ultra (R$ 800,00 dos R$ 4.800,00)"
+        },
+        {
+          "kind": "subscription",
+          "title": "Assinatura Gemini Ultra (R$ 800,00)"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-25",
+      "total_brl": 426.16,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 20573.317406,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 4.125,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 76472.263589,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.5972,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 12134.609378,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0405,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.071521,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 152.4462,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 20835.227688,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.2785,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 39136.795692,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 114.4342,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 12715.885851,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 148.7226,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.013173,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 0.6878,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1025,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.234,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.840976,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.769,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 2.579953,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0689,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1726,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.59364,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.4797,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-26",
+      "total_brl": 432.82,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 22118.49477,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 4.4348,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 91880.701003,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.919,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 13781.354992,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0461,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.922572,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 151.9738,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 17580.865611,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.2351,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 50059.461291,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 146.3716,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 10371.028262,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 121.2977,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.032701,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.7074,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1025,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.234,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.896475,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.7921,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 3.652688,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0977,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1726,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.82294,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 3.4375,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-27",
+      "total_brl": 467.21,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 26800.408444,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.3735,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 102086.422339,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 2.1322,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 13208.804698,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0441,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.084281,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 152.4866,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 38934.078764,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.5204,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 38089.851951,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 111.3729,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 16189.386327,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 189.3482,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.028172,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.4709,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1025,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.234,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.294362,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.5407,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 4.667744,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.1248,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1726,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.787347,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 3.2888,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-28",
+      "total_brl": 509.13,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 18689.189139,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 3.7472,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 80909.179759,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.6898,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 15261.997847,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.051,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.259826,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 153.0433,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 23243.626312,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.3107,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 62777.774732,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 183.5593,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 13785.833253,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 161.2366,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.032553,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.6997,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1025,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.234,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.67596,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.7001,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 2.312502,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0618,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1726,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.603512,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.5209,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-29",
+      "total_brl": 631.26,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 23741.508006,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 4.7602,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 70672.635473,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.476,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 16661.560211,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0556,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 47.70677,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 151.2894,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Custom training NVIDIA T4 (us-central1)",
+          "sku_id": "B77E-4D21-0F9A",
+          "sku_key": "vtx_train",
+          "usage": 25.5,
+          "unit": "node-hours",
+          "unit_price_usd": 0.95,
+          "cost_brl": 202.3794,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 26478.921056,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.3539,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 57587.779803,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 168.384,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 8249.715972,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 96.4871,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.025546,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.3339,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1025,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 3.2,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.5347,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.169786,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.4886,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 45.702744,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 1.2218,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1726,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.531808,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.2214,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": [
+        {
+          "kind": "ai_train",
+          "title": "Temporal v1 e Language v1 (BioBERTpt) no RAG"
+        }
+      ]
+    },
+    {
+      "date": "2026-08-30",
+      "total_brl": 367.5,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 27929.070398,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 5.5998,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 82597.677301,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.7251,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 15054.402372,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0502,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.236915,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 152.9707,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 22785.07858,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.3046,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 34704.959514,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 101.4757,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 8620.113075,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 100.8192,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.025239,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.3179,
+          "color": "#34A853"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Active logical storage",
+          "sku_id": "0D47-6E63-C5BD",
+          "sku_key": "bq_store",
+          "usage": 0.613333,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.1025,
+          "color": "#34A853"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Standard storage us-central1",
+          "sku_id": "0D5D-67C9-76E5",
+          "sku_key": "gcs",
+          "usage": 1.4,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.02,
+          "cost_brl": 0.234,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Storage",
+          "sku": "Class A operations",
+          "sku_id": "E5F0-6A2D-2E8C",
+          "sku_key": "gcs_ops",
+          "usage": 1.268663,
+          "unit": "10k ops",
+          "unit_price_usd": 0.05,
+          "cost_brl": 0.5299,
+          "color": "#FBBC04"
+        },
+        {
+          "service": "Cloud Build",
+          "sku": "e2-standard-2 build minutes",
+          "sku_id": "2E27-4F75-95CD",
+          "sku_key": "build",
+          "usage": 0.501034,
+          "unit": "minutes",
+          "unit_price_usd": 0.0032,
+          "cost_brl": 0.0134,
+          "color": "#00ACC1"
+        },
+        {
+          "service": "Artifact Registry",
+          "sku": "Storage (us-central1)",
+          "sku_id": "6F81-5844-456A",
+          "sku_key": "ar",
+          "usage": 0.206667,
+          "unit": "GiB-month",
+          "unit_price_usd": 0.1,
+          "cost_brl": 0.1726,
+          "color": "#5F6368"
+        },
+        {
+          "service": "Cloud Logging",
+          "sku": "Log storage volume",
+          "sku_id": "58CD-A3F1-0B22",
+          "sku_key": "log",
+          "usage": 0.523009,
+          "unit": "GiB",
+          "unit_price_usd": 0.5,
+          "cost_brl": 2.1847,
+          "color": "#FF6D01"
+        }
+      ],
+      "events": []
+    },
+    {
+      "date": "2026-08-31",
+      "total_brl": 301.52,
+      "items": [
+        {
+          "service": "Cloud Run",
+          "sku": "CPU allocation time (us-central1)",
+          "sku_id": "F64D-1C5A-8E2B",
+          "sku_key": "run_cpu",
+          "usage": 24303.637455,
+          "unit": "vCPU-seconds",
+          "unit_price_usd": 2.4e-05,
+          "cost_brl": 3.1614,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Memory allocation time (us-central1)",
+          "sku_id": "C6E2-0A91-4D77",
+          "sku_key": "run_mem",
+          "usage": 101075.593073,
+          "unit": "GiB-seconds",
+          "unit_price_usd": 2.5e-06,
+          "cost_brl": 1.3696,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Cloud Run",
+          "sku": "Requests (us-central1)",
+          "sku_id": "9A1B-33E0-71C4",
+          "sku_key": "run_req",
+          "usage": 12169.66392,
+          "unit": "count",
+          "unit_price_usd": 4e-07,
+          "cost_brl": 0.0264,
+          "color": "#4285F4"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
+          "sku_id": "A12F-90C3-6B18",
+          "sku_key": "vtx_ep",
+          "usage": 48.118891,
+          "unit": "node-hours",
+          "unit_price_usd": 0.3796,
+          "cost_brl": 99.0013,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Prediction requests (sklearn + TCN container)",
+          "sku_id": "D04C-8A55-219E",
+          "sku_key": "vtx_pred",
+          "usage": 47709.84488,
+          "unit": "count",
+          "unit_price_usd": 1.6e-06,
+          "cost_brl": 0.4137,
+          "color": "#EA4335"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
+          "sku_id": "E918-2B70-CC01",
+          "sku_key": "gem_in",
+          "usage": 65681.364649,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.00035,
+          "cost_brl": 124.5975,
+          "color": "#9334E6"
+        },
+        {
+          "service": "Vertex AI",
+          "sku": "Gemini 2.0 Flash output tokens",
+          "sku_id": "E918-2B70-CC02",
+          "sku_key": "gem_out",
+          "usage": 9058.102124,
+          "unit": "1k tokens",
+          "unit_price_usd": 0.0014,
+          "cost_brl": 68.7329,
+          "color": "#9334E6"
+        },
+        {
+          "service": "BigQuery",
+          "sku": "Analysis (on-demand bytes scanned)",
+          "sku_id": "5510-B289-7FE2",
+          "sku_key": "bq_scan",
+          "usage": 0.040911,
+          "unit": "TiB",
+          "unit_price_usd": 6.25,
+          "cost_brl": 1.3859,
           "color": "#34A853"
         },
         {
@@ -3692,10 +4896,10 @@
           "sku": "Class A operations",
           "sku_id": "E5F0-6A2D-2E8C",
           "sku_key": "gcs_ops",
-          "usage": 1.530915,
+          "usage": 1.692488,
           "unit": "10k ops",
           "unit_price_usd": 0.05,
-          "cost_brl": 0.4149,
+          "cost_brl": 0.4587,
           "color": "#FBBC04"
         },
         {
@@ -3703,10 +4907,10 @@
           "sku": "e2-standard-2 build minutes",
           "sku_id": "2E27-4F75-95CD",
           "sku_key": "build",
-          "usage": 101.225835,
+          "usage": 5.359057,
           "unit": "minutes",
           "unit_price_usd": 0.0032,
-          "cost_brl": 1.7557,
+          "cost_brl": 0.0929,
           "color": "#00ACC1"
         },
         {
@@ -3714,10 +4918,10 @@
           "sku": "Storage (us-central1)",
           "sku_id": "6F81-5844-456A",
           "sku_key": "ar",
-          "usage": 0.416667,
+          "usage": 0.206667,
           "unit": "GiB-month",
           "unit_price_usd": 0.1,
-          "cost_brl": 0.2258,
+          "cost_brl": 0.112,
           "color": "#5F6368"
         },
         {
@@ -3725,83 +4929,55 @@
           "sku": "Log storage volume",
           "sku_id": "58CD-A3F1-0B22",
           "sku_key": "log",
-          "usage": 1.607725,
+          "usage": 0.720895,
           "unit": "GiB",
           "unit_price_usd": 0.5,
-          "cost_brl": 4.3569,
+          "cost_brl": 1.9536,
           "color": "#FF6D01"
-        },
-        {
-          "service": "Google One",
-          "sku": "Gemini Ultra subscription (monthly)",
-          "sku_id": "G1U8-ULTRA-001A",
-          "sku_key": "gem_ultra",
-          "usage": 1.0,
-          "unit": "month",
-          "unit_price_usd": 143.892989,
-          "cost_brl": 779.9,
-          "color": "#9334E6"
         }
       ],
-      "events": [
-        {
-          "kind": "platform",
-          "title": "Redeploy Cloud Run (CSP + app.js)"
-        },
-        {
-          "kind": "database",
-          "title": "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest"
-        },
-        {
-          "kind": "subscription",
-          "title": "Assinatura Gemini Ultra (R$ 779,90 dos R$ 4.800,00)"
-        },
-        {
-          "kind": "subscription",
-          "title": "Assinatura Gemini Ultra (R$ 779,90)"
-        }
-      ]
+      "events": []
     }
   ],
   "by_service": [
     {
       "service": "Vertex AI",
-      "cost_brl": 10092.78,
+      "cost_brl": 13842.3,
       "color": "#EA4335"
     },
     {
       "service": "Google One",
-      "cost_brl": 1559.8,
+      "cost_brl": 1580.0,
       "color": "#9334E6"
     },
     {
       "service": "Cloud Run",
-      "cost_brl": 178.54,
+      "cost_brl": 234.73,
       "color": "#4285F4"
     },
     {
       "service": "Cloud Logging",
-      "cost_brl": 71.49,
+      "cost_brl": 95.19,
       "color": "#FF6D01"
     },
     {
       "service": "BigQuery",
-      "cost_brl": 60.38,
+      "cost_brl": 77.88,
       "color": "#34A853"
     },
     {
       "service": "Cloud Storage",
-      "cost_brl": 19.43,
+      "cost_brl": 26.78,
       "color": "#FBBC04"
     },
     {
       "service": "Cloud Build",
-      "cost_brl": 15.69,
+      "cost_brl": 19.0,
       "color": "#00ACC1"
     },
     {
       "service": "Artifact Registry",
-      "cost_brl": 4.19,
+      "cost_brl": 5.65,
       "color": "#5F6368"
     }
   ],
@@ -3811,8 +4987,8 @@
       "sku": "Online prediction (n1-standard-4 × 2 endpoints, us-central1)",
       "sku_id": "A12F-90C3-6B18",
       "unit": "node-hours",
-      "usage": 1055.12,
-      "cost_brl": 3145.23,
+      "usage": 1391.5208,
+      "cost_brl": 4359.25,
       "color": "#EA4335"
     },
     {
@@ -3820,8 +4996,8 @@
       "sku": "Gemini 2.0 Flash input tokens (RAG clínico)",
       "sku_id": "E918-2B70-CC01",
       "unit": "1k tokens",
-      "usage": 1154104.7232,
-      "cost_brl": 3132.97,
+      "usage": 1502142.7108,
+      "cost_brl": 4324.74,
       "color": "#9334E6"
     },
     {
@@ -3829,8 +5005,8 @@
       "sku": "Gemini 2.0 Flash output tokens",
       "sku_id": "E918-2B70-CC02",
       "unit": "1k tokens",
-      "usage": 268569.2949,
-      "cost_brl": 2931.74,
+      "usage": 347559.3598,
+      "cost_brl": 4027.78,
       "color": "#9334E6"
     },
     {
@@ -3839,7 +5015,7 @@
       "sku_id": "G1U8-ULTRA-001A",
       "unit": "month",
       "usage": 2.0,
-      "cost_brl": 1559.8,
+      "cost_brl": 1580.0,
       "color": "#9334E6"
     },
     {
@@ -3847,8 +5023,8 @@
       "sku": "Custom training NVIDIA T4 (us-central1)",
       "sku_id": "B77E-4D21-0F9A",
       "unit": "node-hours",
-      "usage": 115.6,
-      "cost_brl": 875.1,
+      "usage": 141.1,
+      "cost_brl": 1119.83,
       "color": "#EA4335"
     },
     {
@@ -3856,8 +5032,8 @@
       "sku": "CPU allocation time (us-central1)",
       "sku_id": "F64D-1C5A-8E2B",
       "unit": "vCPU-seconds",
-      "usage": 738582.4067,
-      "cost_brl": 137.79,
+      "usage": 902738.0323,
+      "cost_brl": 179.29,
       "color": "#4285F4"
     },
     {
@@ -3865,8 +5041,8 @@
       "sku": "Log storage volume",
       "sku_id": "58CD-A3F1-0B22",
       "unit": "GiB",
-      "usage": 18.4585,
-      "cost_brl": 71.49,
+      "usage": 23.0416,
+      "cost_brl": 95.19,
       "color": "#FF6D01"
     },
     {
@@ -3874,8 +5050,8 @@
       "sku": "Analysis (on-demand bytes scanned)",
       "sku_id": "5510-B289-7FE2",
       "unit": "TiB",
-      "usage": 1.2513,
-      "cost_brl": 58.26,
+      "usage": 1.4496,
+      "cost_brl": 74.94,
       "color": "#34A853"
     },
     {
@@ -3883,8 +5059,8 @@
       "sku": "Memory allocation time (us-central1)",
       "sku_id": "C6E2-0A91-4D77",
       "unit": "GiB-seconds",
-      "usage": 1991076.8688,
-      "cost_brl": 39.22,
+      "usage": 2596771.3414,
+      "cost_brl": 53.49,
       "color": "#4285F4"
     },
     {
@@ -3892,8 +5068,8 @@
       "sku": "e2-standard-2 build minutes",
       "sku_id": "2E27-4F75-95CD",
       "unit": "minutes",
-      "usage": 647.7524,
-      "cost_brl": 15.69,
+      "usage": 712.5282,
+      "cost_brl": 19.0,
       "color": "#00ACC1"
     },
     {
@@ -3901,8 +5077,8 @@
       "sku": "Class A operations",
       "sku_id": "E5F0-6A2D-2E8C",
       "unit": "10k ops",
-      "usage": 34.111,
-      "cost_brl": 13.4,
+      "usage": 44.9497,
+      "cost_brl": 18.53,
       "color": "#FBBC04"
     },
     {
@@ -3910,8 +5086,8 @@
       "sku": "Prediction requests (sklearn + TCN container)",
       "sku_id": "D04C-8A55-219E",
       "unit": "count",
-      "usage": 619378.5103,
-      "cost_brl": 7.74,
+      "usage": 816946.1532,
+      "cost_brl": 10.7,
       "color": "#EA4335"
     },
     {
@@ -3919,8 +5095,8 @@
       "sku": "Standard storage us-central1",
       "sku_id": "0D5D-67C9-76E5",
       "unit": "GiB-month",
-      "usage": 38.27,
-      "cost_brl": 6.03,
+      "usage": 49.87,
+      "cost_brl": 8.25,
       "color": "#FBBC04"
     },
     {
@@ -3928,8 +5104,8 @@
       "sku": "Storage (us-central1)",
       "sku_id": "6F81-5844-456A",
       "unit": "GiB-month",
-      "usage": 5.3867,
-      "cost_brl": 4.19,
+      "usage": 6.8333,
+      "cost_brl": 5.65,
       "color": "#5F6368"
     },
     {
@@ -3937,8 +5113,8 @@
       "sku": "Active logical storage",
       "sku_id": "0D47-6E63-C5BD",
       "unit": "GiB-month",
-      "usage": 13.4933,
-      "cost_brl": 2.12,
+      "usage": 17.7867,
+      "cost_brl": 2.94,
       "color": "#34A853"
     },
     {
@@ -3946,8 +5122,8 @@
       "sku": "Requests (us-central1)",
       "sku_id": "9A1B-33E0-71C4",
       "unit": "count",
-      "usage": 490171.5754,
-      "cost_brl": 1.53,
+      "usage": 588443.9688,
+      "cost_brl": 1.95,
       "color": "#4285F4"
     }
   ],
@@ -3960,9 +5136,9 @@
       "period_end": "2026-08-09",
       "credit_brl": 4780.0,
       "payer": "NEXT2U SAUDE LTDA",
-      "subtotal_brl": 4184.55,
-      "iss_brl": 83.69,
-      "total_brl": 4268.24,
+      "subtotal_brl": 4349.43,
+      "iss_brl": 86.99,
+      "total_brl": 4436.42,
       "currency": "BRL",
       "document_type": "Invoice"
     },
@@ -3974,9 +5150,9 @@
       "period_end": "2026-08-16",
       "credit_brl": 2000.0,
       "payer": "NEXT2U SAUDE LTDA",
-      "subtotal_brl": 2871.06,
-      "iss_brl": 57.42,
-      "total_brl": 2928.48,
+      "subtotal_brl": 3009.99,
+      "iss_brl": 60.2,
+      "total_brl": 3070.19,
       "currency": "BRL",
       "document_type": "Invoice"
     },
@@ -3988,23 +5164,37 @@
       "period_end": "2026-08-23",
       "credit_brl": 4000.0,
       "payer": "NEXT2U SAUDE LTDA",
-      "subtotal_brl": 3724.39,
-      "iss_brl": 74.49,
-      "total_brl": 3798.88,
+      "subtotal_brl": 3904.64,
+      "iss_brl": 78.09,
+      "total_brl": 3982.73,
       "currency": "BRL",
       "document_type": "Invoice"
     },
     {
       "number": "5048-0824-4703",
-      "status": "open",
-      "issue_date": null,
+      "status": "finalized",
+      "issue_date": "2026-08-30",
       "period_start": "2026-08-24",
       "period_end": "2026-08-30",
       "credit_brl": 4800.0,
       "payer": "NEXT2U SAUDE LTDA",
-      "subtotal_brl": 1222.28,
+      "subtotal_brl": 4315.94,
+      "iss_brl": 86.32,
+      "total_brl": 4402.26,
+      "currency": "BRL",
+      "document_type": "Invoice"
+    },
+    {
+      "number": "5048-0831-4704",
+      "status": "open",
+      "issue_date": null,
+      "period_start": "2026-08-31",
+      "period_end": "2026-09-06",
+      "credit_brl": 4000.0,
+      "payer": "NEXT2U SAUDE LTDA",
+      "subtotal_brl": 301.52,
       "iss_brl": 0.0,
-      "total_brl": 1222.28,
+      "total_brl": 301.52,
       "currency": "BRL",
       "document_type": "Draft invoice"
     }
@@ -4013,7 +5203,7 @@
     {
       "date": "2026-08-03",
       "kind": "subscription",
-      "title": "Assinatura Gemini Ultra (R$ 779,90 dos R$ 4.780,00)"
+      "title": "Assinatura Gemini Ultra (R$ 780,00 dos R$ 4.780,00)"
     },
     {
       "date": "2026-08-03",
@@ -4083,7 +5273,12 @@
     {
       "date": "2026-08-24",
       "kind": "subscription",
-      "title": "Assinatura Gemini Ultra (R$ 779,90 dos R$ 4.800,00)"
+      "title": "Assinatura Gemini Ultra (R$ 800,00 dos R$ 4.800,00)"
+    },
+    {
+      "date": "2026-08-29",
+      "kind": "ai_train",
+      "title": "Temporal v1 e Language v1 (BioBERTpt) no RAG"
     }
   ]
 }

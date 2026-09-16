@@ -197,8 +197,8 @@
         const cap = data.kpis.cloud_from_today_credit_brl || data.meta.weekly_credit_brl;
         const pct = Math.min(100, (weekSpend / cap) * 100);
         $("gcp-budget-name").textContent = data.meta.budget_name;
-        $("gcp-budget-amount").textContent = `${BRL.format(weekSpend)} de ${BRL.format(cap)} em nuvem/tokens · Gemini Ultra ${BRL.format(ultra)} (pago)`;
-        $("gcp-budget-pct").textContent = `${pct.toFixed(1)}% da parcela de nuvem desta semana`;
+        $("gcp-budget-amount").textContent = `${BRL.format(weekSpend)} de ${BRL.format(cap)} em treino do modelo · Gemini Ultra ${BRL.format(ultra)} (pago)`;
+        $("gcp-budget-pct").textContent = `${pct.toFixed(1)}% da parcela de treino desta semana`;
         const bar = $("gcp-budget-fill");
         bar.style.width = pct + "%";
         $("gcp-budget-bar").classList.toggle("over", pct >= 100);
@@ -357,7 +357,7 @@
         const disc = doc.splitTextToSize(data.meta.disclaimer, pageW - margin * 2);
         doc.text(disc, margin, y);
         y += disc.length * 4 + 6;
-        doc.text("Google Cloud  ·  Payments applied as weekly processing & token credits (R$ 4.000,00 every Monday).", margin, y);
+        doc.text("Google Cloud  ·  PIX de R$ 4.000 = treino do modelo e custos correlatos. R$ 4.780/4.800 incluem Gemini Ultra (R$ 780/R$ 800).", margin, y);
     }
 
     async function downloadInvoicePdf(number) {

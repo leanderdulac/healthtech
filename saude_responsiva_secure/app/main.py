@@ -159,6 +159,12 @@ def _create_secure_app() -> FastAPI:
     application.include_router(signal.router)
     application.include_router(admin.router)
     application.include_router(lgpd.router)
+    try:
+        from src.ops.patients_routes import router as patients_router
+
+        application.include_router(patients_router)
+    except ImportError:
+        logger.warning("Rotas /api/v1/patients não carregadas (src.ops indisponível).")
 
     return application
 

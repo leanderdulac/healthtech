@@ -173,8 +173,10 @@ class SearchQuery(BaseModel):
 
 
 from src.ops.billing_routes import register_billing_routes
+from src.ops.patients_routes import router as patients_router
 
 register_billing_routes(app)
+app.include_router(patients_router)
 
 
 @app.get("/api/health")

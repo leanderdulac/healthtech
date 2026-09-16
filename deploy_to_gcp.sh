@@ -159,18 +159,33 @@ RATE_LIMIT_ADMIN=${RATE_LIMIT_ADMIN:-"10/minute"}
 # Bridge dashboard (full) → secure-api (ingest do companion)
 SECURE_API_BASE_URL=${SECURE_API_BASE_URL:-"https://healthtech-secure-api-5794833455.us-central1.run.app"}
 
-ENV_VARS="^@^GCP_PROJECT_ID=${GCP_PROJECT_ID}@GCS_STAGING_BUCKET=${STAGING_BUCKET}@GCP_LOCATION=${GCP_REGION}@ENVIRONMENT=production@APP_MODE=${APP_MODE}@AUTH_DISABLED=${AUTH_DISABLED_VAL}@API_KEY=${API_KEY}@ADMIN_API_KEY=${API_KEY}@INGEST_API_KEY=${INGEST_API_KEY}@READ_API_KEY=${READ_API_KEY}@SECRET_SALT=${SECRET_SALT}@CORS_ORIGINS=${CORS_ORIGINS}@RATE_LIMIT_DEFAULT=${RATE_LIMIT_DEFAULT}@RATE_LIMIT_INGEST=${RATE_LIMIT_INGEST}@RATE_LIMIT_BATCH=${RATE_LIMIT_BATCH}@RATE_LIMIT_ADMIN=${RATE_LIMIT_ADMIN}@SECURE_API_BASE_URL=${SECURE_API_BASE_URL}"
+ALLOWED_PATIENT_IDS=${ALLOWED_PATIENT_IDS:-"*"}
+CLOUDSQL_INSTANCE=${CLOUDSQL_INSTANCE:-"${GCP_PROJECT_ID}:us-central1:healthtech-pg"}
+DATABASE_URL=${DATABASE_URL:-""}
+
+# Delimitador ~ : o @ da URL do Postgres quebraria o delimitador padrão @.
+ENV_VARS="^~^GCP_PROJECT_ID=${GCP_PROJECT_ID}~GCS_STAGING_BUCKET=${STAGING_BUCKET}~GCP_LOCATION=${GCP_REGION}~ENVIRONMENT=production~APP_MODE=${APP_MODE}~AUTH_DISABLED=${AUTH_DISABLED_VAL}~API_KEY=${API_KEY}~ADMIN_API_KEY=${API_KEY}~INGEST_API_KEY=${INGEST_API_KEY}~READ_API_KEY=${READ_API_KEY}~SECRET_SALT=${SECRET_SALT}~CORS_ORIGINS=${CORS_ORIGINS}~RATE_LIMIT_DEFAULT=${RATE_LIMIT_DEFAULT}~RATE_LIMIT_INGEST=${RATE_LIMIT_INGEST}~RATE_LIMIT_BATCH=${RATE_LIMIT_BATCH}~RATE_LIMIT_ADMIN=${RATE_LIMIT_ADMIN}~SECURE_API_BASE_URL=${SECURE_API_BASE_URL}~ALLOWED_PATIENT_IDS=${ALLOWED_PATIENT_IDS}"
+if [[ -n "$DATABASE_URL" ]]; then
+  ENV_VARS="${ENV_VARS}~DATABASE_URL=${DATABASE_URL}"
+fi
 if [[ -n "$VERTEX_ENDPOINT_ID" ]]; then
-  ENV_VARS="${ENV_VARS}@VERTEX_ENDPOINT_ID=${VERTEX_ENDPOINT_ID}"
+  ENV_VARS="${ENV_VARS}~VERTEX_ENDPOINT_ID=${VERTEX_ENDPOINT_ID}"
 fi
 if [[ -n "$VERTEX_MODEL_NAME" ]]; then
-  ENV_VARS="${ENV_VARS}@VERTEX_MODEL_NAME=${VERTEX_MODEL_NAME}"
+  ENV_VARS="${ENV_VARS}~VERTEX_MODEL_NAME=${VERTEX_MODEL_NAME}"
 fi
 if [[ -n "$VERTEX_TCN_ENDPOINT_ID" ]]; then
-  ENV_VARS="${ENV_VARS}@VERTEX_TCN_ENDPOINT_ID=${VERTEX_TCN_ENDPOINT_ID}"
+  ENV_VARS="${ENV_VARS}~VERTEX_TCN_ENDPOINT_ID=${VERTEX_TCN_ENDPOINT_ID}"
 fi
 echo "Vertex IF:  ${VERTEX_ENDPOINT_ID:-'(não definido)'}"
 echo "Vertex TCN: ${VERTEX_TCN_ENDPOINT_ID:-'(não definido)'}"
+echo "Pacientes READ: ${ALLOWED_PATIENT_IDS}"
+echo "Cloud SQL:      ${CLOUDSQL_INSTANCE}"
+if [[ -n "$DATABASE_URL" ]]; then
+  echo "DATABASE_URL:   definida (valor oculto)"
+else
+  echo "DATABASE_URL:   (não definida — /patients retorna 503)"
+fi
 
 echo "Compilando imagem Docker e enviando para o Google Cloud Run..."
 if [[ "$APP_MODE" == "secure" ]]; then
@@ -191,6 +206,10 @@ if [[ "$APP_MODE" == "secure" ]]; then
       --project="$GCP_PROJECT_ID"
 else
   # Monólito full a partir do Dockerfile raiz (APP_MODE=full)
+  SQL_FLAG=()
+  if [[ -n "$DATABASE_URL" ]]; then
+    SQL_FLAG=(--add-cloudsql-instances "$CLOUDSQL_INSTANCE")
+  fi
   gcloud run deploy "$SERVICE_NAME" \
       --quiet \
       --source "$SOURCE_DIR" \
@@ -198,6 +217,7 @@ else
       --platform managed \
       $AUTH_FLAG \
       --set-env-vars "$ENV_VARS" \
+      "${SQL_FLAG[@]}" \
       --port 8080 \
       --memory "$MEMORY" \
       --cpu "$CPU" \

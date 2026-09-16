@@ -811,30 +811,30 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                         <div class="gcp-banner warn">
                             <span class="material-icons-round">payments</span>
                             <div>
-                                <strong>PIX Next2U Saúde — orçamento de nuvem e tokens</strong>
-                                <div id="gcp-countdown">03/08 R$ 4.780 · 10/08 R$ 2.000 · 17/08 R$ 4.000 · 24/08 R$ 4.800</div>
-                                Extrato C6: 03/08 R$ 4.780 (R$ 779,90 Ultra + R$ 4.000,10 nuvem), 10/08 R$ 2.000, 17/08 R$ 4.000. Hoje R$ 4.800 (R$ 779,90 Ultra + R$ 4.020,10 nuvem).
+                                <strong>PIX Next2U Saúde — treino do modelo (R$ 4 mil/semana)</strong>
+                                <div id="gcp-countdown">03/08 R$ 4.780 · 10/08 R$ 2.000 · 17/08 R$ 4.000 · 24/08 R$ 4.800 · 31/08 R$ 4.000</div>
+                                03/08 R$ 4.780 = R$ 4.000 treino + R$ 780 Gemini Ultra. 24/08 R$ 4.800 = R$ 4.000 treino + R$ 800 Gemini Ultra. Todo PIX de R$ 4.000 (17/08 e 31/08) é treino do modelo e custos correlatos. 10/08 R$ 2.000 é complemento de treino.
                             </div>
                         </div>
                         <div class="gcp-kpis">
                             <div class="gcp-card">
-                                <div class="label">PIX Next2U 03–17/08 (nuvem)</div>
+                                <div class="label">PIX Next2U 03–24/08 (já queimado)</div>
                                 <div class="value" id="gcp-kpi-spent">—</div>
-                                <div class="hint">Inclui Ultra 03/08 (R$ 779,90) + nuvem já queimada</div>
+                                <div class="hint">Treino já queimado + Ultra 03/08 (R$ 780) e 24/08 (R$ 800)</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Today so far</div>
                                 <div class="value due" id="gcp-kpi-today">—</div>
-                                <div class="hint">Redeploy Cloud Run + fluxos clínicos</div>
+                                <div class="hint">Custos correlatos de treino desta segunda</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Available balance</div>
                                 <div class="value pos" id="gcp-kpi-balance">—</div>
-                                <div class="hint">Após PIX R$ 4.800 − Ultra R$ 779,90 − uso de hoje</div>
+                                <div class="hint">Após PIX 31/08 R$ 4.000 (treino) − uso de hoje</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Credit today (Next2U)</div>
-                                <div class="value pos" id="gcp-kpi-credit">R$ 4.800,00</div>
+                                <div class="value pos" id="gcp-kpi-credit">R$ 4.000,00</div>
                                 <div class="hint">Forecast semana: <span id="gcp-kpi-forecast">—</span></div>
                             </div>
                         </div>
@@ -853,7 +853,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
 
                     <div id="gcp-panel-reports" class="gcp-panel">
                         <div class="gcp-filters">
-                            <span class="gcp-chip">Time range: Aug 3 – 24, 2026</span>
+                            <span class="gcp-chip">Time range: Aug 3 – 31, 2026</span>
                             <span class="gcp-chip">Group by: Service</span>
                             <span class="gcp-chip">Project: healthtech-gcp-2026</span>
                             <span class="gcp-chip">Location: us-central1</span>
@@ -932,17 +932,17 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                     <div id="gcp-panel-budgets" class="gcp-panel">
                         <div class="gcp-card" style="margin-bottom:16px">
                             <div class="label">Budget</div>
-                            <div style="font-size:16px;margin:4px 0" id="gcp-budget-name">HealthTech weekly compute &amp; tokens</div>
+                            <div style="font-size:16px;margin:4px 0" id="gcp-budget-name">Saúde Responsiva — treino do modelo (R$ 4.000/semana)</div>
                             <div id="gcp-budget-amount">—</div>
                             <div class="gcp-budget-bar" id="gcp-budget-bar"><span id="gcp-budget-fill"></span></div>
                             <div class="hint" id="gcp-budget-pct">—</div>
-                            <div class="hint">Ultra: R$ 779,90 em 03/08 + R$ 779,90 em 24/08. Nuvem desta semana: R$ 4.020,10 (alertas 50/90/100%).</div>
+                            <div class="hint">Gemini Ultra: R$ 780 em 03/08 + R$ 800 em 24/08. Treino desta semana: R$ 4.000 (31/08). Alertas 50/90/100%.</div>
                         </div>
                         <div class="gcp-card">
-                            <div class="label">August ceiling (4 Mondays)</div>
+                            <div class="label">August ceiling (5 Mondays)</div>
                             <div id="gcp-budget-month">—</div>
                             <div class="gcp-budget-bar"><span id="gcp-budget-month-fill"></span></div>
-                            <div class="hint">Teto agosto = soma dos PIX Next2U de nuvem (4.780 + 2.000 + 4.000 + 4.800)</div>
+                            <div class="hint">Teto agosto = 4.780 (treino 4.000 + Ultra 780) + 2.000 + 4.000 + 4.800 (treino 4.000 + Ultra 800) + 4.000</div>
                         </div>
                     </div>
                 </div>
@@ -951,7 +951,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
     </div>
 
     <!-- Script da Aplicação -->
-    <script src="app.js?v=20260824j"></script>
-    <script src="gcp-billing.js?v=20260824g"></script
+    <script src="app.js?v=20260831a"></script>
+    <script src="gcp-billing.js?v=20260831b"></script>
 </body>
 </html>
