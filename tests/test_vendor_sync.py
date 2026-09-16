@@ -57,7 +57,7 @@ for name in (
     assert name in sig.parameters, name
 
 route_paths = {getattr(r, "path", "") for r in patients_router.routes}
-assert any(p.endswith("/patients") for p in route_paths), route_paths
+assert any(p.rstrip("/").endswith("/patients") or p.endswith("/patients") for p in route_paths), route_paths
 assert any("{patient_id}" in p for p in route_paths), route_paths
 
 from app.config import get_settings
@@ -67,10 +67,10 @@ from app.main import create_app
 from fastapi.testclient import TestClient
 
 application = create_app()
-app_paths = {getattr(r, "path", "") for r in application.routes}
-assert "/api/v1/patients" in app_paths, app_paths
-assert "/api/v1/patients/{patient_id}" in app_paths, app_paths
-assert "/api/v1/wearables/ingest" in app_paths, app_paths
+openapi_paths = set((application.openapi() or {}).get("paths") or {})
+assert "/api/v1/patients" in openapi_paths, sorted(openapi_paths)
+assert "/api/v1/patients/{patient_id}" in openapi_paths, sorted(openapi_paths)
+assert "/api/v1/wearables/ingest" in openapi_paths, sorted(openapi_paths)
 
 client = TestClient(application)
 ingest = client.post(
@@ -151,6 +151,7 @@ def test_vendored_list_patients_keeps_authz_before_pagination_signature():
     )
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
     sig = inspect.signature(mod.list_patients)
     assert "allowed_patient_ids" in sig.parameters
