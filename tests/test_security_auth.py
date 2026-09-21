@@ -6,6 +6,7 @@ import pytest
 
 from src.security.auth import (
     check_patient_authorization,
+    get_allowed_patients,
     get_cors_origins,
     get_key_scopes,
     validate_secret_salt,
@@ -83,9 +84,57 @@ def test_idor_fail_closed_in_production_without_whitelist(monkeypatch):
         is False
     )
     monkeypatch.setenv("ALLOWED_PATIENT_IDS", "*")
+    assert get_allowed_patients() == {"*"}
     assert (
         check_patient_authorization("ht_ingest_real_configured_secret_value", "PAT-ANY")
         is True
+    )
+
+
+def test_idor_wildcard_allows_read_key_in_production(monkeypatch):
+    """ALLOWED_PATIENT_IDS=* não pode colapsar para unset (403 em GET patient)."""
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("READ_API_KEY", "ht_read_real_configured_secret_value")
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.delenv("INGEST_API_KEY", raising=False)
+    monkeypatch.setenv("ALLOWED_PATIENT_IDS", "*")
+    assert get_allowed_patients() == {"*"}
+    assert (
+        check_patient_authorization("ht_read_real_configured_secret_value", "PAT-DETAIL-1")
+        is True
+    )
+    monkeypatch.setenv("ALLOWED_PATIENT_IDS", "ALL")
+    assert get_allowed_patients() == {"*"}
+    assert (
+        check_patient_authorization("ht_read_real_configured_secret_value", "PAT-DETAIL-2")
+        is True
+    )
+    monkeypatch.setenv("ALLOWED_PATIENT_IDS", "all")
+    assert (
+        check_patient_authorization("ht_read_real_configured_secret_value", "PAT-DETAIL-3")
+        is True
+    )
+
+
+def test_idor_unset_denies_read_key_in_production(monkeypatch):
+    """Allow-list realmente ausente continua fail-closed para chave não-admin."""
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("READ_API_KEY", "ht_read_real_configured_secret_value")
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.delenv("INGEST_API_KEY", raising=False)
+    monkeypatch.delenv("ALLOWED_PATIENT_IDS", raising=False)
+    assert get_allowed_patients() == set()
+    assert (
+        check_patient_authorization("ht_read_real_configured_secret_value", "PAT-ANY")
+        is False
+    )
+    monkeypatch.setenv("ALLOWED_PATIENT_IDS", "")
+    assert get_allowed_patients() == set()
+    assert (
+        check_patient_authorization("ht_read_real_configured_secret_value", "PAT-ANY")
+        is False
     )
 
 
