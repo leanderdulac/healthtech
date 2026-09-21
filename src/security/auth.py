@@ -239,6 +239,25 @@ def validate_secret_salt(raise_in_production: bool = True) -> str:
     return salt
 
 
+def get_allowed_patients() -> set[str]:
+    """IDs permitidos para chaves não-admin.
+
+    Distingue wildcard de allow-list ausente — `check_patient_authorization`
+    trata `set()` como unset (fail-closed em produção) e `{"*"}` como
+    acesso a qualquer patient_id:
+    - unset / vazio → `set()`
+    - `*` / `ALL` / `all` → `{"*"}`
+    - CSV finito → conjunto de IDs
+    """
+    raw = os.getenv("ALLOWED_PATIENT_IDS", "").strip()
+    if not raw:
+        return set()
+    allowed = {p.strip() for p in raw.split(",") if p.strip()}
+    if allowed & {"*", "ALL", "all"}:
+        return {"*"}
+    return allowed
+
+
 def check_patient_authorization(provided_key: Optional[str], target_patient_id: str) -> bool:
     """
     Verifica se a chave tem permissão para o paciente especificado (Proteção IDOR).
@@ -254,9 +273,8 @@ def check_patient_authorization(provided_key: Optional[str], target_patient_id: 
     if "admin" in scopes:
         return True
 
-    allowed_raw = os.getenv("ALLOWED_PATIENT_IDS", "").strip()
-    if allowed_raw:
-        allowed = {p.strip() for p in allowed_raw.split(",") if p.strip()}
+    allowed = get_allowed_patients()
+    if allowed:
         if allowed & {"*", "ALL", "all"}:
             return True
         return target_patient_id in allowed

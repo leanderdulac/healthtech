@@ -93,12 +93,21 @@ class Settings(BaseSettings):
         ]
 
     def get_allowed_patients(self) -> set[str]:
+        """IDs permitidos para chaves não-admin.
+
+        Distingue wildcard de allow-list ausente — `check_patient_authorization`
+        trata `set()` como unset (fail-closed em produção) e `{"*"}` como
+        acesso a qualquer patient_id:
+        - unset / vazio → `set()`
+        - `*` / `ALL` / `all` → `{"*"}`
+        - CSV finito → conjunto de IDs
+        """
         raw = (self.allowed_patient_ids or "").strip()
         if not raw:
             return set()
         allowed = {p.strip() for p in raw.split(",") if p.strip()}
         if allowed & {"*", "ALL", "all"}:
-            return set()
+            return {"*"}
         return allowed
 
 
