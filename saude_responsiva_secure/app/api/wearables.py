@@ -78,6 +78,8 @@ def _ingest_one(
             frame["client_reading_id"] = payload.client_reading_id
         if payload.metric_type:
             frame["metric_type"] = payload.metric_type
+        if payload.ingest_source:
+            frame["ingest_source"] = payload.ingest_source
         stored, status = telemetry_store.upsert_reading(
             patient_id, frame, dedup_keys=dedup_keys
         )
