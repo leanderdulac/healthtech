@@ -21,6 +21,27 @@ from src.ops.timestamps import is_online, parse_timestamp
 
 logger = logging.getLogger(__name__)
 
+# Tokens de devices/pacientes criados por smoke tests — nunca apagar, só ocultar.
+_SYNTHETIC_TOKENS = ("smoke", "probe", "timecheck")
+
+
+def is_synthetic_device(row: Dict[str, Any]) -> bool:
+    """True para relógios/pacientes de teste (smoke, probe, timecheck) ou flag explícita."""
+    if not isinstance(row, dict):
+        return False
+    flag = row.get("synthetic")
+    if flag is True:
+        return True
+    if isinstance(flag, str) and flag.strip().lower() in {"1", "true", "yes", "sim"}:
+        return True
+    device_id = str(row.get("device_id") or "").strip().lower()
+    patient_id = str(row.get("patient_id") or "").strip().lower()
+    if patient_id.startswith("smoke-"):
+        return True
+    haystack = f"{device_id} {patient_id}"
+    return any(token in haystack for token in _SYNTHETIC_TOKENS)
+
+
 MAX_DEVICES = 5000
 FLUSH_EVERY_SECONDS = 2.0
 LOCAL_FLEET_PATH = Path("data/ops/fleet_devices.json")
@@ -40,7 +61,7 @@ def _now() -> datetime:
 
 
 def _compact(summary: Dict[str, Any]) -> Dict[str, Any]:
-    return {
+    item = {
         "device_id": summary.get("device_id") or "unknown",
         "patient_id": summary.get("patient_id"),
         "last_seen": summary.get("last_seen"),
@@ -52,6 +73,9 @@ def _compact(summary: Dict[str, Any]) -> Dict[str, Any]:
         "heart_rate": summary.get("heart_rate"),
         "spo2": summary.get("spo2"),
     }
+    if is_synthetic_device(summary) or is_synthetic_device(item):
+        item["synthetic"] = True
+    return item
 
 
 def _refresh_online(row: Dict[str, Any], now: Optional[datetime] = None) -> Dict[str, Any]:
@@ -191,6 +215,7 @@ def list_devices(
     offset: int = 0,
     include_latest: bool = False,
     patient_id: Optional[str] = None,
+    include_synthetic: bool = False,
 ) -> Dict[str, Any]:
     """Lista a frota.
 
@@ -198,6 +223,9 @@ def list_devices(
     Sem `patient_id`, `counts` descrevem a frota (não são metadados autorizados
     por Patient). Com `patient_id`, `counts` pertencem só àquele Patient e
     `coverage` = `patient` (conjunto completo conhecido para o id).
+
+    Devices sintéticos (smoke/probe/timecheck) ficam de fora por padrão.
+    Passe `include_synthetic=True` para o opt-in explícito — nada é apagado.
     """
     limit = max(1, min(int(limit), 500))
     offset = max(0, int(offset))
@@ -210,6 +238,8 @@ def list_devices(
         _flush_unlocked()
     if wanted_patient:
         rows = [row for row in rows if str(row.get("patient_id") or "") == wanted_patient]
+    if not include_synthetic:
+        rows = [row for row in rows if not is_synthetic_device(row)]
     if needle:
         rows = [
             row
@@ -238,6 +268,7 @@ def list_devices(
         "offset": offset,
         "devices": out_rows,
         "coverage": "patient" if wanted_patient else "fleet",
+        "include_synthetic": bool(include_synthetic),
     }
     if wanted_patient:
         payload["patient_id"] = wanted_patient

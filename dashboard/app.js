@@ -39,8 +39,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const host = window.location.host;
     const isHttps = protocol === "https:";
     const urlParams = new URLSearchParams(window.location.search);
-    // Nunca embutir chave real no frontend versionado — use ?api_key= ou localStorage
+    // Chaves injetadas pelo bootstrap antigo não são confiáveis — exigir opt-in do operador.
+    const API_KEY_TRUST = "2026-09-24-ops";
+    if (localStorage.getItem("api_key_trust") !== API_KEY_TRUST) {
+        localStorage.removeItem("api_key");
+        localStorage.setItem("api_key_trust", API_KEY_TRUST);
+    }
     let apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "";
+    if (urlParams.get("api_key")) {
+        localStorage.setItem("api_key", apiKey);
+        localStorage.setItem("api_key_trust", API_KEY_TRUST);
+    }
+    const fleetLogic = window.HealthtechFleetLogic || {};
     
     let API_URL = `${protocol}//${host}`;
     let WS_HOST = host;
@@ -110,7 +120,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (sec < 4) return "agora";
         if (sec < 60) return `há ${sec}s`;
         if (sec < 3600) return `há ${Math.floor(sec / 60)} min`;
-        return `há ${Math.floor(sec / 3600)} h`;
+        if (sec < 86400) return `há ${Math.floor(sec / 3600)} h`;
+        const days = Math.floor(sec / 86400);
+        if (days === 1) return "há 1 dia";
+        return `há ${days} dias`;
     }
 
     function liveStamp(rowOrFrame) {
@@ -356,8 +369,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (!apiKey) {
             updateStatusIndicator("disconnected");
-            const hint = document.getElementById("watch-sub");
-            if (hint) hint.textContent = "Informe a API key no canto superior para ver o relógio.";
             return;
         }
         updateStatusIndicator("connecting");
@@ -385,7 +396,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             if (data.type === "patient_ingest") {
-                applyIngestFrame(data.data || data);
+                applyIngestFrame(data.data || data, { fromLiveIngest: true });
                 return;
             }
             if (data && data.sensor_readings) {
@@ -432,17 +443,18 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
-    function applyIngestFrame(ing) {
+    function applyIngestFrame(ing, options) {
         if (!ing) return;
+        const opts = options || {};
         const deviceId = ing.device_id || "";
         if (deviceId && !selectedDeviceId) selectedDeviceId = deviceId;
         if (selectedDeviceId && deviceId && deviceId !== selectedDeviceId) {
-            upsertFleetFromIngest(ing);
+            upsertFleetFromIngest(ing, opts);
             return;
         }
         const stamp = `${deviceId}|${liveStamp(ing)}`;
         renderWatchFromIngest(ing);
-        upsertFleetFromIngest(ing);
+        upsertFleetFromIngest(ing, opts);
         if (stamp && stamp === lastIngestStamp) return;
         lastIngestStamp = stamp;
         const raw = ing.raw_telemetry || {};
@@ -470,6 +482,20 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         if (!Number.isFinite(hr)) return;
         handleTelemetryFrame(frame);
+        setVitalsStale(ing.online !== true, formatAge(liveStamp(ing)));
+    }
+
+    function setVitalsStale(isStale, ageText) {
+        ["card-bpm", "card-bp", "card-spo2", "card-glucose"].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle("stale", isStale);
+        });
+        if (!isStale) return;
+        const staleLabel = ageText ? `Última leitura ${ageText}` : "Última leitura indisponível";
+        if (subBpm) subBpm.textContent = staleLabel;
+        if (subBp) subBp.textContent = staleLabel;
+        if (subSpo2) subSpo2.textContent = staleLabel;
+        if (subGlucose) subGlucose.textContent = staleLabel;
     }
 
     function renderWatchFromIngest(ing) {
@@ -479,21 +505,28 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!name || !sub) return;
         const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? (ing.raw_telemetry || {}).heart_rate_bpm;
         const spo2 = (ing.raw_telemetry || {}).spo2_percent;
+        const isOnline = ing.online === true;
         name.textContent = ing.device_id || "VE30";
         const bits = [];
+        const age = formatAge(liveStamp(ing));
+        if (!isOnline) {
+            bits.push(age ? `Offline · Última leitura ${age}` : "Offline · sem leitura recente");
+        }
         if (hr != null) bits.push(`${Math.round(Number(hr))} BPM`);
         if (spo2 != null) bits.push(`SpO₂ ${Number(spo2).toFixed(0)}%`);
         const when = ing.last_seen_local || formatLocal(liveStamp(ing));
-        const age = formatAge(liveStamp(ing));
-        if (when && when !== "—") bits.push(age ? `${when} · ${age}` : when);
+        if (when && when !== "—") bits.push(isOnline && age ? `${when} · ${age}` : when);
         if (ing.patient_id) bits.push(ing.patient_id);
-        sub.textContent = bits.join(" · ") || "Telemetria recebida";
-        if (card) card.classList.add("online");
+        sub.textContent = bits.join(" · ") || (isOnline ? "Telemetria recebida" : "Sem leitura recente");
+        if (card) {
+            card.classList.toggle("online", isOnline);
+            card.classList.toggle("stale", !isOnline);
+        }
+        setVitalsStale(!isOnline, age);
     }
 
     function deviceToIngest(row) {
-        if (row && row.latest) return row.latest;
-        return {
+        const base = row && row.latest ? { ...row.latest } : {
             device_id: row.device_id,
             patient_id: row.patient_id,
             timestamp: row.last_seen,
@@ -506,25 +539,47 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             cleaned_telemetry: { heart_rate_clean: row.heart_rate }
         };
+        base.online = row.online === true;
+        base.last_seen = row.last_seen || base.last_seen;
+        base.received_at = row.received_at || base.received_at;
+        base.last_seen_local = row.last_seen_local || base.last_seen_local;
+        return base;
     }
 
-    function upsertFleetFromIngest(ing) {
+    function includeSyntheticFleet() {
+        const box = document.getElementById("fleet-include-synthetic");
+        if (box) return !!box.checked;
+        return urlParams.get("include_synthetic") === "1" || urlParams.get("include_synthetic") === "true";
+    }
+
+    function upsertFleetFromIngest(ing, options) {
         if (!ing || !ing.device_id) return;
+        const opts = options || {};
+        if (!includeSyntheticFleet() && typeof fleetLogic.isSyntheticDevice === "function"
+            && fleetLogic.isSyntheticDevice(ing)) {
+            return;
+        }
         const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? (ing.raw_telemetry || {}).heart_rate_bpm;
         const spo2 = (ing.raw_telemetry || {}).spo2_percent;
+        const idx = fleetDevices.findIndex((d) => d.device_id === ing.device_id);
+        const existing = idx >= 0 ? fleetDevices[idx] : {};
+        const online = typeof fleetLogic.resolveFleetOnline === "function"
+            ? fleetLogic.resolveFleetOnline(existing, ing, !!opts.fromLiveIngest)
+            : (opts.fromLiveIngest
+                ? false
+                : (typeof ing.online === "boolean" ? ing.online : existing.online === true));
         const next = {
             device_id: ing.device_id,
             patient_id: ing.patient_id,
-            last_seen: ing.received_at || ing.timestamp,
-            received_at: ing.received_at || ing.timestamp,
+            last_seen: ing.received_at || ing.last_seen || ing.timestamp,
+            received_at: ing.received_at || ing.last_seen || ing.timestamp,
             last_seen_local: ing.last_seen_local || formatLocal(liveStamp(ing)),
             device_time_local: ing.device_time_local,
-            online: true,
+            online,
             heart_rate: hr,
             spo2,
             latest: ing
         };
-        const idx = fleetDevices.findIndex((d) => d.device_id === ing.device_id);
         if (idx >= 0) fleetDevices[idx] = { ...fleetDevices[idx], ...next };
         else fleetDevices.unshift(next);
         renderFleetTable();
@@ -585,7 +640,7 @@ document.addEventListener("DOMContentLoaded", () => {
             tr.addEventListener("click", () => {
                 selectedDeviceId = tr.getAttribute("data-device") || "";
                 const row = fleetDevices.find((d) => d.device_id === selectedDeviceId);
-                if (row) applyIngestFrame(deviceToIngest(row));
+                if (row) applyIngestFrame(deviceToIngest(row), { fromLiveIngest: false });
                 renderFleetTable();
             });
         });
@@ -594,22 +649,31 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderWatchStrip(devices) {
         const incoming = devices || [];
         const byId = {};
-        fleetDevices.forEach((d) => {
-            if (d && d.device_id) byId[d.device_id] = d;
-        });
         incoming.forEach((row) => {
             if (!row || !row.device_id) return;
-            const prev = byId[row.device_id] || {};
-            byId[row.device_id] = { ...prev, ...row };
+            if (!includeSyntheticFleet() && typeof fleetLogic.isSyntheticDevice === "function"
+                && fleetLogic.isSyntheticDevice(row)) {
+                return;
+            }
+            const prev = fleetDevices.find((d) => d.device_id === row.device_id) || {};
+            const merged = { ...prev, ...row };
+            if (prev.online && typeof fleetLogic.isRecentLiveStamp === "function"
+                && fleetLogic.isRecentLiveStamp(prev.received_at || prev.last_seen)) {
+                merged.online = true;
+            }
+            byId[row.device_id] = merged;
         });
         fleetDevices = Object.values(byId);
+        if (selectedDeviceId && !fleetDevices.some((d) => d.device_id === selectedDeviceId)) {
+            selectedDeviceId = "";
+        }
         renderFleetTable();
         const focused = fleetDevices.find((d) => d.device_id === selectedDeviceId)
             || fleetDevices.find((d) => d.online)
             || fleetDevices[0];
         if (focused) {
             if (!selectedDeviceId) selectedDeviceId = focused.device_id;
-            applyIngestFrame(deviceToIngest(focused));
+            applyIngestFrame(deviceToIngest(focused), { fromLiveIngest: false });
             return;
         }
         const name = document.getElementById("watch-name");
@@ -617,17 +681,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const card = document.getElementById("card-watch");
         if (name) name.textContent = "Nenhum relógio no painel";
         if (sub) sub.textContent = "Aguardando ingestão dos apps companion…";
-        if (card) card.classList.remove("online");
+        if (card) {
+            card.classList.remove("online");
+            card.classList.add("stale");
+        }
+        setVitalsStale(true, "");
     }
 
     async function pollDevices() {
-        if (!apiKey) {
-            renderWatchStrip([]);
-            return;
-        }
+        const qs = new URLSearchParams({ limit: "500" });
+        if (includeSyntheticFleet()) qs.set("include_synthetic", "true");
         try {
-            const res = await fetch(`${API_URL}/api/v1/wearables/devices?limit=500`, {
-                headers: { "X-API-Key": apiKey },
+            const res = await fetch(`${API_URL}/api/v1/ops/fleet-summary?${qs}`, {
                 cache: "no-store"
             });
             if (!res.ok) return;
@@ -641,7 +706,6 @@ document.addEventListener("DOMContentLoaded", () => {
     function startDevicePoll() {
         if (devicePollTimer) clearInterval(devicePollTimer);
         pollDevices();
-        if (!apiKey) return;
         devicePollTimer = setInterval(pollDevices, 2000);
         if (!window.__fleetClock) {
             window.__fleetClock = setInterval(() => renderFleetTable(), 1000);
@@ -653,15 +717,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(`${API_URL}/api/v1/ops/dashboard-bootstrap`, { cache: "no-store" });
             if (res.ok) {
                 const cfg = await res.json();
-                if (cfg.api_key) {
-                    apiKey = cfg.api_key;
-                    localStorage.setItem("api_key", apiKey);
-                    const display = document.getElementById("api-key-display");
-                    if (display) display.value = apiKey;
+                if (cfg && Object.prototype.hasOwnProperty.call(cfg, "api_key")) {
+                    delete cfg.api_key;
                 }
+                const display = document.getElementById("api-key-display");
+                if (display && apiKey) display.value = apiKey;
             }
         } catch (err) {
-            /* segue com localStorage se o bootstrap falhar */
+            /* segue sem chave: a frota pública não precisa dela */
         }
         connectWebSocket();
         startDevicePoll();
@@ -915,6 +978,40 @@ document.addEventListener("DOMContentLoaded", () => {
     if (fleetFilter) fleetFilter.addEventListener("change", () => { fleetPage = 0; renderFleetTable(); });
     if (fleetPrev) fleetPrev.addEventListener("click", () => { fleetPage -= 1; renderFleetTable(); });
     if (fleetNext) fleetNext.addEventListener("click", () => { fleetPage += 1; renderFleetTable(); });
+    const fleetSynthetic = document.getElementById("fleet-include-synthetic");
+    if (fleetSynthetic) {
+        if (urlParams.get("include_synthetic") === "1" || urlParams.get("include_synthetic") === "true") {
+            fleetSynthetic.checked = true;
+        }
+        fleetSynthetic.addEventListener("change", () => {
+            fleetPage = 0;
+            pollDevices();
+        });
+    }
+
+    function persistOperatorKey(nextKey) {
+        apiKey = (nextKey || "").trim();
+        if (apiKey) {
+            localStorage.setItem("api_key", apiKey);
+            localStorage.setItem("api_key_trust", API_KEY_TRUST);
+        } else {
+            localStorage.removeItem("api_key");
+        }
+        connectWebSocket();
+    }
+
+    const btnSaveKey = document.getElementById("btn-save-key");
+    if (btnSaveKey && apiKeyDisplay) {
+        btnSaveKey.addEventListener("click", () => {
+            persistOperatorKey(apiKeyDisplay.value);
+            if (copyFeedback) {
+                copyFeedback.textContent = apiKey
+                    ? "Chave guardada neste navegador. Use só para o canal ao vivo."
+                    : "Chave removida. A frota pública continua visível.";
+                setTimeout(() => { copyFeedback.textContent = ""; }, 4000);
+            }
+        });
+    }
 
     if (btnCopyKey && apiKeyDisplay) {
         btnCopyKey.addEventListener("click", () => {
