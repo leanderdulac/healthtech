@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import threading
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Hashable, List, Optional, Tuple
 from uuid import uuid4
 
 from app.config import get_settings
@@ -18,6 +18,7 @@ from app.services.durable_readings import (
     is_configured as durable_is_configured,
     log_backend as log_durable_backend,
 )
+from app.services.ingest_idempotency import DedupIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +30,8 @@ _lock = threading.Lock()
 
 # patient_id -> lista de frames processados
 _patient_history: Dict[str, List[Dict[str, Any]]] = {}
-# dedup_key -> (patient_id, reading_id)
-_dedup_index: Dict[str, Tuple[str, str]] = {}
+# chave opaca (tupla ou string) -> (patient_id, reading_id)
+_dedup_index: Dict[Hashable, Tuple[str, str]] = {}
 # Idempotency-Key da request HTTP -> resposta já produzida
 _request_cache: Dict[str, Any] = {}
 _request_cache_order: List[str] = []
@@ -48,7 +49,7 @@ def _is_synthetic_fallback(row: Dict[str, Any]) -> bool:
     return any(token in haystack for token in _SYNTHETIC_TOKENS)
 
 
-def _lookup_unlocked(dedup_key: Optional[str]) -> Optional[Dict[str, Any]]:
+def _lookup_unlocked(dedup_key: Optional[Hashable]) -> Optional[Dict[str, Any]]:
     if not dedup_key:
         return None
     loc = _dedup_index.get(dedup_key)
@@ -75,14 +76,20 @@ def _drop_index_for_frames(patient_id: str, frames: List[Dict[str, Any]]) -> Non
         _dedup_index.pop(key, None)
 
 
-def _as_key_list(dedup_key: Optional[str] = None, dedup_keys: Optional[List[str]] = None) -> List[str]:
-    keys: List[str] = []
+def _as_key_list(
+    dedup_key: Optional[Hashable] = None,
+    dedup_keys: Optional[List[Hashable]] = None,
+    identity: Optional[DedupIdentity] = None,
+) -> List[Hashable]:
+    keys: List[Hashable] = []
+    if identity is not None:
+        keys.extend(identity.memory_keys())
     if dedup_keys:
         keys.extend(k for k in dedup_keys if k)
     if dedup_key:
         keys.append(dedup_key)
     seen = set()
-    unique: List[str] = []
+    unique: List[Hashable] = []
     for key in keys:
         if key not in seen:
             seen.add(key)
@@ -100,25 +107,20 @@ def log_store_backend() -> str:
 
 
 def find_duplicate(
-    dedup_key: Optional[str] = None,
-    dedup_keys: Optional[List[str]] = None,
+    dedup_key: Optional[Hashable] = None,
+    dedup_keys: Optional[List[Hashable]] = None,
     patient_id: Optional[str] = None,
+    identity: Optional[DedupIdentity] = None,
 ) -> Optional[Dict[str, Any]]:
     """Retorna o frame já persistido para qualquer chave informada."""
-    keys = _as_key_list(dedup_key, dedup_keys)
+    keys = _as_key_list(dedup_key, dedup_keys, identity=identity)
     if _use_durable():
         from app.services import durable_readings
 
-        pid = patient_id
-        if not pid:
-            for key in keys:
-                parts = key.split(":", 2)
-                if len(parts) >= 3:
-                    pid = parts[1]
-                    break
+        pid = patient_id or (identity.patient_id if identity else None)
         if not pid:
             return None
-        return durable_readings.find_duplicate(pid, keys)
+        return durable_readings.find_duplicate(pid, identity=identity)
     with _lock:
         for key in keys:
             found = _lookup_unlocked(key)
@@ -130,9 +132,10 @@ def find_duplicate(
 def upsert_reading(
     patient_id: str,
     frame: Dict[str, Any],
-    dedup_key: Optional[str] = None,
-    dedup_keys: Optional[List[str]] = None,
+    dedup_key: Optional[Hashable] = None,
+    dedup_keys: Optional[List[Hashable]] = None,
     *,
+    identity: Optional[DedupIdentity] = None,
     extra: Optional[Dict[str, Any]] = None,
     client_reading_id: Optional[str] = None,
     idempotency_key: Optional[str] = None,
@@ -144,14 +147,14 @@ def upsert_reading(
     Retorna ``(frame, "accepted"|"duplicate")``. Duplicate devolve o frame
     original (first write wins) sem acrescentar histórico.
     """
-    keys = _as_key_list(dedup_key, dedup_keys)
+    keys = _as_key_list(dedup_key, dedup_keys, identity=identity)
     if _use_durable():
         from app.services import durable_readings
 
         stored, status = durable_readings.upsert_reading(
             patient_id,
             frame,
-            dedup_keys=keys,
+            identity=identity,
             extra=extra,
             client_reading_id=client_reading_id,
             idempotency_key=idempotency_key,
@@ -398,7 +401,11 @@ def anonymize_patient(patient_id: str) -> bool:
         for key, (pid, _rid) in list(_dedup_index.items()):
             if pid == patient_id:
                 _dedup_index.pop(key, None)
-        stale_cache = [key for key in _request_cache if f":{patient_id}:" in key]
+        stale_cache = [
+            key
+            for key in _request_cache
+            if f":{patient_id}:" in key or f"|{patient_id}|" in key
+        ]
         for key in stale_cache:
             _request_cache.pop(key, None)
             if key in _request_cache_order:
