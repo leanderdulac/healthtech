@@ -85,7 +85,7 @@ docker run --rm -p 8080:8080 \
 |--------|------|--------|
 | GET | `/api/health` | público |
 | GET | `/api/status` | `admin` |
-| POST | `/api/v1/wearables/ingest` | `wearables:write` (idempotente: `client_reading_id` / `Idempotency-Key` / chave natural) |
+| POST | `/api/v1/wearables/ingest` | `wearables:write` (idempotente + persistido em Postgres quando `DATABASE_URL` existe) |
 | POST | `/api/v1/wearables/batch-ingest` | `wearables:write` (resultados por item: accepted / duplicate / rejected) |
 | GET | `/api/v1/wearables/patient/{id}/latest` | `wearables:read` + paciente |
 | GET | `/api/v1/wearables/patient/{id}/history` | `wearables:read` + paciente |

@@ -39,6 +39,24 @@ First write wins. O mesmo id com payload diferente devolve o registro original (
 
 ---
 
+## 1.1 Durabilidade (Cloud SQL)
+
+Critério de aceite: a leitura foi **aceita, persistida e recuperável** no servidor após restart / nova revision.
+
+| Ambiente | Store | Comportamento |
+| --- | --- | --- |
+| `DATABASE_URL` (ou `OPERATIONAL_DATABASE_URL`) definida e Postgres alcançável | tabela `wearable_readings` no Cloud SQL `healthtech-pg` | ingest faz `INSERT … ON CONFLICT DO NOTHING`; latest/history leem do banco |
+| URL **ausente** | memória do processo | só local/testes; o startup loga isso com clareza |
+| URL **presente** mas banco inacessível | **não** há fallback | ingest / latest / history → **503**; o app **mantém** a leitura na fila |
+
+Não há store silencioso em memória no Cloud Run. Várias instâncias compartilham o mesmo Postgres; os índices únicos parciais (client id, `Idempotency-Key`, chave natural) tornam o dedup correto entre instâncias.
+
+Campos persistidos: `patient_id`, `device_id`, `metric_type`, `value`, `unit`, `measured_at` (UTC, nullable), `received_at`, `client_reading_id`, `idempotency_key`, colunas da chave natural, `extra` JSONB (steps, calories e qualquer campo extra do body) e `frame` JSONB (resposta processada).
+
+Migração: `saude_responsiva_secure/migrations/001_wearable_readings.sql` (`CREATE TABLE IF NOT EXISTS` + índices únicos parciais).
+
+---
+
 ## 2. `POST /api/v1/wearables/ingest`
 
 Escopo: `wearables:write`. HTTP **200** tanto para escrita nova quanto para replay.
@@ -97,7 +115,9 @@ Clients antigos que só olham `200` + `processed_count` continuam corretos: dupl
 
 ## 4. GET latest / history
 
-Forma inalterada. Campos novos no frame persistido (`reading_id`, `client_reading_id`, `metric_type`) são opcionais e não-quebrantes. `ingest_status` é da resposta de ingest, não um requisito de GET.
+Forma inalterada. Campos novos no frame persistido (`reading_id`, `client_reading_id`, `metric_type`, `extra`) são opcionais e não-quebrantes. `ingest_status` é da resposta de ingest, não um requisito de GET.
+
+Com `DATABASE_URL` configurada, latest/history leem de `wearable_readings` (sobrevivem a restart). Sem banco: memória. Banco configurado e caído: **503**, não 404.
 
 ---
 
@@ -118,7 +138,7 @@ Forma inalterada. Campos novos no frame persistido (`reading_id`, `client_readin
 3. WorkManager: `200` com `ingest_status` `accepted` ou `duplicate` → `synced`.
 4. Preferir `POST /api/v1/wearables/batch-ingest` no flush. Reconciliar por `results[i].status`.
 5. Header `Idempotency-Key` opcional = id estável daquele chunk de flush (ex. hash ordenado dos `client_reading_id`), **não** um UUID por tentativa.
-6. 401/403: não marcar synced (chave). 5xx / rede: manter na fila; o retry é seguro.
+6. 401/403: não marcar synced (chave). **503** (banco caído) / 5xx / rede: manter na fila; o retry é seguro e não duplica.
 
 Exemplo unitário:
 

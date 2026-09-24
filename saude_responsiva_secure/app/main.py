@@ -61,6 +61,12 @@ async def lifespan(app: FastAPI):
         settings.environment,
         settings.app_mode,
     )
+    try:
+        from app.services.telemetry_store import log_store_backend
+
+        log_store_backend()
+    except Exception as exc:
+        logger.warning("Não foi possível determinar o backend de telemetria: %s", exc)
     yield
     logger.info("Encerrando aplicação.")
 

@@ -41,7 +41,10 @@ paths:
         patient+device+timestamp+métrica) devolve HTTP 200 com
         `ingest_status=duplicate` e **não** cria outro registro. Já
         armazenado conta como sucesso — o client deve marcar a outbox
-        como synced. Ver `docs/contracts/WEARABLE_INGEST_IDEMPOTENCY.md`.
+        como synced. Com `DATABASE_URL` a leitura é persistida em
+        PostgreSQL (`wearable_readings`) e sobrevive a restart; se o
+        banco estiver configurado e caído a API devolve 503 (sem
+        fallback em memória). Ver `docs/contracts/WEARABLE_INGEST_IDEMPOTENCY.md`.
       operationId: hbandRealtimeIngest
       security:
         - ApiKeyAuth: []
@@ -93,6 +96,8 @@ paths:
           description: Escopo insuficiente (requer wearables:write)
         "422":
           description: Validação Pydantic falhou
+        "503":
+          description: DATABASE_URL configurada mas o Postgres está inacessível (manter na fila)
 
   /api/v1/wearables/batch-ingest:
     post:
@@ -151,6 +156,8 @@ paths:
           description: Escopo insuficiente (requer wearables:write)
         "422":
           description: Validação Pydantic falhou
+        "503":
+          description: DATABASE_URL configurada mas o Postgres está inacessível (manter na fila)
 
   /api/v1/signal/bmo-analysis:
     post:
@@ -203,9 +210,11 @@ paths:
             type: string
       responses:
         "200":
-          description: Último frame processado
+          description: Último frame processado (lido do store durável quando DATABASE_URL está setada)
         "404":
           description: Sem dados para o paciente
+        "503":
+          description: Store durável configurado mas inacessível
 
   /api/v1/wearables/patient/{patient_id}/history:
     get:
@@ -292,6 +301,7 @@ components:
       description: |
         Subconjunto do schema WearableTelemetryRequest da API.
         Campos HBand extras (BP, respiratory) devem ir em raw ou Bronze via normalizer.
+        Campos extras (steps, calories, …) são aceitos e persistidos em `extra` JSONB.
       properties:
         patient_id:
           type: string
@@ -351,6 +361,7 @@ components:
           description: >
             Tipo da métrica (heart_rate, spo2, vitals, …) para a chave natural.
             Se omitido, o servidor deriva dos campos enviados.
+      additionalProperties: true
 
     IngestedTelemetry:
       type: object
@@ -384,6 +395,9 @@ components:
           type: object
         clinical_alerts:
           type: object
+        extra:
+          type: object
+          description: Campos extras do body (steps, calories, …) persistidos em JSONB
 
     WearableBatchIngestItemResult:
       type: object
