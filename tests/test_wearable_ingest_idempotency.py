@@ -94,8 +94,9 @@ def test_resolve_dedup_key_precedence():
         client_timestamp=TS,
         fields_set=fields,
     )
-    assert natural is not None and natural.startswith("nat:PAT-A:DEV-1:")
-    assert natural.endswith(":heart_rate")
+    assert natural is not None and natural.startswith("nat|PAT-A|DEV-1|")
+    assert natural.endswith("|heart_rate")
+    assert "T12:00:00" in natural
 
     no_key = resolve_dedup_key(
         patient_id="PAT-A",

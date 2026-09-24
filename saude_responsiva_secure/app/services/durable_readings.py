@@ -22,6 +22,8 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.services.ingest_idempotency import DedupIdentity, NaturalKey, metric_signature
+
 logger = logging.getLogger(__name__)
 
 MIGRATION_NAME = "001_wearable_readings.sql"
@@ -277,31 +279,6 @@ def _row_frame(row: Any) -> Dict[str, Any]:
     return out
 
 
-def _natural_parts(dedup_keys: List[str]) -> Tuple[Optional[str], Optional[str], Optional[datetime], Optional[str]]:
-    for key in dedup_keys:
-        if not key.startswith("nat:"):
-            continue
-        parts = key.split(":", 4)
-        if len(parts) < 5:
-            continue
-        return parts[1], parts[2], _parse_dt(parts[3]), parts[4]
-    return None, None, None, None
-
-
-def _client_id_from_keys(dedup_keys: List[str]) -> Optional[str]:
-    for key in dedup_keys:
-        if key.startswith("cid:"):
-            return key.split(":", 2)[-1]
-    return None
-
-
-def _idem_from_keys(dedup_keys: List[str]) -> Optional[str]:
-    for key in dedup_keys:
-        if key.startswith("hdr:"):
-            return key.split(":", 2)[-1]
-    return None
-
-
 def _value_and_unit(frame: Dict[str, Any], extra: Dict[str, Any], metric_type: str) -> Tuple[Optional[float], Optional[str]]:
     raw = frame.get("raw_telemetry") if isinstance(frame.get("raw_telemetry"), dict) else {}
     candidates = [
@@ -380,23 +357,47 @@ def _select_by_keys(
     return _row_frame(row) if row else None
 
 
-def find_duplicate(patient_id: str, dedup_keys: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
-    keys = [k for k in (dedup_keys or []) if k]
-    if not keys:
+def find_duplicate(
+    patient_id: str,
+    identity: Optional[DedupIdentity] = None,
+    *,
+    client_reading_id: Optional[str] = None,
+    idempotency_key: Optional[str] = None,
+    measured_at: Optional[str] = None,
+    metric_type: Optional[str] = None,
+    device_id: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Lookup por colunas estruturadas — nunca faz split de string com ':'."""
+    ident = identity or DedupIdentity(
+        patient_id=patient_id,
+        client_reading_id=client_reading_id,
+        idempotency_key=idempotency_key,
+        natural=(
+            NaturalKey(
+                patient_id=patient_id,
+                device_id=(device_id or "wrist_wearable"),
+                measured_at=measured_at or "",
+                metric_type=metric_type or "heart_rate",
+            )
+            if measured_at
+            else None
+        ),
+    )
+    if not ident.has_any():
         return None
-    nat_p, nat_d, nat_ts, nat_m = _natural_parts(keys)
+    nat = ident.natural
     try:
         engine = _require_engine()
         with engine.connect() as conn:
             return _select_by_keys(
                 conn,
-                patient_id,
-                client_reading_id=_client_id_from_keys(keys),
-                idempotency_key=_idem_from_keys(keys),
-                natural_patient_id=nat_p,
-                natural_device_id=nat_d,
-                natural_measured_at=nat_ts,
-                natural_metric_type=nat_m,
+                ident.patient_id or patient_id,
+                client_reading_id=ident.client_reading_id,
+                idempotency_key=ident.idempotency_key,
+                natural_patient_id=nat.patient_id if nat else None,
+                natural_device_id=nat.device_id if nat else None,
+                natural_measured_at=_parse_dt(nat.measured_at) if nat else None,
+                natural_metric_type=nat.metric_type if nat else None,
             )
     except DurableStoreUnavailable:
         raise
@@ -408,6 +409,7 @@ def upsert_reading(
     patient_id: str,
     frame: Dict[str, Any],
     *,
+    identity: Optional[DedupIdentity] = None,
     dedup_keys: Optional[List[str]] = None,
     extra: Optional[Dict[str, Any]] = None,
     client_reading_id: Optional[str] = None,
@@ -416,18 +418,27 @@ def upsert_reading(
     metric_type: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], str]:
     """INSERT ... ON CONFLICT DO NOTHING; duplicate devolve o registro original."""
-    keys = [k for k in (dedup_keys or []) if k]
     extra = dict(extra or {})
     stored = dict(frame)
     stored.setdefault("reading_id", uuid4().hex)
     stored["patient_id"] = patient_id
-    cid = client_reading_id or stored.get("client_reading_id") or _client_id_from_keys(keys)
-    hid = idempotency_key or _idem_from_keys(keys)
-    nat_p, nat_d, nat_ts, nat_m = _natural_parts(keys)
-    metric = (metric_type or stored.get("metric_type") or nat_m or "heart_rate")
-    measured = _parse_dt(measured_at) or nat_ts
+    _ = dedup_keys  # legado: não parsear strings com ':'
+    nat = identity.natural if identity else None
+    cid = (
+        client_reading_id
+        or (identity.client_reading_id if identity else None)
+        or stored.get("client_reading_id")
+    )
+    hid = idempotency_key or (identity.idempotency_key if identity else None)
+    device_id = str(
+        stored.get("device_id") or (nat.device_id if nat else None) or "wrist_wearable"
+    )
+    measured = _parse_dt(measured_at) or (_parse_dt(nat.measured_at) if nat else None)
+    metric = (
+        (metric_type or stored.get("metric_type") or (nat.metric_type if nat else "") or "").strip()
+        or metric_signature(set(extra.keys()), metric_type)
+    )
     received = _parse_dt(stored.get("received_at")) or datetime.now(timezone.utc)
-    device_id = str(stored.get("device_id") or nat_d or "wrist_wearable")
     if cid:
         stored["client_reading_id"] = cid
     stored["metric_type"] = metric
@@ -444,10 +455,10 @@ def upsert_reading(
         "received_at": received,
         "client_reading_id": cid,
         "idempotency_key": hid,
-        "natural_patient_id": nat_p or (patient_id if measured else None),
-        "natural_device_id": nat_d or (device_id if measured else None),
+        "natural_patient_id": patient_id if measured else None,
+        "natural_device_id": device_id if measured else None,
         "natural_measured_at": measured,
-        "natural_metric_type": nat_m or (metric if measured else None),
+        "natural_metric_type": metric if measured else None,
         "extra": json.dumps(extra, default=str),
         "frame": json.dumps(stored, default=str),
         "created_at": now,
@@ -455,8 +466,9 @@ def upsert_reading(
     try:
         engine = _require_engine()
         dialect = _dialect_name(engine)
-        extra_sql = ":extra::jsonb" if dialect == "postgresql" else ":extra"
-        frame_sql = ":frame::jsonb" if dialect == "postgresql" else ":frame"
+        # Nunca use :nome::jsonb — o bind do SQLAlchemy come o primeiro ':' extra.
+        extra_sql = "CAST(:extra AS jsonb)" if dialect == "postgresql" else ":extra"
+        frame_sql = "CAST(:frame AS jsonb)" if dialect == "postgresql" else ":frame"
         insert_sql = f"""
             INSERT INTO wearable_readings (
                 reading_id, patient_id, device_id, metric_type, value, unit,

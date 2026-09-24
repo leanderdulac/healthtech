@@ -53,7 +53,20 @@ Não há store silencioso em memória no Cloud Run. Várias instâncias comparti
 
 Campos persistidos: `patient_id`, `device_id`, `metric_type`, `value`, `unit`, `measured_at` (UTC, nullable), `received_at`, `client_reading_id`, `idempotency_key`, colunas da chave natural, `extra` JSONB (steps, calories e qualquer campo extra do body) e `frame` JSONB (resposta processada).
 
+A chave natural **não** é uma string concatenada com `:`. ISO-8601 (`2026-09-24T15:54:57.000Z`) e MAC de `device_id` já têm dois-pontos; um `split(":")` produz `natural_metric_type='54:57.000Z:heart_rate'`. O store grava colunas (`natural_patient_id`, `natural_device_id`, `natural_measured_at`, `natural_metric_type`).
+
+Binds JSONB no Postgres usam `CAST(:extra AS jsonb)` / `CAST(:frame AS jsonb)`. **Não** use `:extra::jsonb`: o bind nomeado do SQLAlchemy come o `:` extra e o Postgres vê syntax error.
+
 Migração: `saude_responsiva_secure/migrations/001_wearable_readings.sql` (`CREATE TABLE IF NOT EXISTS` + índices únicos parciais).
+
+Testes: `tests/test_wearable_durable_store.py` corre **SQLite e PostgreSQL real** (psycopg2, mesmo stack do Cloud SQL). A suíte secure inteira também roda nos dois:
+
+```
+WEARABLE_TEST_DB=sqlite pytest tests/test_wearable_durable_store.py tests/test_wearable_ingest_idempotency.py tests/test_connection_status.py saude_responsiva_secure/test_security.py
+WEARABLE_TEST_DB=postgres pytest tests/test_wearable_durable_store.py tests/test_wearable_ingest_idempotency.py tests/test_connection_status.py saude_responsiva_secure/test_security.py
+```
+
+URL local default: `postgresql://wearable_test:wearable_test@127.0.0.1:5432/wearable_test` (`WEARABLE_TEST_POSTGRES_URL`). Sem Postgres os testes **falham** — não ficam só no SQLite.
 
 ---
 

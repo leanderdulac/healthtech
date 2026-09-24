@@ -14,7 +14,7 @@ from app.services.durable_readings import DurableStoreUnavailable
 from app.services.ingest_idempotency import (
     normalize_client_id,
     request_cache_key,
-    resolve_dedup_keys,
+    resolve_dedup_identity,
 )
 from app.services.signal_core import process_ingest_frame
 
@@ -88,7 +88,7 @@ def _ingest_one(
     """Processa uma leitura. Retorna (frame, status, error)."""
     client_ts = payload.timestamp
     fields_set = set(payload.model_fields_set)
-    dedup_keys = resolve_dedup_keys(
+    identity = resolve_dedup_identity(
         patient_id=patient_id,
         device_id=payload.device_id,
         client_reading_id=payload.client_reading_id,
@@ -98,7 +98,7 @@ def _ingest_one(
         metric_type=payload.metric_type,
     )
     existing = telemetry_store.find_duplicate(
-        dedup_keys=dedup_keys, patient_id=patient_id
+        identity=identity, patient_id=patient_id
     )
     if existing is not None:
         return existing, "duplicate", None
@@ -118,12 +118,12 @@ def _ingest_one(
         stored, status = telemetry_store.upsert_reading(
             patient_id,
             frame,
-            dedup_keys=dedup_keys,
+            identity=identity,
             extra=extra,
             client_reading_id=payload.client_reading_id,
             idempotency_key=idempotency_key,
             measured_at=client_ts,
-            metric_type=payload.metric_type,
+            metric_type=payload.metric_type or (identity.natural.metric_type if identity.natural else None),
         )
         return stored, status, None
     except DurableStoreUnavailable:
