@@ -66,7 +66,7 @@ WEARABLE_TEST_DB=sqlite pytest tests/test_wearable_durable_store.py tests/test_w
 WEARABLE_TEST_DB=postgres pytest tests/test_wearable_durable_store.py tests/test_wearable_ingest_idempotency.py tests/test_connection_status.py saude_responsiva_secure/test_security.py
 ```
 
-URL local default: `postgresql://wearable_test:wearable_test@127.0.0.1:5432/wearable_test` (`WEARABLE_TEST_POSTGRES_URL`). Sem Postgres os testes **falham** — não ficam só no SQLite.
+URL local default: `postgresql://wearable_test:wearable_test@127.0.0.1:5432/wearable_test` (`WEARABLE_TEST_POSTGRES_URL`). Sem Postgres os casos `backend=postgres` fazem **skip** (SQLite continua obrigatório). O job de CI `Wearable durable store (PostgreSQL)` sobe Postgres 16 e define `WEARABLE_REQUIRE_POSTGRES=1` para falhar se o serviço não estiver no ar.
 
 ---
 

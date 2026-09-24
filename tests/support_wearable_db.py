@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
+import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
@@ -24,6 +25,20 @@ def postgres_available(url: str = POSTGRES_URL) -> bool:
         return True
     except Exception:
         return False
+
+
+def require_postgres(*, url: str = POSTGRES_URL) -> None:
+    """Skip Postgres-backed cases unless WEARABLE_REQUIRE_POSTGRES=1 (CI job)."""
+    if postgres_available(url):
+        return
+    message = (
+        f"PostgreSQL is not reachable ({url}). "
+        "Start the local wearable_test cluster or set WEARABLE_TEST_POSTGRES_URL."
+    )
+    flag = os.environ.get("WEARABLE_REQUIRE_POSTGRES", "").strip().lower()
+    if flag in {"1", "true", "yes"}:
+        pytest.fail(message)
+    pytest.skip(message)
 
 
 def make_sqlite_engine(path: Path) -> Engine:
