@@ -9,7 +9,7 @@
     <!-- Icones Material -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
-    <link rel="stylesheet" href="style.css?v=20260824j">
+    <link rel="stylesheet" href="style.css?v=20260924a">
     <link rel="stylesheet" href="gcp-billing.css?v=20260824g">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -125,6 +125,10 @@
                                 <option value="online">Online</option>
                                 <option value="offline">Offline</option>
                             </select>
+                            <label class="fleet-synthetic" for="fleet-include-synthetic">
+                                <input type="checkbox" id="fleet-include-synthetic">
+                                Mostrar dispositivos de teste
+                            </label>
                         </div>
                         <div class="fleet-table-wrap">
                             <table class="fleet-table">
@@ -154,7 +158,7 @@
                                 <span class="material-icons-round icon-blue">watch</span>
                             </div>
                             <div class="watch-name" id="watch-name">Nenhum relógio no painel</div>
-                            <div class="metric-sub" id="watch-sub">Os companions autenticam com a chave de ingestão; o painel já entra com a chave de leitura.</div>
+                            <div class="metric-sub" id="watch-sub">A frota pública não exige chave. Offline mostra a última leitura conhecida.</div>
                         </div>
                     </section>
                     <!-- SINAIS VITAIS -->
@@ -447,12 +451,15 @@
                 <!-- CARD: CREDENCIAIS DA API -->
                 <div class="card">
                     <h2><span class="material-icons-round">vpn_key</span> Chave de API & Credenciais de Acesso</h2>
-                    <p class="section-desc">Utilize esta chave de API para autenticar as requisições enviadas pela plataforma de monitoramento de wearables.</p>
+                    <p class="section-desc">A tabela da frota é pública e somente leitura. Informe uma chave só para o canal WebSocket e ações privilegiadas (ingestão, histórico). O painel não recebe chave do servidor.</p>
                     
                     <div class="api-key-box">
-                        <label>Sua API Key Ativa</label>
+                        <label>Chave de API (opcional)</label>
                         <div class="key-input-group">
-                            <input type="text" id="api-key-display" readonly value="" placeholder="defina via ?api_key= ou localStorage">
+                            <input type="password" id="api-key-display" value="" placeholder="Cole a chave de leitura para o canal ao vivo" autocomplete="off">
+                            <button type="button" id="btn-save-key" class="btn btn-secondary">
+                                <span class="material-icons-round">save</span> Guardar
+                            </button>
                             <button id="btn-copy-key" class="btn btn-primary">
                                 <span class="material-icons-round">content_copy</span> Copiar
                             </button>
@@ -951,7 +958,8 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
     </div>
 
     <!-- Script da Aplicação -->
-    <script src="app.js?v=20260831a"></script>
+    <script src="fleet_logic.js?v=20260924a"></script>
+    <script src="app.js?v=20260924a"></script>
     <script src="gcp-billing.js?v=20260831b"></script>
 </body>
 </html>

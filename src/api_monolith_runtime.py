@@ -173,10 +173,12 @@ class SearchQuery(BaseModel):
 
 
 from src.ops.billing_routes import register_billing_routes
+from src.ops.dashboard_routes import router as dashboard_ops_router
 from src.ops.patients_routes import router as patients_router
 
 register_billing_routes(app)
 app.include_router(patients_router)
+app.include_router(dashboard_ops_router)
 
 
 @app.get("/api/health")
@@ -591,19 +593,6 @@ def batch_ingest_wearables(
     }
 
 
-@app.get("/api/v1/ops/dashboard-bootstrap")
-def dashboard_bootstrap():
-    """Injeta a chave de leitura no dashboard (não pede colar no UI)."""
-    key = (os.environ.get("READ_API_KEY") or os.environ.get("API_KEY") or "").strip()
-    return {
-        "ok": True,
-        "api_key": key,
-        "fleet_poll_ms": 2000,
-        "page_size": 50,
-        "max_devices": 500,
-    }
-
-
 @app.get("/api/v1/wearables/devices")
 def list_wearable_devices(
     q: str = Query(default=""),
@@ -611,6 +600,10 @@ def list_wearable_devices(
     limit: int = Query(default=200, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=10000),
     include_latest: bool = Query(default=False),
+    include_synthetic: bool = Query(
+        default=False,
+        description="Se true, inclui devices de smoke/probe/timecheck. Padrão: ocultos.",
+    ),
     patient_id: Optional[str] = Query(
         default=None,
         description="Se informado, restringe a frota a esse Patient antes da paginação.",
@@ -639,6 +632,7 @@ def list_wearable_devices(
         offset=offset,
         include_latest=include_latest,
         patient_id=wanted,
+        include_synthetic=include_synthetic,
     )
 
 
