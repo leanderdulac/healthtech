@@ -160,6 +160,24 @@ body {
     min-width: 180px;
 }
 
+.fleet-synthetic {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #94a3b8;
+    font-size: 0.82rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.fleet-synthetic input {
+    flex: none;
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    accent-color: #38bdf8;
+}
+
 .fleet-table-wrap {
     overflow: auto;
     max-height: 360px;
@@ -228,6 +246,18 @@ body {
 
 .watch-card.online {
     box-shadow: 0 0 24px rgba(14, 165, 233, 0.18);
+}
+
+.watch-card.stale,
+.metric-card.stale {
+    opacity: 0.78;
+    box-shadow: none;
+    border-color: rgba(148, 163, 184, 0.35);
+}
+
+.watch-card.stale .watch-name,
+.metric-card.stale .metric-value {
+    color: #94a3b8;
 }
 
 .watch-name {

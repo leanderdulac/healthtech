@@ -2,6 +2,8 @@
 test_wearable_api.py — Testes dos endpoints de ingestão e monitoramento de wearables
 """
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from src.api_server import app
@@ -63,11 +65,19 @@ def test_wearable_get_latest_and_history():
     assert len(hist_data["records"]) == 2
 
 
-def test_dashboard_bootstrap_saves_read_key(monkeypatch):
+def test_dashboard_bootstrap_does_not_return_api_key(monkeypatch):
     monkeypatch.setenv("READ_API_KEY", "ht_read_test_key_32chars_long_token")
+    monkeypatch.setenv("API_KEY", "ht_admin_test_key_32chars_long_token")
     res = client.get("/api/v1/ops/dashboard-bootstrap")
     assert res.status_code == 200
-    assert res.json()["api_key"] == "ht_read_test_key_32chars_long_token"
+    body = res.json()
+    assert "api_key" not in body
+    assert body["ok"] is True
+    assert body["fleet_summary_path"] == "/api/v1/ops/fleet-summary"
+    for env_name in ("READ_API_KEY", "API_KEY"):
+        configured = os.environ.get(env_name)
+        if configured:
+            assert configured not in res.text
 
 
 def test_device_registry_handles_hundreds_of_watches():
