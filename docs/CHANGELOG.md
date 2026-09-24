@@ -5,6 +5,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/). O projeto se
 ## [Unreleased]
 
 ### Added
+- **Idempotência no ingest de wearables (secure)** — `client_reading_id` / `Idempotency-Key` / chave natural; resend não duplica; batch com `results[]` por item (`accepted`/`duplicate`/`rejected`). Contrato: `docs/contracts/WEARABLE_INGEST_IDEMPOTENCY.md`
 - **Vendor `src.ops` na imagem secure** — `timestamps`, `patients_routes`, `operational_patients`, `live_devices`, `device_registry` em `_vendor_src/` (ingest + GET `/api/v1/patients`; `--check` pega drift). Sem billing / live_watch_bridge.
 - **Caminho crítico vs laboratório** — `docs/CRITICAL_PATH.md`, marker pytest `critical`/`research`, CI exige `pytest -m critical` + vendor sync
 - **Vendor sync** — `scripts/sync_secure_vendor.py` (imagem secure não fica com regras stale)
