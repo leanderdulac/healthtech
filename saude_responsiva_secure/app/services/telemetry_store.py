@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import uuid4
 
 from app.config import get_settings
 
 ONLINE_WITHIN_SECONDS = 120.0
 _SYNTHETIC_TOKENS = ("smoke", "probe", "timecheck")
+_MAX_REQUEST_CACHE = 2048
+
+_lock = threading.Lock()
 
 # patient_id -> lista de frames processados
 _patient_history: Dict[str, List[Dict[str, Any]]] = {}
+# dedup_key -> (patient_id, reading_id)
+_dedup_index: Dict[str, Tuple[str, str]] = {}
+# Idempotency-Key da request HTTP -> resposta já produzida
+_request_cache: Dict[str, Any] = {}
+_request_cache_order: List[str] = []
 
 
 def _is_synthetic_fallback(row: Dict[str, Any]) -> bool:
@@ -26,22 +36,141 @@ def _is_synthetic_fallback(row: Dict[str, Any]) -> bool:
     return any(token in haystack for token in _SYNTHETIC_TOKENS)
 
 
-def append_reading(patient_id: str, frame: Dict[str, Any]) -> None:
+def _lookup_unlocked(dedup_key: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not dedup_key:
+        return None
+    loc = _dedup_index.get(dedup_key)
+    if not loc:
+        return None
+    patient_id, reading_id = loc
+    for frame in _patient_history.get(patient_id, []):
+        if frame.get("reading_id") == reading_id:
+            return frame
+    _dedup_index.pop(dedup_key, None)
+    return None
+
+
+def _drop_index_for_frames(patient_id: str, frames: List[Dict[str, Any]]) -> None:
+    dropped_ids = {frame.get("reading_id") for frame in frames if frame.get("reading_id")}
+    if not dropped_ids:
+        return
+    stale = [
+        key
+        for key, (pid, rid) in _dedup_index.items()
+        if pid == patient_id and rid in dropped_ids
+    ]
+    for key in stale:
+        _dedup_index.pop(key, None)
+
+
+def _as_key_list(dedup_key: Optional[str] = None, dedup_keys: Optional[List[str]] = None) -> List[str]:
+    keys: List[str] = []
+    if dedup_keys:
+        keys.extend(k for k in dedup_keys if k)
+    if dedup_key:
+        keys.append(dedup_key)
+    seen = set()
+    unique: List[str] = []
+    for key in keys:
+        if key not in seen:
+            seen.add(key)
+            unique.append(key)
+    return unique
+
+
+def find_duplicate(
+    dedup_key: Optional[str] = None,
+    dedup_keys: Optional[List[str]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Retorna o frame já persistido para qualquer chave informada."""
+    with _lock:
+        for key in _as_key_list(dedup_key, dedup_keys):
+            found = _lookup_unlocked(key)
+            if found is not None:
+                return dict(found)
+        return None
+
+
+def upsert_reading(
+    patient_id: str,
+    frame: Dict[str, Any],
+    dedup_key: Optional[str] = None,
+    dedup_keys: Optional[List[str]] = None,
+) -> Tuple[Dict[str, Any], str]:
+    """Persiste a leitura se nenhuma das chaves ainda existir.
+
+    Retorna ``(frame, "accepted"|"duplicate")``. Duplicate devolve o frame
+    original (first write wins) sem acrescentar histórico.
+    """
     settings = get_settings()
-    if patient_id not in _patient_history:
-        _patient_history[patient_id] = []
-    _patient_history[patient_id].append(frame)
-    max_n = settings.history_max_per_patient
-    if len(_patient_history[patient_id]) > max_n:
-        _patient_history[patient_id] = _patient_history[patient_id][-max_n:]
+    keys = _as_key_list(dedup_key, dedup_keys)
+    stored: Dict[str, Any]
+    with _lock:
+        for key in keys:
+            existing = _lookup_unlocked(key)
+            if existing is not None:
+                return dict(existing), "duplicate"
+        stored = dict(frame)
+        stored.setdefault("reading_id", uuid4().hex)
+        if patient_id not in _patient_history:
+            _patient_history[patient_id] = []
+        _patient_history[patient_id].append(stored)
+        max_n = settings.history_max_per_patient
+        hist = _patient_history[patient_id]
+        if len(hist) > max_n:
+            dropped = hist[:-max_n]
+            _patient_history[patient_id] = hist[-max_n:]
+            _drop_index_for_frames(patient_id, dropped)
+        reading_id = str(stored["reading_id"])
+        for key in keys:
+            _dedup_index[key] = (patient_id, reading_id)
     try:
         from src.ops.device_registry import upsert_frame
 
-        upsert_frame(frame)
+        upsert_frame(stored)
     except Exception as exc:
         import logging
 
         logging.getLogger(__name__).warning("Falha ao registrar relógio na frota: %s", exc)
+    return dict(stored), "accepted"
+
+
+def append_reading(
+    patient_id: str,
+    frame: Dict[str, Any],
+    dedup_key: Optional[str] = None,
+    dedup_keys: Optional[List[str]] = None,
+) -> None:
+    """Compat: sempre tenta persistir (com dedup se houver chave)."""
+    upsert_reading(patient_id, frame, dedup_key=dedup_key, dedup_keys=dedup_keys)
+
+
+def get_cached_response(cache_key: Optional[str]) -> Optional[Any]:
+    if not cache_key:
+        return None
+    with _lock:
+        cached = _request_cache.get(cache_key)
+        return cached if cached is None else _clone_cached(cached)
+
+
+def put_cached_response(cache_key: Optional[str], response: Any) -> None:
+    if not cache_key:
+        return
+    with _lock:
+        if cache_key not in _request_cache:
+            _request_cache_order.append(cache_key)
+        _request_cache[cache_key] = _clone_cached(response)
+        while len(_request_cache_order) > _MAX_REQUEST_CACHE:
+            old = _request_cache_order.pop(0)
+            _request_cache.pop(old, None)
+
+
+def _clone_cached(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _clone_cached(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_clone_cached(item) for item in value]
+    return value
 
 
 def get_latest(patient_id: str) -> Optional[Dict[str, Any]]:
@@ -152,9 +281,18 @@ def list_devices(
 
 def anonymize_patient(patient_id: str) -> bool:
     """Remove histórico do paciente (LGPD). Retorna True se havia dados."""
-    had = patient_id in _patient_history
-    _patient_history.pop(patient_id, None)
-    return had
+    with _lock:
+        had = patient_id in _patient_history
+        _patient_history.pop(patient_id, None)
+        for key, (pid, _rid) in list(_dedup_index.items()):
+            if pid == patient_id:
+                _dedup_index.pop(key, None)
+        stale_cache = [key for key in _request_cache if f":{patient_id}:" in key]
+        for key in stale_cache:
+            _request_cache.pop(key, None)
+            if key in _request_cache_order:
+                _request_cache_order.remove(key)
+        return had
 
 
 def stats() -> Dict[str, int]:
@@ -171,7 +309,11 @@ def iter_patients() -> Dict[str, List[Dict[str, Any]]]:
 
 def clear_all() -> None:
     """Utilitário de teste."""
-    _patient_history.clear()
+    with _lock:
+        _patient_history.clear()
+        _dedup_index.clear()
+        _request_cache.clear()
+        _request_cache_order.clear()
     try:
         from src.ops.device_registry import clear_all as clear_fleet
 

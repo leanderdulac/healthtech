@@ -113,8 +113,11 @@ Headers:
 
 ```http
 X-API-Key: <INGEST_API_KEY>
+Idempotency-Key: <id estável do flush; opcional>
 Content-Type: application/json
 ```
+
+Idempotência (obrigatório para a outbox Room / WorkManager): enviar `client_reading_id` (UUID da linha local) e o `timestamp` da medição. Reenvio devolve **200** com `ingest_status=duplicate` e **não** cria outro registro. Semântica: [`docs/contracts/WEARABLE_INGEST_IDEMPOTENCY.md`](contracts/WEARABLE_INGEST_IDEMPOTENCY.md).
 
 ### 3.2 Histórico → batch ou arquivo + adaptador
 
