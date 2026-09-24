@@ -20,6 +20,7 @@ HBand ou simulador BLE
 | Superfície | Onde |
 |------------|------|
 | Contrato OpenAPI | `docs/openapi/hband-wearable.yaml` |
+| Idempotência ingest | `docs/contracts/WEARABLE_INGEST_IDEMPOTENCY.md` |
 | Ingest + scopes | `saude_responsiva_secure/app/api/wearables.py` |
 | Matriz clínica | `src/clinical_intelligence/alert_matrix_rules.py` |
 | Status app/device | `saude_responsiva_secure/app/services/connection_status.py` |
