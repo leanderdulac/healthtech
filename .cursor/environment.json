@@ -1,0 +1,15 @@
+{
+  "name": "HealthTech Biomedical Platform",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "api-full",
+      "command": "ENVIRONMENT=development AUTH_DISABLED=true SECRET_SALT=dev-salt-not-for-production-32bytes-min PORT=8080 .venv/bin/python -m uvicorn src.api_server:app --host 0.0.0.0 --port 8080"
+    },
+    {
+      "name": "api-aggregator",
+      "command": "cd health-aggregator && ENVIRONMENT=development AUTH_DISABLED=true SECRET_SALT=dev-salt-not-for-production-32bytes-min ../.venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000"
+    }
+  ],
+  "ports": [8000, 8080, 8501]
+}
