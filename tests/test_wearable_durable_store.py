@@ -27,12 +27,12 @@ from app.config import get_settings  # noqa: E402
 from app.services import durable_readings, telemetry_store  # noqa: E402
 from app.services.ingest_idempotency import resolve_dedup_identity  # noqa: E402
 from tests.support_wearable_db import (  # noqa: E402
-    POSTGRES_URL,
     activate_engine,
     deactivate_engine,
     make_postgres_engine,
     make_sqlite_engine,
     postgres_available,
+    require_postgres,
 )
 
 INGEST_KEY = "ht_ingest_test_key_32chars_long_token"
@@ -54,12 +54,7 @@ def durable_engine(backend, tmp_path):
     if backend == "sqlite":
         engine = make_sqlite_engine(tmp_path / "wearable_readings.db")
     else:
-        if not postgres_available():
-            pytest.fail(
-                f"PostgreSQL real é obrigatório neste teste ({POSTGRES_URL}). "
-                "Suba o cluster local (role/db wearable_test) ou defina "
-                "WEARABLE_TEST_POSTGRES_URL."
-            )
+        require_postgres()
         engine = make_postgres_engine()
     previous = activate_engine(engine)
     yield engine
@@ -419,10 +414,8 @@ def test_http_durable_auth_unchanged(durable_client):
 
 
 def test_postgres_is_reachable():
-    assert postgres_available(), (
-        f"PostgreSQL real é obrigatório ({POSTGRES_URL}). "
-        "O smoke Cloud SQL falhou por código que só rodou em SQLite."
-    )
+    require_postgres()
+    assert postgres_available()
 
 
 def test_configured_but_unreachable_db_returns_503(monkeypatch):
