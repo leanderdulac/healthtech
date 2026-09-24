@@ -1,19 +1,19 @@
 """Chaves de idempotência / deduplicação para ingestão de wearables.
 
-Precedência da chave de uma leitura:
-1. ``client_reading_id`` no body (recomendado — UUID estável da outbox/Room)
-2. header ``Idempotency-Key`` (ingest unitário; no batch vale como cache da request)
-3. chave natural: patient_id + device_id + timestamp do client + tipo de métrica
+Precedência:
+1. ``client_reading_id`` no body
+2. header ``Idempotency-Key`` (ingest unitário)
+3. chave natural estruturada: patient_id + device_id + timestamp UTC + métrica
 
-Sem identificador de client e sem timestamp enviado pelo client, a leitura
-não é deduplicada (o servidor gera o instante de recepção, que não é estável
-entre retries).
+A chave natural **não** é serializada com ``:`` (ISO-8601 e MACs têm dois-pontos).
+Colunas estruturadas no Postgres são a fonte da verdade.
 """
 
 from __future__ import annotations
 
 import re
-from typing import AbstractSet, List, Optional
+from dataclasses import dataclass
+from typing import AbstractSet, List, Optional, Tuple
 
 CLIENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:\-]{1,128}$")
 
@@ -29,6 +29,43 @@ METRIC_FIELDS = (
     "glucose_mgdl",
     "body_temp_c",
 )
+
+MemoryKey = Tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class NaturalKey:
+    patient_id: str
+    device_id: str
+    measured_at: str
+    metric_type: str
+
+
+@dataclass(frozen=True)
+class DedupIdentity:
+    """Identidade de dedup sem encoding frágil por split(':')."""
+
+    patient_id: str
+    client_reading_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+    natural: Optional[NaturalKey] = None
+
+    def has_any(self) -> bool:
+        return bool(self.client_reading_id or self.idempotency_key or self.natural)
+
+    def memory_keys(self) -> List[MemoryKey]:
+        """Tuplas opacas para o índice em memória. Nunca faça split por ':'."""
+        keys: List[MemoryKey] = []
+        if self.client_reading_id:
+            keys.append(("cid", self.patient_id, self.client_reading_id))
+        if self.idempotency_key:
+            keys.append(("hdr", self.patient_id, self.idempotency_key))
+        if self.natural:
+            nat = self.natural
+            keys.append(
+                ("nat", nat.patient_id, nat.device_id, nat.measured_at, nat.metric_type)
+            )
+        return keys
 
 
 def normalize_client_id(value: Optional[str]) -> Optional[str]:
@@ -69,6 +106,37 @@ def canonical_timestamp(device_ts: Optional[str]) -> Optional[str]:
     return utc_iso(parsed)
 
 
+def resolve_dedup_identity(
+    *,
+    patient_id: str,
+    device_id: Optional[str],
+    client_reading_id: Optional[str],
+    idempotency_key: Optional[str],
+    client_timestamp: Optional[str],
+    fields_set: AbstractSet[str],
+    metric_type: Optional[str] = None,
+) -> DedupIdentity:
+    """Identidade estruturada (colunas). Não serializa timestamp com ':'."""
+    cid = normalize_client_id(client_reading_id)
+    hid = normalize_client_id(idempotency_key)
+    natural: Optional[NaturalKey] = None
+    ts = canonical_timestamp(client_timestamp)
+    if ts:
+        device = (device_id or "wrist_wearable").strip() or "wrist_wearable"
+        natural = NaturalKey(
+            patient_id=patient_id,
+            device_id=device,
+            measured_at=ts,
+            metric_type=metric_signature(fields_set, metric_type),
+        )
+    return DedupIdentity(
+        patient_id=patient_id,
+        client_reading_id=cid,
+        idempotency_key=hid,
+        natural=natural,
+    )
+
+
 def resolve_dedup_keys(
     *,
     patient_id: str,
@@ -79,30 +147,27 @@ def resolve_dedup_keys(
     fields_set: AbstractSet[str],
     metric_type: Optional[str] = None,
 ) -> List[str]:
-    """Todas as chaves aplicáveis (client id, header, natural).
-
-    Indexar todas evita que um retry com um identificador diferente
-    (ex.: passou a enviar ``client_reading_id``) crie um segundo registro.
-    """
-    keys: List[str] = []
-    cid = normalize_client_id(client_reading_id)
-    if cid:
-        keys.append(f"cid:{patient_id}:{cid}")
-    hid = normalize_client_id(idempotency_key)
-    if hid:
-        keys.append(f"hdr:{patient_id}:{hid}")
-    ts = canonical_timestamp(client_timestamp)
-    if ts:
-        device = (device_id or "wrist_wearable").strip() or "wrist_wearable"
-        sig = metric_signature(fields_set, metric_type)
-        keys.append(f"nat:{patient_id}:{device}:{ts}:{sig}")
-    seen = set()
-    unique: List[str] = []
-    for key in keys:
-        if key not in seen:
-            seen.add(key)
-            unique.append(key)
-    return unique
+    """Rótulos estáveis para testes/log. Não parsear com split(':')."""
+    ident = resolve_dedup_identity(
+        patient_id=patient_id,
+        device_id=device_id,
+        client_reading_id=client_reading_id,
+        idempotency_key=idempotency_key,
+        client_timestamp=client_timestamp,
+        fields_set=fields_set,
+        metric_type=metric_type,
+    )
+    labels: List[str] = []
+    if ident.client_reading_id:
+        labels.append(f"cid:{ident.patient_id}:{ident.client_reading_id}")
+    if ident.idempotency_key:
+        labels.append(f"hdr:{ident.patient_id}:{ident.idempotency_key}")
+    if ident.natural:
+        nat = ident.natural
+        labels.append(
+            f"nat|{nat.patient_id}|{nat.device_id}|{nat.measured_at}|{nat.metric_type}"
+        )
+    return labels
 
 
 def resolve_dedup_key(
@@ -115,7 +180,7 @@ def resolve_dedup_key(
     fields_set: AbstractSet[str],
     metric_type: Optional[str] = None,
 ) -> Optional[str]:
-    """Chave primária (precedência client id → header → natural), ou None."""
+    """Primeiro rótulo (precedência client id → header → natural), ou None."""
     keys = resolve_dedup_keys(
         patient_id=patient_id,
         device_id=device_id,
@@ -138,4 +203,4 @@ def request_cache_key(
     hid = normalize_client_id(idempotency_key)
     if not hid:
         return None
-    return f"req:{path}:{patient_id}:{hid}"
+    return f"req|{path}|{patient_id}|{hid}"
