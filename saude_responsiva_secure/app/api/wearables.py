@@ -73,6 +73,10 @@ def list_wearable_devices(
     limit: int = Query(default=200, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=10000),
     include_latest: bool = Query(default=False),
+    include_synthetic: bool = Query(
+        default=False,
+        description="Se true, inclui devices de smoke/probe/timecheck. Padrão: ocultos.",
+    ),
     patient_id: Optional[str] = Query(
         default=None,
         description="Se informado, restringe a frota a esse Patient antes da paginação.",
@@ -99,6 +103,7 @@ def list_wearable_devices(
         offset=offset,
         include_latest=include_latest,
         patient_id=wanted,
+        include_synthetic=include_synthetic,
     )
 
 

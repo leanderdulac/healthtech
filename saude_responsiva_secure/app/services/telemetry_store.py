@@ -8,9 +8,22 @@ from typing import Any, Dict, List, Optional
 from app.config import get_settings
 
 ONLINE_WITHIN_SECONDS = 120.0
+_SYNTHETIC_TOKENS = ("smoke", "probe", "timecheck")
 
 # patient_id -> lista de frames processados
 _patient_history: Dict[str, List[Dict[str, Any]]] = {}
+
+
+def _is_synthetic_fallback(row: Dict[str, Any]) -> bool:
+    flag = row.get("synthetic")
+    if flag is True:
+        return True
+    device_id = str(row.get("device_id") or "").lower()
+    patient_id = str(row.get("patient_id") or "").lower()
+    if patient_id.startswith("smoke-"):
+        return True
+    haystack = f"{device_id} {patient_id}"
+    return any(token in haystack for token in _SYNTHETIC_TOKENS)
 
 
 def append_reading(patient_id: str, frame: Dict[str, Any]) -> None:
@@ -50,6 +63,7 @@ def list_devices(
     offset: int = 0,
     include_latest: bool = False,
     patient_id: Optional[str] = None,
+    include_synthetic: bool = False,
 ) -> Dict[str, Any]:
     """Última leitura por device_id (frota, payload compacto)."""
     try:
@@ -62,6 +76,7 @@ def list_devices(
             offset=offset,
             include_latest=include_latest,
             patient_id=patient_id,
+            include_synthetic=include_synthetic,
         )
     except Exception:
         pass
@@ -103,6 +118,8 @@ def list_devices(
     wanted_patient = (patient_id or "").strip() or None
     if wanted_patient:
         rows = [row for row in rows if str(row.get("patient_id") or "") == wanted_patient]
+    if not include_synthetic:
+        rows = [row for row in rows if not _is_synthetic_fallback(row)]
     rows.sort(key=lambda row: str(row.get("last_seen") or ""), reverse=True)
     rows.sort(key=lambda row: 0 if row.get("online") else 1)
     if online is True:
@@ -126,6 +143,7 @@ def list_devices(
         "offset": offset,
         "devices": page,
         "coverage": "patient" if wanted_patient else "fleet",
+        "include_synthetic": bool(include_synthetic),
     }
     if wanted_patient:
         payload["patient_id"] = wanted_patient
