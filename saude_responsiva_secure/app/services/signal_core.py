@@ -211,6 +211,7 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
         "received_at": payload.get("received_at") or payload.get("timestamp") or "",
         "last_seen_local": payload.get("last_seen_local"),
         "device_time_local": payload.get("device_time_local"),
+        "ingest_source": payload.get("ingest_source") or "companion_manual",
         "raw_telemetry": {
             "heart_rate_bpm": hr,
             "hrv_rmssd_ms": hrv,
