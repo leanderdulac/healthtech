@@ -6,6 +6,24 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+# Fonte única: validador Pydantic e /openapi.json (docs/openapi/hband-wearable.yaml).
+INGEST_SOURCES = ("companion_manual", "ble_sim", "ble_hband", "http")
+FILTER_TYPES = ("BMO", "Wavelet", "Butterworth", "Raw", "Adaptive")
+
+
+def _string_enum(values: tuple[str, ...]):
+    """Expõe o enum no ramo string de Optional[str] sem alterar a validação."""
+
+    def extra(schema: Dict[str, Any]) -> None:
+        enum_values = list(values)
+        for item in schema.get("anyOf") or ():
+            if item.get("type") == "string":
+                item["enum"] = enum_values
+                return
+        schema["enum"] = enum_values
+
+    return extra
+
 
 class WearableTelemetryRequest(BaseModel):
     model_config = {"extra": "allow"}
@@ -19,7 +37,11 @@ class WearableTelemetryRequest(BaseModel):
     spo2: Optional[float] = Field(98.0, ge=50.0, le=100.0)
     activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
     ppg_signal: Optional[List[float]] = None
-    filter_type: Optional[str] = Field("BMO", max_length=32)
+    filter_type: Optional[str] = Field(
+        "BMO",
+        max_length=32,
+        json_schema_extra=_string_enum(FILTER_TYPES),
+    )
     # Opcionais matriz de alertas / HBand
     blood_pressure_sys: Optional[float] = Field(None, ge=50.0, le=300.0)
     blood_pressure_dia: Optional[float] = Field(None, ge=20.0, le=200.0)
@@ -47,7 +69,11 @@ class WearableTelemetryRequest(BaseModel):
     inactivity_rest_of_active_period: Optional[bool] = None
     consciousness_altered: Optional[bool] = None
     # Origem do ingest: HTTP manual, simulador BLE ou HBand SDK
-    ingest_source: Optional[str] = Field("companion_manual", max_length=32)
+    ingest_source: Optional[str] = Field(
+        "companion_manual",
+        max_length=32,
+        json_schema_extra=_string_enum(INGEST_SOURCES),
+    )
     # Idempotência (opcional — clients antigos sem estes campos continuam válidos)
     client_reading_id: Optional[str] = Field(
         None,
@@ -67,28 +93,23 @@ class WearableTelemetryRequest(BaseModel):
     @field_validator("ingest_source")
     @classmethod
     def validate_ingest_source(cls, v: Optional[str]) -> Optional[str]:
-        allowed = {
-            "companion_manual",
-            "ble_sim",
-            "ble_hband",
-            "http",
-        }
         if v is None or v == "":
             return "companion_manual"
-        if v not in allowed:
+        if v not in INGEST_SOURCES:
             raise ValueError(
                 "ingest_source inválido. Valores aceitos: "
-                + ", ".join(sorted(allowed))
+                + ", ".join(sorted(INGEST_SOURCES))
             )
         return v
 
     @field_validator("filter_type")
     @classmethod
     def validate_filter_type(cls, v: Optional[str]) -> Optional[str]:
-        if v and v not in {"BMO", "Wavelet", "Butterworth", "Raw", "Adaptive"}:
+        if v and v not in FILTER_TYPES:
             raise ValueError(
                 "filter_type inválido. Valores aceitos: "
-                "BMO, Wavelet, Butterworth, Raw, Adaptive."
+                + ", ".join(FILTER_TYPES)
+                + "."
             )
         return v
 
