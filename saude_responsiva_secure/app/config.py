@@ -45,8 +45,12 @@ class Settings(BaseSettings):
     rate_limit_batch: str = "30/minute"
     rate_limit_admin: str = "10/minute"
 
-    # Telemetria em memória
+    # Telemetria em memória (fallback só sem DATABASE_URL)
     history_max_per_patient: int = 100
+
+    # Postgres operacional (Cloud SQL). Alias: OPERATIONAL_DATABASE_URL.
+    database_url: str = ""
+    operational_database_url: str = ""
 
     @field_validator("environment")
     @classmethod

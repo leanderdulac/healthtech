@@ -35,9 +35,21 @@ paths:
       description: |
         Mapeamento típico a partir de `startDetectHeart`, `startDetectSpo2h`,
         `startDetectTempture`, `startDetectBP` ou chunk PPG (`ppg_signal`).
+
+        Idempotência: reenviar a mesma leitura (mesmo `client_reading_id`,
+        mesmo `Idempotency-Key`, ou mesma chave natural
+        patient+device+timestamp+métrica) devolve HTTP 200 com
+        `ingest_status=duplicate` e **não** cria outro registro. Já
+        armazenado conta como sucesso — o client deve marcar a outbox
+        como synced. Com `DATABASE_URL` a leitura é persistida em
+        PostgreSQL (`wearable_readings`) e sobrevive a restart; se o
+        banco estiver configurado e caído a API devolve 503 (sem
+        fallback em memória). Ver `docs/contracts/WEARABLE_INGEST_IDEMPOTENCY.md`.
       operationId: hbandRealtimeIngest
       security:
         - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -69,13 +81,23 @@ paths:
                   filter_type: BMO
       responses:
         "200":
-          description: Frame processado (phantom / anomalia / códigos clínicos no modo full)
+          description: |
+            Frame processado. `ingest_status=accepted` na primeira persistência
+            ou `duplicate` se a leitura já existia. Ambos são sucesso para o client.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestedTelemetry'
+        "400":
+          description: Idempotency-Key com formato inválido
         "401":
           description: API key ausente ou inválida
         "403":
           description: Escopo insuficiente (requer wearables:write)
         "422":
           description: Validação Pydantic falhou
+        "503":
+          description: DATABASE_URL configurada mas o Postgres está inacessível (manter na fila)
 
   /api/v1/wearables/batch-ingest:
     post:
@@ -85,9 +107,17 @@ paths:
         O companion deve expandir cada `HBandOriginSample` em um item de
         `readings` ou enviar múltiplos POSTs. Preferível normalizar no app
         para o schema WearableTelemetryRequest.
+
+        Duplicatas parciais são resolvidas **por item** em `results[]`
+        (`accepted` / `duplicate` / `rejected`). `processed_count` =
+        accepted + duplicate (itens que o client pode marcar synced).
+        `Idempotency-Key` cacheia a resposta do lote inteiro.
+        Ver `docs/contracts/WEARABLE_INGEST_IDEMPOTENCY.md`.
       operationId: hbandBatchIngest
       security:
         - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -113,7 +143,21 @@ paths:
                       timestamp: "2026-08-06T08:05:00Z"
       responses:
         "200":
-          description: Lote processado
+          description: Lote processado (itens novos e duplicatas contam como sucesso)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WearableBatchIngestResponse'
+        "400":
+          description: Idempotency-Key com formato inválido
+        "401":
+          description: API key ausente ou inválida
+        "403":
+          description: Escopo insuficiente (requer wearables:write)
+        "422":
+          description: Validação Pydantic falhou
+        "503":
+          description: DATABASE_URL configurada mas o Postgres está inacessível (manter na fila)
 
   /api/v1/signal/bmo-analysis:
     post:
@@ -166,9 +210,11 @@ paths:
             type: string
       responses:
         "200":
-          description: Último frame processado
+          description: Último frame processado (lido do store durável quando DATABASE_URL está setada)
         "404":
           description: Sem dados para o paciente
+        "503":
+          description: Store durável configurado mas inacessível
 
   /api/v1/wearables/patient/{patient_id}/history:
     get:
@@ -200,6 +246,21 @@ components:
       in: header
       name: X-API-Key
       description: Chave com escopo wearables:write (INGEST_API_KEY)
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._:\-]+$'
+      description: |
+        Identificador estável da operação HTTP. No ingest unitário também
+        serve de chave da leitura quando `client_reading_id` está ausente.
+        No batch, cacheia o envelope do lote. Não gere um UUID novo a cada retry.
 
   schemas:
     HBandDeviceInfo:
@@ -240,6 +301,7 @@ components:
       description: |
         Subconjunto do schema WearableTelemetryRequest da API.
         Campos HBand extras (BP, respiratory) devem ir em raw ou Bronze via normalizer.
+        Campos extras (steps, calories, …) são aceitos e persistidos em `extra` JSONB.
       properties:
         patient_id:
           type: string
@@ -284,6 +346,102 @@ components:
           description: >
             Origem honesta do frame. ble_sim = simulador no app (não é pulseira).
             ble_hband = SDK Veepoo. companion_manual = botão/smoke HTTP.
+        client_reading_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[A-Za-z0-9._:\-]+$'
+          description: >
+            UUID estável da linha Room / outbox. Recomendado. Não mudar entre retries.
+        metric_type:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Za-z0-9_\-]+$'
+          description: >
+            Tipo da métrica (heart_rate, spo2, vitals, …) para a chave natural.
+            Se omitido, o servidor deriva dos campos enviados.
+      additionalProperties: true
+
+    IngestedTelemetry:
+      type: object
+      description: Frame processado + campos de idempotência (não-quebrantes)
+      properties:
+        patient_id:
+          type: string
+        device_id:
+          type: string
+        timestamp:
+          type: string
+        reading_id:
+          type: string
+          description: Id interno do registro persistido
+        client_reading_id:
+          type: string
+        metric_type:
+          type: string
+        ingest_status:
+          type: string
+          enum: [accepted, duplicate]
+        duplicate:
+          type: boolean
+        raw_telemetry:
+          type: object
+        cleaned_telemetry:
+          type: object
+        phantom_data:
+          type: object
+        anomaly_detection:
+          type: object
+        clinical_alerts:
+          type: object
+        extra:
+          type: object
+          description: Campos extras do body (steps, calories, …) persistidos em JSONB
+
+    WearableBatchIngestItemResult:
+      type: object
+      required: [index, status]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum: [accepted, duplicate, rejected]
+        client_reading_id:
+          type: string
+          nullable: true
+        result:
+          $ref: '#/components/schemas/IngestedTelemetry'
+        error:
+          type: string
+
+    WearableBatchIngestResponse:
+      type: object
+      required: [status, patient_id, processed_count]
+      properties:
+        status:
+          type: string
+          enum: [success, partial]
+          description: success se rejected_count=0; partial se algum item falhou
+        patient_id:
+          type: string
+        processed_count:
+          type: integer
+          description: accepted + duplicate (itens que o client pode marcar synced)
+        accepted_count:
+          type: integer
+        duplicate_count:
+          type: integer
+        rejected_count:
+          type: integer
+        latest_result:
+          $ref: '#/components/schemas/IngestedTelemetry'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/WearableBatchIngestItemResult'
 
     WearableBatchIngest:
       type: object

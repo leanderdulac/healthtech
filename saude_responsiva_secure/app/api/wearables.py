@@ -2,17 +2,38 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 from app.config import Settings, get_settings
 from app.models.schemas import WearableBatchIngestRequest, WearableTelemetryRequest
 from app.security.auth import require_patient_access, require_scope
 from app.services import telemetry_store
+from app.services.durable_readings import DurableStoreUnavailable
+from app.services.ingest_idempotency import (
+    normalize_client_id,
+    request_cache_key,
+    resolve_dedup_identity,
+)
 from app.services.signal_core import process_ingest_frame
 
+_STORE_UNAVAILABLE_DETAIL = (
+    "Armazenamento durável de telemetria indisponível. "
+    "Leituras não foram aceitas em memória. "
+    "O client deve manter a leitura na fila e tentar de novo."
+)
+_IDENTITY_FIELDS = {
+    "patient_id",
+    "device_id",
+    "timestamp",
+    "client_reading_id",
+    "metric_type",
+}
+
 router = APIRouter(prefix="/api/v1/wearables", tags=["wearables"])
+
+_INGEST_STATUSES = ("accepted", "duplicate", "rejected")
 
 
 def _with_timestamp(payload: WearableTelemetryRequest) -> Dict[str, Any]:
@@ -23,22 +44,138 @@ def _with_timestamp(payload: WearableTelemetryRequest) -> Dict[str, Any]:
     return data
 
 
+def _require_valid_optional_id(value: Optional[str], name: str) -> Optional[str]:
+    if value is None or str(value).strip() == "":
+        return None
+    normalized = normalize_client_id(value)
+    if normalized is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{name} inválido. Use 1–128 caracteres [A-Za-z0-9._:-].",
+        )
+    return normalized
+
+
+def _decorate_frame(frame: Dict[str, Any], status: str) -> Dict[str, Any]:
+    out = dict(frame)
+    out["ingest_status"] = status
+    out["duplicate"] = status == "duplicate"
+    return out
+
+
+def _raise_store_unavailable(exc: DurableStoreUnavailable) -> NoReturn:
+    raise HTTPException(
+        status_code=503,
+        detail=f"{_STORE_UNAVAILABLE_DETAIL} ({exc})",
+    )
+
+
+def _extra_payload(payload: WearableTelemetryRequest) -> Dict[str, Any]:
+    extra: Dict[str, Any] = {}
+    for key, value in payload.model_dump().items():
+        if key in _IDENTITY_FIELDS or value is None:
+            continue
+        extra[key] = value
+    return extra
+
+
+def _ingest_one(
+    payload: WearableTelemetryRequest,
+    *,
+    patient_id: str,
+    idempotency_key: Optional[str],
+) -> Tuple[Optional[Dict[str, Any]], str, Optional[str]]:
+    """Processa uma leitura. Retorna (frame, status, error)."""
+    client_ts = payload.timestamp
+    fields_set = set(payload.model_fields_set)
+    identity = resolve_dedup_identity(
+        patient_id=patient_id,
+        device_id=payload.device_id,
+        client_reading_id=payload.client_reading_id,
+        idempotency_key=idempotency_key,
+        client_timestamp=client_ts,
+        fields_set=fields_set,
+        metric_type=payload.metric_type,
+    )
+    existing = telemetry_store.find_duplicate(
+        identity=identity, patient_id=patient_id
+    )
+    if existing is not None:
+        return existing, "duplicate", None
+    try:
+        data = _with_timestamp(payload)
+        data["patient_id"] = patient_id
+        frame = process_ingest_frame(data)
+        if payload.client_reading_id:
+            frame["client_reading_id"] = payload.client_reading_id
+        if payload.metric_type:
+            frame["metric_type"] = payload.metric_type
+        if payload.ingest_source:
+            frame["ingest_source"] = payload.ingest_source
+        extra = _extra_payload(payload)
+        if extra:
+            frame["extra"] = extra
+        stored, status = telemetry_store.upsert_reading(
+            patient_id,
+            frame,
+            identity=identity,
+            extra=extra,
+            client_reading_id=payload.client_reading_id,
+            idempotency_key=idempotency_key,
+            measured_at=client_ts,
+            metric_type=payload.metric_type or (identity.natural.metric_type if identity.natural else None),
+        )
+        return stored, status, None
+    except DurableStoreUnavailable:
+        raise
+    except Exception as exc:
+        return None, "rejected", str(exc)
+
+
 @router.post("/ingest")
 def ingest_wearable_reading(
     payload: WearableTelemetryRequest,
     request: Request,
     settings: Settings = Depends(get_settings),
     _api_key: str = Depends(require_scope("wearables:write")),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
 ):
     """
     Recebe telemetria de wearable (PPG / HR / SpO2).
     Requer escopo wearables:write.
+
+    Reenvio da mesma leitura (mesmo ``client_reading_id``, ``Idempotency-Key``
+    ou chave natural patient+device+timestamp+métrica) devolve 200 com
+    ``ingest_status=duplicate`` e **não** cria outro registro.
     """
     _ = request  # disponível para auditoria / rate-limit middleware
-    data = _with_timestamp(payload)
-    frame = process_ingest_frame(data)
-    telemetry_store.append_reading(payload.patient_id, frame)
-    return frame
+    _ = settings
+    header_key = _require_valid_optional_id(idempotency_key, "Idempotency-Key")
+    cache_key = request_cache_key(
+        path="/api/v1/wearables/ingest",
+        patient_id=payload.patient_id,
+        idempotency_key=header_key,
+    )
+    cached = telemetry_store.get_cached_response(cache_key)
+    if cached is not None:
+        return _decorate_frame(cached, "duplicate")
+
+    try:
+        frame, status, error = _ingest_one(
+            payload,
+            patient_id=payload.patient_id,
+            idempotency_key=header_key,
+        )
+    except DurableStoreUnavailable as exc:
+        _raise_store_unavailable(exc)
+    if status == "rejected" or frame is None:
+        raise HTTPException(
+            status_code=500,
+            detail=error or "Falha ao processar a leitura.",
+        )
+    decorated = _decorate_frame(frame, status)
+    telemetry_store.put_cached_response(cache_key, decorated)
+    return decorated
 
 
 @router.post("/batch-ingest")
@@ -47,22 +184,71 @@ def batch_ingest_wearables(
     batch: WearableBatchIngestRequest,
     request: Request,
     _api_key: str = Depends(require_scope("wearables:write")),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
 ):
-    """Ingestão em lote (sincronização periódica). Requer wearables:write."""
+    """Ingestão em lote (sincronização periódica). Requer wearables:write.
+
+    Duplicatas parciais são reportadas por item em ``results``
+    (``accepted`` / ``duplicate`` / ``rejected``). Itens já armazenados
+    contam como sucesso para o client marcar a outbox como synced.
+    """
     _ = request
-    results = []
-    for reading in batch.readings:
+    header_key = _require_valid_optional_id(idempotency_key, "Idempotency-Key")
+    cache_key = request_cache_key(
+        path="/api/v1/wearables/batch-ingest",
+        patient_id=batch.patient_id,
+        idempotency_key=header_key,
+    )
+    cached = telemetry_store.get_cached_response(cache_key)
+    if cached is not None:
+        return cached
+
+    results: List[Dict[str, Any]] = []
+    frames: List[Dict[str, Any]] = []
+    accepted = 0
+    duplicates = 0
+    rejected = 0
+    for index, reading in enumerate(batch.readings):
         reading.patient_id = batch.patient_id
-        data = _with_timestamp(reading)
-        frame = process_ingest_frame(data)
-        telemetry_store.append_reading(batch.patient_id, frame)
-        results.append(frame)
-    return {
-        "status": "success",
+        try:
+            frame, status, error = _ingest_one(
+                reading,
+                patient_id=batch.patient_id,
+                idempotency_key=None,
+            )
+        except DurableStoreUnavailable as exc:
+            _raise_store_unavailable(exc)
+        item: Dict[str, Any] = {
+            "index": index,
+            "status": status if status in _INGEST_STATUSES else "rejected",
+            "client_reading_id": reading.client_reading_id,
+        }
+        if status == "rejected" or frame is None:
+            rejected += 1
+            item["status"] = "rejected"
+            item["error"] = error or "Falha ao processar a leitura."
+        else:
+            decorated = _decorate_frame(frame, status)
+            item["result"] = decorated
+            frames.append(decorated)
+            if status == "duplicate":
+                duplicates += 1
+            else:
+                accepted += 1
+        results.append(item)
+
+    payload = {
+        "status": "success" if rejected == 0 else "partial",
         "patient_id": batch.patient_id,
-        "processed_count": len(results),
-        "latest_result": results[-1] if results else None,
+        "processed_count": accepted + duplicates,
+        "accepted_count": accepted,
+        "duplicate_count": duplicates,
+        "rejected_count": rejected,
+        "latest_result": frames[-1] if frames else None,
+        "results": results,
     }
+    telemetry_store.put_cached_response(cache_key, payload)
+    return payload
 
 
 @router.get("/devices")
@@ -96,15 +282,18 @@ def list_wearable_devices(
                 f"para os dados do paciente '{wanted}'."
             ),
         )
-    return telemetry_store.list_devices(
-        q=q,
-        online=online,
-        limit=limit,
-        offset=offset,
-        include_latest=include_latest,
-        patient_id=wanted,
-        include_synthetic=include_synthetic,
-    )
+    try:
+        return telemetry_store.list_devices(
+            q=q,
+            online=online,
+            limit=limit,
+            offset=offset,
+            include_latest=include_latest,
+            patient_id=wanted,
+            include_synthetic=include_synthetic,
+        )
+    except DurableStoreUnavailable as exc:
+        _raise_store_unavailable(exc)
 
 
 @router.get("/patient/{patient_id}/latest")
@@ -115,7 +304,10 @@ def get_latest_patient_telemetry(
 ):
     """Último estado fisiológico do paciente (anti-IDOR)."""
     _ = request
-    latest = telemetry_store.get_latest(patient_id)
+    try:
+        latest = telemetry_store.get_latest(patient_id)
+    except DurableStoreUnavailable as exc:
+        _raise_store_unavailable(exc)
     if not latest:
         raise HTTPException(
             status_code=404,
@@ -133,7 +325,10 @@ def get_patient_telemetry_history(
 ):
     """Histórico recente do paciente (anti-IDOR)."""
     _ = request
-    history = telemetry_store.get_history(patient_id, limit=limit)
+    try:
+        history = telemetry_store.get_history(patient_id, limit=limit)
+    except DurableStoreUnavailable as exc:
+        _raise_store_unavailable(exc)
     if not history:
         raise HTTPException(
             status_code=404,

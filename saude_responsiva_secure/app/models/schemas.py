@@ -48,6 +48,21 @@ class WearableTelemetryRequest(BaseModel):
     consciousness_altered: Optional[bool] = None
     # Origem do ingest: HTTP manual, simulador BLE ou HBand SDK
     ingest_source: Optional[str] = Field("companion_manual", max_length=32)
+    # Idempotência (opcional — clients antigos sem estes campos continuam válidos)
+    client_reading_id: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._:\-]+$",
+        description="Identificador estável gerado no client (ex.: UUID da linha Room).",
+    )
+    metric_type: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_\-]+$",
+        description="Tipo da métrica quando a leitura não é um snapshot multi-vital.",
+    )
 
     @field_validator("ingest_source")
     @classmethod

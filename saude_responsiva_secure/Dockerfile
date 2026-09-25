@@ -26,6 +26,7 @@ ENV APP_MODE=secure
 ENV PYTHONPATH=/app
 
 COPY --chown=appuser:appuser app/ /app/app/
+COPY --chown=appuser:appuser migrations/ /app/migrations/
 COPY --chown=appuser:appuser requirements.txt /app/
 # Subset gerado por scripts/sync_secure_vendor.py (não o monorepo inteiro):
 #   clinical_intelligence — matriz de alertas no ingest
