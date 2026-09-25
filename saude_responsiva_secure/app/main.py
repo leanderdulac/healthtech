@@ -61,6 +61,12 @@ async def lifespan(app: FastAPI):
         settings.environment,
         settings.app_mode,
     )
+    try:
+        from app.services.telemetry_store import log_store_backend
+
+        log_store_backend()
+    except Exception as exc:
+        logger.warning("Não foi possível determinar o backend de telemetria: %s", exc)
     yield
     logger.info("Encerrando aplicação.")
 
@@ -94,7 +100,7 @@ def _create_secure_app() -> FastAPI:
         allow_origins=origins or ["http://localhost:8080"],
         allow_credentials=bool(origins) and origins != ["*"],
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["*", "X-API-Key", "X-Request-ID"],
+        allow_headers=["*", "X-API-Key", "X-Request-ID", "Idempotency-Key"],
     )
 
     @application.exception_handler(StarletteHTTPException)

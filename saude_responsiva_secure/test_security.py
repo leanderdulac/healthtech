@@ -257,6 +257,83 @@ def test_batch_ingest():
     assert response.json()["processed_count"] == 2
 
 
+def test_ingest_resend_with_client_reading_id_is_duplicate():
+    payload = {
+        "patient_id": "PAT-IDEM-SEC",
+        "heart_rate": 77.0,
+        "timestamp": "2026-09-24T12:00:00Z",
+        "client_reading_id": "room-sec-1",
+    }
+    first = client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json=payload,
+    )
+    second = client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json=payload,
+    )
+    assert first.status_code == 200
+    assert first.json()["ingest_status"] == "accepted"
+    assert second.status_code == 200
+    assert second.json()["ingest_status"] == "duplicate"
+    hist = client.get(
+        "/api/v1/wearables/patient/PAT-IDEM-SEC/history",
+        headers={"X-API-Key": READ_KEY},
+    )
+    assert hist.status_code == 200
+    assert hist.json()["total_records"] == 1
+
+
+def test_batch_ingest_reports_partial_duplicates():
+    seed = {
+        "patient_id": "PAT-IDEM-SEC-B",
+        "heart_rate": 70.0,
+        "timestamp": "2026-09-24T08:00:00Z",
+        "client_reading_id": "room-sec-b1",
+    }
+    client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json=seed,
+    )
+    response = client.post(
+        "/api/v1/wearables/batch-ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json={
+            "patient_id": "PAT-IDEM-SEC-B",
+            "readings": [
+                seed,
+                {
+                    "patient_id": "PAT-IDEM-SEC-B",
+                    "heart_rate": 71.0,
+                    "timestamp": "2026-09-24T08:05:00Z",
+                    "client_reading_id": "room-sec-b2",
+                },
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["duplicate_count"] == 1
+    assert body["accepted_count"] == 1
+    assert [item["status"] for item in body["results"]] == ["duplicate", "accepted"]
+
+
+def test_read_key_still_cannot_write_after_idempotency():
+    response = client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": READ_KEY},
+        json={
+            "patient_id": "PAT-IDEM-SEC-AUTH",
+            "heart_rate": 78.0,
+            "client_reading_id": "should-not-store",
+        },
+    )
+    assert response.status_code == 403
+
+
 def test_bmo_analysis_requires_read_scope():
     signal = [70.0, 72.0, 71.0, 73.0, 74.0, 72.0, 70.0, 69.0]
     denied = client.post(
