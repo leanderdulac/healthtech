@@ -47,6 +47,48 @@ jobs:
         run: |
           python -m pytest tests/ -q --tb=short
 
+  test-postgres:
+    name: Wearable durable store (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: wearable_test
+          POSTGRES_PASSWORD: wearable_test
+          POSTGRES_DB: wearable_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wearable_test -d wearable_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements-dev.txt
+
+      - name: Run wearable durable store + idempotency (PostgreSQL)
+        env:
+          TESTING: "1"
+          PYTHONIOENCODING: "utf-8"
+          ENVIRONMENT: "development"
+          WEARABLE_REQUIRE_POSTGRES: "1"
+          WEARABLE_TEST_POSTGRES_URL: postgresql://wearable_test:wearable_test@127.0.0.1:5432/wearable_test
+        run: |
+          python -m pytest tests/test_wearable_durable_store.py tests/test_wearable_ingest_idempotency.py -q --tb=short
+
   lint:
     name: Code Quality & Linting
     runs-on: ubuntu-latest
