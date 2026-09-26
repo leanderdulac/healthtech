@@ -23,6 +23,18 @@ logger = logging.getLogger(__name__)
 
 _MODEL_DIR = Path(os.getenv("ALERT_MATRIX_MODEL_DIR", "data/models"))
 
+# Opt-in explícito (default OFF): só com ALERT_ALLOW_PHANTOM_VITALS=1 a matriz
+# aceita PA/glicose estimadas (phantom/simulação) e os defaults legados de
+# sono/passos/FC-basal. Sem o flag, a matriz avalia APENAS vitais medidos:
+# sinal ausente = desconhecido (None), nunca um valor inventado.
+PHANTOM_VITALS_ENV = "ALERT_ALLOW_PHANTOM_VITALS"
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def phantom_vitals_enabled() -> bool:
+    """True só se o operador ligou explicitamente a simulação (demo)."""
+    return str(os.getenv(PHANTOM_VITALS_ENV, "")).strip().lower() in _TRUTHY
+
 
 @lru_cache(maxsize=1)
 def _load_classifier():
@@ -67,21 +79,30 @@ def vitals_from_ingest_context(
     hband_ext: Optional[Dict[str, Any]] = None,
     raw_telemetry: Optional[Dict[str, Any]] = None,
     use_unreliable_phantom: bool = False,
+    allow_phantom_vitals: Optional[bool] = None,
 ) -> Tuple[VitalSnapshot, Dict[str, Any]]:
     """
-    Monta VitalSnapshot + metadados de origem (measured/phantom).
+    Monta VitalSnapshot + metadados de origem (measured/phantom/absent).
 
-    PA/glicose phantom só entram se reliable=True (ou use_unreliable_phantom).
+    Padrão: só vitais efetivamente presentes na leitura. Sinal ausente fica
+    None (desconhecido) e regras que dependem dele não disparam.
+
+    allow_phantom_vitals=True (ou env ALERT_ALLOW_PHANTOM_VITALS=1) reativa o
+    modo demo legado: PA/glicose phantom entram se reliable=True (ou
+    use_unreliable_phantom) e sono/passos/FC-basal recebem defaults.
     """
+    if allow_phantom_vitals is None:
+        allow_phantom_vitals = phantom_vitals_enabled()
     hband = hband_ext or {}
     raw = raw_telemetry or {}
-    ph = phantom or {}
+    ph = (phantom or {}) if allow_phantom_vitals else {}
     pas = pad = glucose = None
     meta: Dict[str, Any] = {
-        "bp_source": "unknown",
-        "glucose_source": "unknown",
-        "bp_reliable": True,
-        "glucose_reliable": True,
+        "bp_source": "absent",
+        "glucose_source": "absent",
+        "bp_reliable": False,
+        "glucose_reliable": False,
+        "phantom_vitals_enabled": bool(allow_phantom_vitals),
     }
 
     def phantom_est(*keys: str) -> Tuple[Optional[float], bool]:
@@ -130,10 +151,9 @@ def vitals_from_ingest_context(
             meta["glucose_reliable"] = glu_rel
 
     temp = _num(skin_temp)
-    if temp is not None and 25.0 <= temp < 35.0:
-        body = _num(hband.get("body_temp_c")) or _num(raw.get("body_temp_c"))
-        if body is not None:
-            temp = body
+    body = _num(hband.get("body_temp_c")) or _num(raw.get("body_temp_c"))
+    if body is not None and (temp is None or 25.0 <= temp < 35.0):
+        temp = body
 
     steps_drop = _num(hband.get("steps_drop_pct")) or _num(raw.get("steps_drop_pct"))
     sleep_worsen = _num(hband.get("sleep_worsen_pct")) or _num(raw.get("sleep_worsen_pct"))
@@ -143,14 +163,15 @@ def vitals_from_ingest_context(
         hband.get("consciousness_altered") or raw.get("consciousness_altered")
     )
 
-    if hr_rise is None and activity_level is not None and float(activity_level) > 40:
-        hr_rise = min(25.0, float(activity_level) * 0.2)
-
-    # Sono "Bom" implícito se não informado
-    if sleep_worsen is None:
-        sleep_worsen = 5.0
-    if steps_drop is None:
-        steps_drop = 5.0
+    if allow_phantom_vitals:
+        # Heurísticas/defaults legados (modo demo). Fora do opt-in: ausente = None.
+        if hr_rise is None and activity_level is not None and float(activity_level) > 40:
+            hr_rise = min(25.0, float(activity_level) * 0.2)
+        # Sono "Bom" implícito se não informado
+        if sleep_worsen is None:
+            sleep_worsen = 5.0
+        if steps_drop is None:
+            steps_drop = 5.0
 
     basal = raw.get("basal") or raw.get("baseline") or hband.get("basal") or {}
     prev = raw.get("previous_reading") or raw.get("previous_vitals") or {}
@@ -227,6 +248,25 @@ def vitals_from_ingest_context(
     return vitals, meta
 
 
+_PRESENT_VITAL_FIELDS = (
+    "pas",
+    "pad",
+    "hr",
+    "spo2",
+    "temp_c",
+    "glucose_mgdl",
+    "steps_drop_pct",
+    "sleep_worsen_pct",
+    "hr_baseline_rise",
+    "spo2_drop_points",
+)
+
+
+def vitals_present(vitals: VitalSnapshot) -> Dict[str, Optional[float]]:
+    """Vitais usados pela matriz, sem imputação: ausente → None."""
+    return {k: getattr(vitals, k) for k in _PRESENT_VITAL_FIELDS}
+
+
 def _apply_discrepancy(full: Dict[str, Any], vitals: VitalSnapshot, meta: Dict[str, Any]) -> Dict[str, Any]:
     disc = evaluate_discrepancy(
         vitals,
@@ -235,8 +275,8 @@ def _apply_discrepancy(full: Dict[str, Any], vitals: VitalSnapshot, meta: Dict[s
         primary_alert_name=full.get("primary_alert_name"),
         bp_source=meta.get("bp_source", "unknown"),
         glucose_source=meta.get("glucose_source", "unknown"),
-        glucose_reliable=bool(meta.get("glucose_reliable", True)),
-        bp_reliable=bool(meta.get("bp_reliable", True)),
+        glucose_reliable=bool(meta.get("glucose_reliable", False)),
+        bp_reliable=bool(meta.get("bp_reliable", False)),
     )
     full = dict(full)
     full["discrepancy"] = disc.to_dict()
@@ -275,9 +315,13 @@ def assess_ingest_alerts(
     phantom: Optional[Dict[str, Any]] = None,
     hband_ext: Optional[Dict[str, Any]] = None,
     raw_telemetry: Optional[Dict[str, Any]] = None,
+    allow_phantom_vitals: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Avalia alertas clínicos para um frame de ingestão.
+
+    Só vitais presentes na leitura entram na matriz (ver
+    vitals_from_ingest_context / ALERT_ALLOW_PHANTOM_VITALS).
 
     Retorno enxuto para embutir em processed_frame['clinical_alerts'].
     """
@@ -290,6 +334,7 @@ def assess_ingest_alerts(
         phantom=phantom,
         hband_ext=hband_ext,
         raw_telemetry=raw_telemetry,
+        allow_phantom_vitals=allow_phantom_vitals,
     )
 
     from src.clinical_intelligence.next2u_context import PatientContext
@@ -355,7 +400,9 @@ def assess_ingest_alerts(
         "primary_rule_id": full.get("primary_rule_id") if full.get("is_true_alert") else None,
         "rule_hits": full.get("rule_hits") or [],
         "rule_explanation": full.get("rule_explanation"),
-        "vitals_used": full.get("vitals") or vitals.to_feature_dict(),
+        # Sem imputação: só o que foi medido (ausente → None). Features do ML
+        # (com defaults de treino) ficam fora da resposta.
+        "vitals_used": vitals_present(vitals),
         "ml": full.get("ml"),
         "discrepancy": full.get("discrepancy"),
         "source_meta": full.get("source_meta") or meta,
