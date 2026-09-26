@@ -379,7 +379,8 @@ class AlertMatrixClassifier:
 
     @classmethod
     def load(cls, model_dir: Path | str = DEFAULT_MODEL_DIR) -> "AlertMatrixClassifier":
-        path = Path(model_dir) / "alert_matrix_classifier.pkl"
+        raw = Path(model_dir)
+        path = raw if raw.suffix.lower() == ".pkl" or raw.is_file() else raw / "alert_matrix_classifier.pkl"
         with open(path, "rb") as f:
             payload = pickle.load(f)
         obj = cls()
@@ -390,4 +391,5 @@ class AlertMatrixClassifier:
         obj.alert_clf = payload["alert_clf"]
         obj.feature_columns = payload["feature_columns"]
         obj.metrics_ = payload.get("metrics", {})
+        obj.model_path_ = str(path)
         return obj
