@@ -44,6 +44,7 @@ saude_responsiva_secure/
 | Clinical alerts | subset `clinical_intelligence` via `scripts/sync_secure_vendor.py` (`_vendor_src/`) |
 | Cadastro operacional | subset `ops`: `timestamps`, `patients_routes`, `operational_patients`, `live_devices`, `device_registry` (sem billing / live_watch_bridge) |
 | Snapshot da frota | arquivo local (`FLEET_DEVICES_PATH`) + GCS (`GCS_STAGING_BUCKET` / `ops/fleet/devices.json`) via `google-cloud-storage` |
+| Sem imputação de vitais | A matriz avalia só sinais presentes na leitura: ausente = desconhecido (`None`). Sem PA/glicose phantom, sem temperatura/SpO2/HRV/atividade default; `bp_reliable=false` sem PA medida. Phantom demo só com `ALERT_ALLOW_PHANTOM_VITALS=1` (default OFF) |
 | Headers | HSTS, CSP, nosniff, X-Frame-Options, Referrer-Policy |
 | Auditoria | Middleware JSON com `X-Request-ID` e chave mascarada |
 | Validação | Pydantic v2 (limites fisiológicos, patient_id sanitizado) |
@@ -153,3 +154,4 @@ Veja [`.env.example`](.env.example). Em **production**:
 2. `SECRET_SALT` fraco aborta o startup
 3. API keys fracas/curtas abortam o startup
 4. CORS com `*` é rejeitado
+5. `ALERT_ALLOW_PHANTOM_VITALS` deve ficar ausente/`0` (default): ligar só em demo — injeta PA/glicose estimadas na matriz
