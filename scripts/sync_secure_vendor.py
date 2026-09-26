@@ -28,6 +28,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = ROOT / "src"
 DST_ROOT = ROOT / "saude_responsiva_secure" / "_vendor_src"
+SECURE_DATA = ROOT / "saude_responsiva_secure" / "data"
+
+# JSON de catálogo necessário na imagem: sem ele as 158 regras caem para 1★/leve.
+VENDOR_DATA_FILES: tuple[tuple[Path, Path], ...] = (
+    (
+        ROOT / "data" / "models" / "next2u_expanded_matrix.json",
+        SECURE_DATA / "models" / "next2u_expanded_matrix.json",
+    ),
+)
 
 # pacote → arquivos (além de __init__.py gerado)
 VENDOR_PACKAGES: dict[str, tuple[str, ...]] = {
@@ -135,6 +144,13 @@ def _copy() -> int:
             shutil.copy2(src, dst_dir / name)
             copied += 1
         _prune_package(dst_dir, _allowed_names(pkg))
+    for src, dst in VENDOR_DATA_FILES:
+        if not src.is_file():
+            missing.append(str(src))
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        copied += 1
     if missing:
         raise SystemExit(f"arquivos ausentes em {SRC_ROOT}: {missing}")
     return copied
@@ -168,14 +184,26 @@ def _check() -> int:
         leaked = _package_dst("ops") / name
         if leaked.is_file():
             errors.append(f"módulo ops excluído vazou para o vendor: {leaked}")
+    for src, dst in VENDOR_DATA_FILES:
+        if not src.is_file():
+            errors.append(f"faltando fonte {src}")
+            continue
+        if not dst.is_file():
+            errors.append(f"faltando vendor data {dst}")
+            continue
+        if src.read_bytes() != dst.read_bytes():
+            errors.append(
+                f"defasado: {dst.relative_to(ROOT)} "
+                "(rode python scripts/sync_secure_vendor.py)"
+            )
     if errors:
         print("vendor sync FAILED:", file=sys.stderr)
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         return 1
-    n_files = sum(len(v) for v in VENDOR_PACKAGES.values())
+    n_files = sum(len(v) for v in VENDOR_PACKAGES.values()) + len(VENDOR_DATA_FILES)
     pkgs = ", ".join(VENDOR_PACKAGES)
-    print(f"vendor sync OK ({n_files} files in {pkgs})")
+    print(f"vendor sync OK ({n_files} files in {pkgs} + data catalog)")
     return 0
 
 

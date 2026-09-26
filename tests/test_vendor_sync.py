@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "sync_secure_vendor.py"
 VENDOR = ROOT / "saude_responsiva_secure" / "_vendor_src"
 SECURE_APP = ROOT / "saude_responsiva_secure" / "app"
+SECURE_DATA = ROOT / "saude_responsiva_secure" / "data"
 
 VENDORED_OPS = (
     "timestamps.py",
@@ -43,6 +44,7 @@ from src.ops.operational_patients import list_patients
 from src.ops.patients_routes import router as patients_router
 from src.ops.device_registry import upsert_frame
 from src.ops.live_devices import summarize_frame
+from src.clinical_intelligence.alert_ingest import assess_ingest_alerts, clear_classifier_cache
 
 assert callable(stamp_ingest)
 assert callable(upsert_frame)
@@ -94,6 +96,12 @@ payload = listed.json()
 assert payload.get("total") == 0
 assert payload.get("items") == []
 assert payload.get("patients") == []
+
+clear_classifier_cache()
+hypox = assess_ingest_alerts(heart_rate=85, spo2=88, skin_temp=33.0, phantom={})
+assert hypox["severity"] == "critico", hypox
+assert hypox["is_true_alert"] is True
+assert hypox.get("engine") == "alert_matrix_rules"
 print("secure-image-ops-ok")
 """
 
@@ -124,6 +132,8 @@ def test_secure_image_pythonpath_imports_ops_and_registers_patients(tmp_path):
     app_root = tmp_path / "app"
     shutil.copytree(VENDOR, app_root / "src")
     shutil.copytree(SECURE_APP, app_root / "app")
+    assert (SECURE_DATA / "models" / "next2u_expanded_matrix.json").is_file()
+    shutil.copytree(SECURE_DATA, app_root / "data")
     env = os.environ.copy()
     env["PYTHONPATH"] = str(app_root)
     env["ENVIRONMENT"] = "development"
