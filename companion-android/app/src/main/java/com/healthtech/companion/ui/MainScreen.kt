@@ -101,6 +101,8 @@ fun MainScreen(viewModel: MainViewModel) {
         ) {
             StatusCard(state)
 
+            state.authError?.takeIf { it.isNotBlank() }?.let { AuthErrorCard(it) }
+
             ConfigCard(state, viewModel)
 
             BleCard(state, viewModel)
@@ -151,6 +153,31 @@ private fun StatusCard(state: UiState) {
                     color = MaterialTheme.colorScheme.secondary,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun AuthErrorCard(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.18f),
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "Erro de autenticação",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }
@@ -287,7 +314,21 @@ private fun BleCard(state: UiState, viewModel: MainViewModel) {
                     }
                 }
             }
+            if (state.historySyncLine.isNotBlank()) {
+                Text(
+                    state.historySyncLine,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = viewModel::syncHistory,
+                    enabled = state.handshakeReady && !state.busy && !state.historySyncing,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(if (state.historySyncing) "Sync…" else "Histórico flash")
+                }
                 OutlinedButton(
                     onClick = viewModel::tryGattFallback,
                     enabled = state.connectedMac != null && !state.busy,
@@ -295,6 +336,8 @@ private fun BleCard(state: UiState, viewModel: MainViewModel) {
                 ) {
                     Text("GATT SIG")
                 }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = viewModel::toggleBleSimulator,
                     enabled = !state.busy,
