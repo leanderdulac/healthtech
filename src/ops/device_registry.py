@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 import threading
 import time
 from datetime import datetime, timezone
@@ -44,7 +45,9 @@ def is_synthetic_device(row: Dict[str, Any]) -> bool:
 
 MAX_DEVICES = 5000
 FLUSH_EVERY_SECONDS = 2.0
-LOCAL_FLEET_PATH = Path("data/ops/fleet_devices.json")
+# Local-dev default. Override with FLEET_DEVICES_PATH. On Cloud Run / production
+# the resolver prefers tempfile so a root-owned WORKDIR cannot break ingest.
+DEFAULT_LOCAL_FLEET_PATH = Path("data/ops/fleet_devices.json")
 GCS_OBJECT = "ops/fleet/devices.json"
 
 _lock = threading.Lock()
@@ -53,7 +56,30 @@ _dirty = False
 _last_flush = 0.0
 _loaded = False
 _last_load = 0.0
+_local_write_warned = False
 RELOAD_EVERY_SECONDS = 4.0
+
+
+def local_fleet_path() -> Path:
+    """Caminho do snapshot local da frota.
+
+    Precedência: ``FLEET_DEVICES_PATH`` → ``/tmp/ops/fleet_devices.json`` no
+    Cloud Run / production → ``data/ops/fleet_devices.json`` em dev local.
+    """
+    raw = (os.environ.get("FLEET_DEVICES_PATH") or "").strip()
+    if raw:
+        return Path(raw)
+    environment = (os.environ.get("ENVIRONMENT") or "").strip().lower()
+    on_cloud_run = bool(os.environ.get("K_SERVICE") or os.environ.get("K_REVISION"))
+    if on_cloud_run or environment in {"production", "prod", "staging"}:
+        return Path(tempfile.gettempdir()) / "ops" / "fleet_devices.json"
+    return DEFAULT_LOCAL_FLEET_PATH
+
+
+def __getattr__(name: str) -> Any:
+    if name == "LOCAL_FLEET_PATH":
+        return local_fleet_path()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _now() -> datetime:
@@ -112,9 +138,11 @@ def _load_unlocked(force: bool = False) -> None:
                 payload = json.loads(blob.download_as_text())
         except Exception as exc:
             logger.warning("Não foi possível ler a frota no GCS: %s", exc)
-    if payload is None and LOCAL_FLEET_PATH.exists():
+    if payload is None:
         try:
-            payload = json.loads(LOCAL_FLEET_PATH.read_text(encoding="utf-8"))
+            path = local_fleet_path()
+            if path.exists():
+                payload = json.loads(path.read_text(encoding="utf-8"))
         except Exception as exc:
             logger.warning("Não foi possível ler a frota local: %s", exc)
             payload = None
@@ -151,6 +179,20 @@ def _evict_unlocked() -> None:
         _devices.pop(device_id, None)
 
 
+def _write_local_fleet(text: str) -> None:
+    """Grava o snapshot local. Falha de mkdir/write não escapa nem bloqueia GCS."""
+    global _local_write_warned
+    path = local_fleet_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text + "\n", encoding="utf-8")
+        _local_write_warned = False
+    except Exception as exc:
+        if not _local_write_warned:
+            logger.warning("Falha ao gravar frota local: %s", exc)
+            _local_write_warned = True
+
+
 def _flush_unlocked(force: bool = False) -> None:
     global _dirty, _last_flush
     if not _dirty and not force:
@@ -168,11 +210,7 @@ def _flush_unlocked(force: bool = False) -> None:
         "devices": [_compact(row) for row in _devices.values()],
     }
     text = json.dumps(snapshot, ensure_ascii=False)
-    LOCAL_FLEET_PATH.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        LOCAL_FLEET_PATH.write_text(text + "\n", encoding="utf-8")
-    except Exception as exc:
-        logger.warning("Falha ao gravar frota local: %s", exc)
+    _write_local_fleet(text)
     bucket_name, object_name = _gcs_parts()
     if bucket_name:
         try:
@@ -320,6 +358,8 @@ def merge_remote_rows(rows: List[Dict[str, Any]]) -> None:
 def clear_all() -> None:
     with _lock:
         _devices.clear()
-        global _dirty, _loaded
+        global _dirty, _loaded, _last_flush, _local_write_warned
         _dirty = False
         _loaded = True
+        _last_flush = 0.0
+        _local_write_warned = False
