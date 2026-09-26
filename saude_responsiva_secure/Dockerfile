@@ -24,6 +24,8 @@ ENV ENVIRONMENT=production
 ENV AUTH_DISABLED=false
 ENV APP_MODE=secure
 ENV PYTHONPATH=/app
+# /app é root-owned; appuser (uid 10001) não consegue mkdir data/. Prefer /tmp.
+ENV FLEET_DEVICES_PATH=/tmp/ops/fleet_devices.json
 
 COPY --chown=appuser:appuser app/ /app/app/
 COPY --chown=appuser:appuser migrations/ /app/migrations/
@@ -33,6 +35,9 @@ COPY --chown=appuser:appuser requirements.txt /app/
 #   ops — timestamps, patients_routes, operational_patients, live_devices, device_registry
 # Fonte local: _vendor_src/ (evita sombrear monorepo `src/` no PYTHONPATH do host)
 COPY --chown=appuser:appuser _vendor_src/ /app/src/
+
+# Harmless fallback if FLEET_DEVICES_PATH is unset and code uses data/ops/.
+RUN mkdir -p /app/data && chown appuser:appuser /app/data
 
 USER appuser
 
