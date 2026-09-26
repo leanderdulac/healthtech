@@ -8,14 +8,38 @@ depois, em next2u_promotion — aqui só o padrão original.
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.clinical_intelligence.alert_matrix_rules import VitalSnapshot, _ge, _in, _le
 
+logger = logging.getLogger(__name__)
+
 Pred = Callable[[VitalSnapshot], bool]
 STAR_SEV = {1: "leve", 2: "moderado", 3: "critico"}
+DEFAULT_MATRIX_NAME = "next2u_expanded_matrix.json"
+
+
+def expanded_matrix_path(catalog_path: Optional[Path | str] = None) -> Path:
+    """Localiza o catálogo 971 padrões (repo, imagem secure ou env)."""
+    if catalog_path is not None:
+        return Path(catalog_path)
+    env = (os.getenv("NEXT2U_EXPANDED_MATRIX_PATH") or "").strip()
+    if env:
+        return Path(env)
+    here = Path(__file__).resolve()
+    candidates = [
+        Path("/app/data/models") / DEFAULT_MATRIX_NAME,
+        Path("data/models") / DEFAULT_MATRIX_NAME,
+        here.parents[2] / "data" / "models" / DEFAULT_MATRIX_NAME,
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return Path("data/models") / DEFAULT_MATRIX_NAME
 PROFILE_CAT = {
     1: "pa_alta",
     2: "pa_baixa",
@@ -463,8 +487,15 @@ def _short_name(suggested: str) -> str:
 
 
 def load_base_meta(catalog_path: Optional[Path] = None) -> Dict[int, Dict[str, Any]]:
-    path = catalog_path or Path("data/models/next2u_expanded_matrix.json")
-    cat = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"patterns": []}
+    path = expanded_matrix_path(catalog_path)
+    if not path.is_file():
+        logger.warning(
+            "next2u_catalog=missing path=%s — estrelas/nomes caem para 1★/leve",
+            path,
+        )
+        cat: Dict[str, Any] = {"patterns": []}
+    else:
+        cat = json.loads(path.read_text(encoding="utf-8"))
     meta: Dict[int, Dict[str, Any]] = {}
     for p in cat.get("patterns", []):
         b = int(p["base_id"])

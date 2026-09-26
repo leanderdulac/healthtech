@@ -23,6 +23,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from src.clinical_intelligence.next2u_bases import expanded_matrix_path
 from src.clinical_intelligence.next2u_context import (
     RULE_TO_NEXT2U,
     PatientContext,
@@ -60,7 +61,7 @@ DEFAULT_CATALOG = Path("data/models/next2u_expanded_matrix.json")
 
 @lru_cache(maxsize=1)
 def load_catalog(path: Optional[str] = None) -> Dict[str, Any]:
-    p = Path(path) if path else DEFAULT_CATALOG
+    p = Path(path) if path else expanded_matrix_path()
     if not p.exists():
         return {"patterns": [], "n_expanded_patterns": 0}
     return json.loads(p.read_text(encoding="utf-8"))
