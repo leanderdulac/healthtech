@@ -40,6 +40,11 @@ COPY --chown=appuser:appuser requirements.txt /app/
 #   ops — timestamps, patients_routes, operational_patients, live_devices, device_registry
 # Fonte local: _vendor_src/ (evita sombrear monorepo `src/` no PYTHONPATH do host)
 COPY --chown=appuser:appuser _vendor_src/ /app/src/
+# Catálogo Next2U real (158 alertas-base / 971 padrões, versão 2026-08-16):
+# estrelas, nomes e perfis das regras. Caminho = o que load_base_meta() lê
+# relativo ao WORKDIR (/app). Sem ele as 158 regras caem para 1★/leve.
+# Só o JSON — sem modelo ML / pandas / scikit-learn.
+COPY --chown=appuser:appuser data/models/next2u_expanded_matrix.json /app/data/models/next2u_expanded_matrix.json
 
 # Harmless fallback if FLEET_DEVICES_PATH is unset and code uses data/ops/.
 RUN mkdir -p /app/data && chown appuser:appuser /app/data
@@ -49,6 +54,9 @@ USER appuser
 # Falha o build se o vendor não incluir o src.ops usado em ingest + /patients,
 # ou se google-cloud-storage (frota → GCS) faltar em requirements.txt.
 RUN python -c "from src.ops.timestamps import stamp_ingest; from src.ops.patients_routes import router; from src.ops.device_registry import upsert_frame; from google.cloud import storage; assert stamp_ingest and router.routes and upsert_frame and storage.Client"
+
+# Falha o build se o catálogo Next2U não estiver na imagem ou não for o real.
+RUN python -c "from src.clinical_intelligence.alert_matrix_rules import ALERT_RULES; from src.clinical_intelligence.next2u_bases import load_base_meta; m = load_base_meta(); assert len(m) == 158, len(m); assert m[34]['base_stars'] == 3 and m[34]['profile_id'] == 3; assert sum(r['name'].startswith('Possível padrão clínico') for r in ALERT_RULES) == 0"
 
 EXPOSE 8080
 
