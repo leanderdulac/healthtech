@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -95,18 +94,36 @@ def _opt_float(value: Any) -> Optional[float]:
         return None
 
 
-# Mesmo flag de src.clinical_intelligence.alert_ingest.PHANTOM_VITALS_ENV.
-_PHANTOM_VITALS_ENV = "ALERT_ALLOW_PHANTOM_VITALS"
+def _ensure_monorepo_path() -> None:
+    """Garantir monorepo (src/) no path quando a API secure roda na raiz."""
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
 
 
 def _phantom_vitals_enabled() -> bool:
-    return str(os.getenv(_PHANTOM_VITALS_ENV, "")).strip().lower() in {"1", "true", "yes", "on"}
+    """Guard único em src.clinical_intelligence.alert_ingest (fail-closed).
+
+    Exige ALERT_ALLOW_PHANTOM_VITALS=1 + ENVIRONMENT dev explícito e nunca
+    roda no Cloud Run/produção. Qualquer falha de import → desligado.
+    """
+    try:
+        _ensure_monorepo_path()
+        from src.clinical_intelligence.alert_ingest import phantom_vitals_enabled
+
+        return bool(phantom_vitals_enabled())
+    except Exception:
+        return False
 
 
 def _phantom_estimates(bpm_clean: float, hrv: float, skin: float, activity: float) -> Dict[str, Any]:
     """Phantom simplificado (DEMO) — estimativas heurísticas, não medidas.
 
-    Só usado com opt-in explícito ALERT_ALLOW_PHANTOM_VITALS=1. Produção usa
+    Só usado com opt-in explícito ALERT_ALLOW_PHANTOM_VITALS=1 em ambiente dev
+    explícito (nunca produção/Cloud Run). Produção usa
     Kalman no monólito; o ingest secure nunca envia isto à matriz por padrão.
     """
     map_est = 70.0 + (bpm_clean - 70.0) * 0.3 + (skin - 33.0) * 2.0
@@ -153,7 +170,8 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Processa uma leitura de wearable (denoising + anomalia local + matriz).
 
     Nunca inventa vitais: sinais ausentes seguem None até a matriz de alertas
-    (desconhecido ≠ valor). Phantom/simulação só com ALERT_ALLOW_PHANTOM_VITALS=1.
+    (desconhecido ≠ valor). Phantom/simulação só com ALERT_ALLOW_PHANTOM_VITALS=1
+    E ambiente dev explícito; em produção/Cloud Run é impossível.
     """
     hr = float(payload["heart_rate"])
     hrv = _opt_float(payload.get("hrv_rmssd"))
@@ -211,13 +229,7 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
     body_temp = _opt_float(payload.get("body_temp_c"))
     temp_for_matrix = body_temp if body_temp is not None else skin
     try:
-        # Garantir monorepo no path quando a API secure roda na raiz
-        import sys
-        from pathlib import Path
-
-        root = Path(__file__).resolve().parents[3]
-        if str(root) not in sys.path:
-            sys.path.insert(0, str(root))
+        _ensure_monorepo_path()
 
         from src.clinical_intelligence.alert_ingest import (
             assess_ingest_alerts,

@@ -27,13 +27,94 @@ _MODEL_DIR = Path(os.getenv("ALERT_MATRIX_MODEL_DIR", "data/models"))
 # aceita PA/glicose estimadas (phantom/simulação) e os defaults legados de
 # sono/passos/FC-basal. Sem o flag, a matriz avalia APENAS vitais medidos:
 # sinal ausente = desconhecido (None), nunca um valor inventado.
+#
+# Isolamento (revisão Rafael, PR #22): o modo phantom exige AMBOS
+#   1) ALERT_ALLOW_PHANTOM_VITALS=1, e
+#   2) ambiente de desenvolvimento explícito (ENVIRONMENT / APP_ENV em
+#      PHANTOM_DEV_ENVIRONMENTS; nenhum dos dois pode indicar produção),
+# e NUNCA roda no Cloud Run (K_SERVICE / K_REVISION / K_CONFIGURATION /
+# CLOUD_RUN_JOB). Fora disso o flag e o parâmetro allow_phantom_vitals=True
+# são ignorados e um WARNING é emitido uma vez por processo/motivo.
 PHANTOM_VITALS_ENV = "ALERT_ALLOW_PHANTOM_VITALS"
 _TRUTHY = {"1", "true", "yes", "on"}
+PHANTOM_ENVIRONMENT_VARS = ("ENVIRONMENT", "APP_ENV")
+PHANTOM_DEV_ENVIRONMENTS = frozenset({"development", "dev", "local", "test", "testing"})
+_PRODUCTION_ENVIRONMENTS = frozenset({"production", "prod", "staging"})
+_CLOUD_RUN_ENV_MARKERS = ("K_SERVICE", "K_REVISION", "K_CONFIGURATION", "CLOUD_RUN_JOB")
+_phantom_block_warned: set = set()
 
 
-def phantom_vitals_enabled() -> bool:
-    """True só se o operador ligou explicitamente a simulação (demo)."""
+def phantom_vitals_flag_set() -> bool:
+    """True se ALERT_ALLOW_PHANTOM_VITALS está ligado (não basta para ativar)."""
     return str(os.getenv(PHANTOM_VITALS_ENV, "")).strip().lower() in _TRUTHY
+
+
+def phantom_vitals_block_reason() -> Optional[str]:
+    """Motivo pelo qual o ambiente NÃO autoriza phantom; None se autorizado.
+
+    Fail-closed: Cloud Run, produção/staging, ambiente ausente ou qualquer
+    valor fora de PHANTOM_DEV_ENVIRONMENTS bloqueiam.
+    """
+    for marker in _CLOUD_RUN_ENV_MARKERS:
+        if str(os.getenv(marker, "")).strip():
+            return f"cloud_run({marker})"
+    envs = {}
+    for name in PHANTOM_ENVIRONMENT_VARS:
+        value = str(os.getenv(name, "")).strip().lower()
+        if value:
+            envs[name] = value
+    if not envs:
+        return "environment_unset"
+    for name, value in envs.items():
+        if value in _PRODUCTION_ENVIRONMENTS:
+            return f"production({name}={value})"
+    for name, value in envs.items():
+        if value not in PHANTOM_DEV_ENVIRONMENTS:
+            return f"environment_not_dev({name}={value})"
+    return None
+
+
+def _warn_phantom_blocked(reason: str, requested_via: str) -> None:
+    key = (reason, requested_via)
+    if key in _phantom_block_warned:
+        return
+    _phantom_block_warned.add(key)
+    logger.warning(
+        "phantom_vitals=blocked reason=%s requested_via=%s — estimativas "
+        "(PA/glicose phantom, defaults sono/passos/FC-basal) DESATIVADAS; "
+        "%s=1 só vale junto com ENVIRONMENT de dev explícito (%s) e fora do Cloud Run.",
+        reason,
+        requested_via,
+        PHANTOM_VITALS_ENV,
+        ",".join(sorted(PHANTOM_DEV_ENVIRONMENTS)),
+    )
+
+
+def reset_phantom_guard_warnings() -> None:
+    """Uso em testes: permite observar de novo o WARNING único."""
+    _phantom_block_warned.clear()
+
+
+def phantom_vitals_enabled(requested: Optional[bool] = None) -> bool:
+    """Decide (fail-closed) se o modo phantom/demo pode rodar.
+
+    requested=None → segue o flag; requested=False → sempre desligado;
+    requested=True → ainda exige flag + dev explícito (o parâmetro sozinho
+    não liga nada e é ignorado em produção/Cloud Run).
+    """
+    if requested is False:
+        return False
+    flag = phantom_vitals_flag_set()
+    if not flag and not requested:
+        return False  # ninguém pediu phantom: caminho normal, sem log
+    requested_via = "param" if requested else "env"
+    reason = phantom_vitals_block_reason()
+    if reason is None and not flag:
+        reason = f"flag_{PHANTOM_VITALS_ENV}_not_set"
+    if reason is not None:
+        _warn_phantom_blocked(reason, requested_via)
+        return False
+    return True
 
 
 @lru_cache(maxsize=1)
@@ -87,12 +168,13 @@ def vitals_from_ingest_context(
     Padrão: só vitais efetivamente presentes na leitura. Sinal ausente fica
     None (desconhecido) e regras que dependem dele não disparam.
 
-    allow_phantom_vitals=True (ou env ALERT_ALLOW_PHANTOM_VITALS=1) reativa o
-    modo demo legado: PA/glicose phantom entram se reliable=True (ou
-    use_unreliable_phantom) e sono/passos/FC-basal recebem defaults.
+    Modo demo legado (PA/glicose phantom se reliable=True ou
+    use_unreliable_phantom; defaults de sono/passos/FC-basal) só roda com
+    ALERT_ALLOW_PHANTOM_VITALS=1 E ambiente dev explícito fora do Cloud Run
+    (ver phantom_vitals_enabled). allow_phantom_vitals=True não basta.
     """
-    if allow_phantom_vitals is None:
-        allow_phantom_vitals = phantom_vitals_enabled()
+    # Guard central: em produção/Cloud Run o parâmetro é ignorado (fail-closed).
+    allow_phantom_vitals = phantom_vitals_enabled(allow_phantom_vitals)
     hband = hband_ext or {}
     raw = raw_telemetry or {}
     ph = (phantom or {}) if allow_phantom_vitals else {}
@@ -267,6 +349,85 @@ def vitals_present(vitals: VitalSnapshot) -> Dict[str, Optional[float]]:
     return {k: getattr(vitals, k) for k in _PRESENT_VITAL_FIELDS}
 
 
+# Campos do vitals_used legado (to_feature_dict, 22 chaves) que saíram na
+# PR #22. Aqui voltam SEM imputação: só valor derivado de dado efetivamente
+# enviado pelo cliente (ou medido); caso contrário None. Ver
+# docs/contracts/INGEST_VITALS_USED_CONTRACT.md.
+CONTEXT_INFORMED_FIELDS = (
+    "consciousness_altered",
+    "map_approx",
+    "pulse_pressure",
+    "consecutive_valid",
+    "rest",
+    "fasting",
+    "steps_interrupted",
+    "sleep_hours",
+    "steps_drop_days",
+    "pas_rise_vs_basal",
+    "pas_drop_vs_basal",
+    "glucose_delta",
+)
+
+
+def _has_any(sources: Tuple[Dict[str, Any], ...], *keys: str) -> bool:
+    return any(src.get(k) is not None for src in sources for k in keys)
+
+
+def context_informed(
+    vitals: VitalSnapshot,
+    meta: Dict[str, Any],
+    *,
+    hband_ext: Optional[Dict[str, Any]] = None,
+    raw_telemetry: Optional[Dict[str, Any]] = None,
+    activity_level: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Contexto informado pelo cliente que a matriz usou — nunca imputado.
+
+    PA/glicose só contam se bp_source/glucose_source == "measured" (phantom
+    nunca aparece aqui, nem no modo demo).
+    """
+    hband = hband_ext or {}
+    raw = raw_telemetry or {}
+    srcs = (raw, hband)
+    bp_measured = meta.get("bp_source") == "measured"
+    glu_measured = meta.get("glucose_source") == "measured"
+    both_bp = bp_measured and vitals.pas is not None and vitals.pad is not None
+
+    prev = raw.get("previous_reading") or raw.get("previous_vitals")
+    has_prev = isinstance(prev, dict) and bool(prev)
+
+    def rounded(v: Optional[float]) -> Optional[float]:
+        return None if v is None else round(float(v), 2)
+
+    rest_informed = _has_any(srcs, "rest") or activity_level is not None
+    return {
+        "consciousness_altered": (
+            bool(vitals.consciousness_altered)
+            if _has_any(srcs, "consciousness_altered")
+            else None
+        ),
+        "map_approx": rounded((vitals.pas + 2 * vitals.pad) / 3.0) if both_bp else None,
+        "pulse_pressure": rounded(vitals.pas - vitals.pad) if both_bp else None,
+        "consecutive_valid": int(vitals.consecutive_valid or 1) if has_prev else None,
+        "rest": bool(vitals.rest) if rest_informed else None,
+        "fasting": (
+            bool(vitals.fasting) if _has_any(srcs, "fasting", "preprandial") else None
+        ),
+        "steps_interrupted": (
+            bool(vitals.steps_interrupted)
+            if _has_any(srcs, "steps_interrupted", "fall_suspected")
+            else None
+        ),
+        "sleep_hours": vitals.sleep_hours,
+        "steps_drop_days": (
+            int(vitals.steps_drop_days or 0) if _has_any(srcs, "steps_drop_days") else None
+        ),
+        "pas_rise_vs_basal": rounded(vitals.pas_rise()) if bp_measured else None,
+        "pas_drop_vs_basal": rounded(vitals.pas_drop()) if bp_measured else None,
+        "glucose_delta": rounded(vitals.glucose_delta()) if glu_measured else None,
+    }
+
+
 def _apply_discrepancy(full: Dict[str, Any], vitals: VitalSnapshot, meta: Dict[str, Any]) -> Dict[str, Any]:
     disc = evaluate_discrepancy(
         vitals,
@@ -403,6 +564,15 @@ def assess_ingest_alerts(
         # Sem imputação: só o que foi medido (ausente → None). Features do ML
         # (com defaults de treino) ficam fora da resposta.
         "vitals_used": vitals_present(vitals),
+        # Contexto informado (sem imputação) dos 12 campos que saíram do
+        # vitals_used legado — ausente/não enviado → None.
+        "context_informed": context_informed(
+            vitals,
+            meta,
+            hband_ext=hband_ext,
+            raw_telemetry=raw_telemetry,
+            activity_level=activity_level,
+        ),
         "ml": full.get("ml"),
         "discrepancy": full.get("discrepancy"),
         "source_meta": full.get("source_meta") or meta,
