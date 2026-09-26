@@ -66,6 +66,10 @@ LEGACY_PHANTOM = {
 @pytest.fixture(autouse=True)
 def _phantom_flag_off(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(PHANTOM_VITALS_ENV, raising=False)
+    # Ambiente dev explícito e fora do Cloud Run (o guard é fail-closed).
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    for var in ("APP_ENV", "K_SERVICE", "K_REVISION", "K_CONFIGURATION", "CLOUD_RUN_JOB"):
+        monkeypatch.delenv(var, raising=False)
 
 
 @pytest.fixture
