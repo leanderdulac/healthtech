@@ -58,6 +58,7 @@ _loaded = False
 _last_load = 0.0
 _local_write_warned = False
 _local_write_logged = False
+_gcs_write_warned = False
 _gcs_write_logged = False
 RELOAD_EVERY_SECONDS = 4.0
 
@@ -191,19 +192,19 @@ def _write_local_fleet(text: str) -> None:
         _local_write_warned = False
         if not _local_write_logged:
             logger.info(
-                "Frota gravada localmente: %s (%s devices)",
+                "fleet_local_write=ok path=%s count=%s",
                 path,
                 len(_devices),
             )
             _local_write_logged = True
     except Exception as exc:
         if not _local_write_warned:
-            logger.warning("Falha ao gravar frota local: %s", exc)
+            logger.warning("fleet_local_write=failed path=%s error=%s", path, exc)
             _local_write_warned = True
 
 
 def _flush_unlocked(force: bool = False) -> None:
-    global _dirty, _last_flush, _gcs_write_logged
+    global _dirty, _last_flush, _gcs_write_logged, _gcs_write_warned
     if not _dirty and not force:
         return
     now = time.time()
@@ -222,22 +223,25 @@ def _flush_unlocked(force: bool = False) -> None:
     _write_local_fleet(text)
     bucket_name, object_name = _gcs_parts()
     if bucket_name:
+        gcs_uri = f"gs://{bucket_name}/{object_name}"
         try:
             from google.cloud import storage  # type: ignore
 
             client = storage.Client()
             blob = client.bucket(bucket_name).blob(object_name)
             blob.upload_from_string(text, content_type="application/json")
+            _gcs_write_warned = False
             if not _gcs_write_logged:
                 logger.info(
-                    "Frota gravada no GCS: gs://%s/%s (%s devices)",
-                    bucket_name,
-                    object_name,
+                    "fleet_gcs_upload=ok %s count=%s",
+                    gcs_uri,
                     snapshot["count"],
                 )
                 _gcs_write_logged = True
         except Exception as exc:
-            logger.warning("Falha ao gravar frota no GCS: %s", exc)
+            if not _gcs_write_warned:
+                logger.warning("fleet_gcs_upload=failed %s error=%s", gcs_uri, exc)
+                _gcs_write_warned = True
     _dirty = False
     _last_flush = now
 
@@ -376,10 +380,11 @@ def clear_all() -> None:
     with _lock:
         _devices.clear()
         global _dirty, _loaded, _last_flush, _local_write_warned
-        global _local_write_logged, _gcs_write_logged
+        global _local_write_logged, _gcs_write_warned, _gcs_write_logged
         _dirty = False
         _loaded = True
         _last_flush = 0.0
         _local_write_warned = False
         _local_write_logged = False
+        _gcs_write_warned = False
         _gcs_write_logged = False

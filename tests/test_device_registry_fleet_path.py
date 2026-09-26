@@ -33,10 +33,19 @@ from src.ops import device_registry as dr  # noqa: E402
 INGEST_HEADERS = {"X-API-Key": "ht_ingest_test_key_32chars_long_token"}
 FLEET_LOGGER = "src.ops.device_registry"
 REGISTER_WARNING = "Falha ao registrar relógio na frota"
-LOCAL_WARNING = "Falha ao gravar frota local"
-LOCAL_SUCCESS = "Frota gravada localmente"
-GCS_SUCCESS = "Frota gravada no GCS"
+LOCAL_OK = "fleet_local_write=ok"
+LOCAL_FAILED = "fleet_local_write=failed"
+GCS_OK = "fleet_gcs_upload=ok"
+GCS_FAILED = "fleet_gcs_upload=failed"
 SECURE_REQUIREMENTS = SECURE / "requirements.txt"
+
+
+def _fleet_messages(caplog, needle: str) -> list[str]:
+    return [
+        rec.getMessage()
+        for rec in caplog.records
+        if rec.name == FLEET_LOGGER and needle in rec.getMessage()
+    ]
 
 
 def _enable_flush(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -155,8 +164,11 @@ def test_non_writable_path_ingest_accepted_warning_throttled(
 
     messages = [rec.getMessage() for rec in caplog.records]
     assert not any(REGISTER_WARNING in msg for msg in messages)
-    local_warnings = [msg for msg in messages if LOCAL_WARNING in msg]
-    assert len(local_warnings) == 1
+    local_failures = [msg for msg in messages if LOCAL_FAILED in msg]
+    assert len(local_failures) == 1
+    assert str(target) in local_failures[0]
+    assert not any(LOCAL_OK in msg for msg in messages)
+    assert not any(GCS_OK in msg or GCS_FAILED in msg for msg in messages)
     assert not target.exists()
 
 
@@ -195,6 +207,35 @@ def test_gcs_upload_attempted_after_local_failure(monkeypatch, tmp_path):
     assert not target.exists()
 
 
+def test_local_failed_and_gcs_ok_logs_distinct_outcomes_once(
+    monkeypatch, tmp_path, caplog
+):
+    """Local failure must not be confused with a later GCS success on the same flush."""
+    blocked = tmp_path / "blocked"
+    blocked.write_text("not-a-directory\n", encoding="utf-8")
+    target = blocked / "ops" / "fleet_devices.json"
+    monkeypatch.setenv("FLEET_DEVICES_PATH", str(target))
+    monkeypatch.setenv("GCS_STAGING_BUCKET", "gs://healthtech-gcp-2026-vertex-staging")
+    _enable_flush(monkeypatch)
+    blob = _install_fake_storage(monkeypatch)
+
+    with caplog.at_level(logging.INFO, logger=FLEET_LOGGER):
+        dr.upsert_frame(_frame("VE30-FLEET-MIX-1"))
+        dr.upsert_frame(_frame("VE30-FLEET-MIX-2"))
+
+    assert blob.upload_from_string.call_count == 2
+    local_failed = _fleet_messages(caplog, LOCAL_FAILED)
+    gcs_ok = _fleet_messages(caplog, GCS_OK)
+    assert len(local_failed) == 1
+    assert str(target) in local_failed[0]
+    assert len(gcs_ok) == 1
+    assert "gs://healthtech-gcp-2026-vertex-staging/ops/fleet/devices.json" in gcs_ok[0]
+    assert "count=1" in gcs_ok[0]
+    assert not _fleet_messages(caplog, LOCAL_OK)
+    assert not _fleet_messages(caplog, GCS_FAILED)
+    assert not target.exists()
+
+
 def test_successful_local_write_logs_info_once(monkeypatch, tmp_path, caplog):
     path = tmp_path / "ops" / "fleet_devices.json"
     monkeypatch.setenv("FLEET_DEVICES_PATH", str(path))
@@ -205,14 +246,13 @@ def test_successful_local_write_logs_info_once(monkeypatch, tmp_path, caplog):
         dr.upsert_frame(_frame("VE30-FLEET-LOG-1"))
         dr.upsert_frame(_frame("VE30-FLEET-LOG-2"))
 
-    hits = [
-        rec.getMessage()
-        for rec in caplog.records
-        if rec.name == FLEET_LOGGER and LOCAL_SUCCESS in rec.getMessage()
-    ]
+    hits = _fleet_messages(caplog, LOCAL_OK)
     assert len(hits) == 1
-    assert str(path) in hits[0]
-    assert "1 devices" in hits[0]
+    assert f"path={path}" in hits[0]
+    assert "count=1" in hits[0]
+    assert not _fleet_messages(caplog, LOCAL_FAILED)
+    assert not _fleet_messages(caplog, GCS_OK)
+    assert not _fleet_messages(caplog, GCS_FAILED)
     assert path.is_file()
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["count"] == 2
@@ -230,18 +270,45 @@ def test_successful_gcs_upload_logs_info_once(monkeypatch, tmp_path, caplog):
         dr.upsert_frame(_frame("VE30-FLEET-GCS-LOG-2"))
 
     assert blob.upload_from_string.call_count == 2
-    hits = [
-        rec.getMessage()
-        for rec in caplog.records
-        if rec.name == FLEET_LOGGER and GCS_SUCCESS in rec.getMessage()
-    ]
-    assert len(hits) == 1
-    assert "gs://healthtech-gcp-2026-vertex-staging/ops/fleet/devices.json" in hits[0]
-    assert "1 devices" in hits[0]
-    lowered = hits[0].lower()
+    local_ok = _fleet_messages(caplog, LOCAL_OK)
+    gcs_ok = _fleet_messages(caplog, GCS_OK)
+    assert len(local_ok) == 1
+    assert f"path={path}" in local_ok[0]
+    assert "count=1" in local_ok[0]
+    assert len(gcs_ok) == 1
+    assert "gs://healthtech-gcp-2026-vertex-staging/ops/fleet/devices.json" in gcs_ok[0]
+    assert "count=1" in gcs_ok[0]
+    lowered = gcs_ok[0].lower()
     assert "credential" not in lowered
     assert "token" not in lowered
     assert "key" not in lowered
+    assert not _fleet_messages(caplog, LOCAL_FAILED)
+    assert not _fleet_messages(caplog, GCS_FAILED)
+
+
+def test_gcs_upload_failure_logs_once(monkeypatch, tmp_path, caplog):
+    path = tmp_path / "ops" / "fleet_devices.json"
+    monkeypatch.setenv("FLEET_DEVICES_PATH", str(path))
+    monkeypatch.setenv("GCS_STAGING_BUCKET", "gs://fleet-fail-bucket")
+    _enable_flush(monkeypatch)
+
+    blob = _install_fake_storage(monkeypatch)
+    blob.upload_from_string.side_effect = RuntimeError("simulated-gcs-denied")
+
+    with caplog.at_level(logging.INFO, logger=FLEET_LOGGER):
+        dr.upsert_frame(_frame("VE30-FLEET-GCS-FAIL-1"))
+        dr.upsert_frame(_frame("VE30-FLEET-GCS-FAIL-2"))
+
+    assert blob.upload_from_string.call_count == 2
+    local_ok = _fleet_messages(caplog, LOCAL_OK)
+    gcs_failed = _fleet_messages(caplog, GCS_FAILED)
+    assert len(local_ok) == 1
+    assert f"path={path}" in local_ok[0]
+    assert len(gcs_failed) == 1
+    assert "gs://fleet-fail-bucket/ops/fleet/devices.json" in gcs_failed[0]
+    assert "simulated-gcs-denied" in gcs_failed[0]
+    assert not _fleet_messages(caplog, GCS_OK)
+    assert not _fleet_messages(caplog, LOCAL_FAILED)
 
 
 def test_secure_requirements_pins_google_cloud_storage():
