@@ -7,11 +7,13 @@ Mapeia telemetria + phantom/estimativas → VitalSnapshot → AlertMatrixClassif
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
 
 from src.clinical_intelligence.alert_discrepancy import evaluate_discrepancy
 from src.clinical_intelligence.alert_matrix_rules import (
@@ -21,30 +23,235 @@ from src.clinical_intelligence.alert_matrix_rules import (
 
 logger = logging.getLogger(__name__)
 
-_MODEL_DIR = Path(os.getenv("ALERT_MATRIX_MODEL_DIR", "data/models"))
+_DEFAULT_MODEL_REL = Path("data/models") / "alert_matrix_classifier.pkl"
+_DEFAULT_PROVENANCE = "synthetic-unvalidated"
+_SEV_RANK = {"none": 0, "leve": 1, "moderado": 2, "critico": 3}
+_DISCREPANCY_DECISIONS = {"suppressed_sample_discrepancy"}
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def alert_ml_enabled() -> bool:
+    """Piloto Next2U: ML desligado por omissão (só regras)."""
+    return _env_flag("ALERT_ML_ENABLED", False)
+
+
+def alert_ml_allow_suppress() -> bool:
+    return _env_flag("ALERT_ML_ALLOW_SUPPRESS", False)
+
+
+def alert_ml_allow_soft_alert() -> bool:
+    return _env_flag("ALERT_ML_ALLOW_SOFT_ALERT", False)
+
+
+def resolve_model_spec() -> str:
+    """ALERT_MATRIX_MODEL_PATH (ficheiro ou gs://) ou dir + nome padrão."""
+    explicit = (os.getenv("ALERT_MATRIX_MODEL_PATH") or "").strip()
+    if explicit:
+        return explicit
+    model_dir = (os.getenv("ALERT_MATRIX_MODEL_DIR") or "data/models").strip()
+    return str(Path(model_dir) / "alert_matrix_classifier.pkl")
+
+
+def _cache_dir() -> Path:
+    return Path(os.getenv("ALERT_ML_CACHE_DIR") or "/tmp/alert_matrix_cache")
+
+
+def _download_gcs_uri(uri: str) -> Path:
+    """Baixa gs://bucket/blob para cache local. Requer google-cloud-storage."""
+    parsed = urlparse(uri)
+    if parsed.scheme != "gs" or not parsed.netloc or not parsed.path.lstrip("/"):
+        raise ValueError(f"URI GCS inválida: {uri}")
+    bucket_name = parsed.netloc
+    blob_name = parsed.path.lstrip("/")
+    dest = _cache_dir() / bucket_name / blob_name
+    if dest.is_file() and dest.stat().st_size > 0:
+        logger.info("alert_ml cache hit path=%s", dest)
+        return dest
+    try:
+        from google.cloud import storage  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError(
+            "gcs_client_unavailable: instale google-cloud-storage "
+            "ou use um caminho local em ALERT_MATRIX_MODEL_PATH"
+        ) from exc
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    client = storage.Client()
+    client.bucket(bucket_name).blob(blob_name).download_to_filename(str(dest))
+    if not dest.is_file() or dest.stat().st_size <= 0:
+        raise RuntimeError(f"download GCS vazio: {uri}")
+    logger.info("alert_ml cached gs://%s/%s -> %s", bucket_name, blob_name, dest)
+    return dest
+
+
+def materialize_model_path(spec: str) -> Path:
+    """Resolve spec local ou gs:// para um ficheiro .pkl no disco."""
+    if spec.startswith("gs://"):
+        return _download_gcs_uri(spec)
+    path = Path(spec)
+    if path.is_dir():
+        return path / "alert_matrix_classifier.pkl"
+    return path
+
+
+def _model_version(local_path: Path, clf: Any) -> str:
+    env_v = (os.getenv("ALERT_ML_MODEL_VERSION") or "").strip()
+    if env_v:
+        return env_v
+    meta_path = local_path.parent / "alert_matrix_classifier_meta.json"
+    if meta_path.is_file():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            for key in ("version", "model_version"):
+                if meta.get(key):
+                    return str(meta[key])
+        except Exception:
+            pass
+    metrics = getattr(clf, "metrics_", None) or {}
+    if isinstance(metrics, dict) and metrics.get("version"):
+        return str(metrics["version"])
+    return (os.getenv("ALERT_ML_PROVENANCE") or _DEFAULT_PROVENANCE).strip() or _DEFAULT_PROVENANCE
 
 
 @lru_cache(maxsize=1)
-def _load_classifier():
-    """Lazy load do classificador treinado; None se indisponível."""
+def get_alert_ml_state() -> Dict[str, Any]:
+    """Carrega o classificador uma vez e emite a linha de estado do startup."""
+    spec = resolve_model_spec()
+    if not alert_ml_enabled():
+        logger.info("alert_ml=disabled reason=ALERT_ML_ENABLED=false")
+        return {
+            "classifier": None,
+            "enabled": False,
+            "reason": "ALERT_ML_ENABLED=false",
+            "model": spec,
+            "version": "",
+        }
     try:
+        local = materialize_model_path(spec)
+        if not local.is_file():
+            reason = f"model_missing path={local}"
+            logger.warning("alert_ml=disabled reason=%s", reason)
+            return {
+                "classifier": None,
+                "enabled": False,
+                "reason": reason,
+                "model": str(local),
+                "version": "",
+            }
         from src.clinical_intelligence.alert_matrix_classifier import AlertMatrixClassifier
 
-        pkl = _MODEL_DIR / "alert_matrix_classifier.pkl"
-        if not pkl.exists():
-            logger.warning(
-                "Modelo de matriz de alertas não encontrado em %s — usando só regras.",
-                pkl,
-            )
-            return None
-        return AlertMatrixClassifier.load(_MODEL_DIR)
+        clf = AlertMatrixClassifier.load(local)
+        version = _model_version(local, clf)
+        logger.info("alert_ml=enabled model=%s version=%s", local, version)
+        return {
+            "classifier": clf,
+            "enabled": True,
+            "reason": "",
+            "model": str(local),
+            "version": version,
+        }
     except Exception as exc:
-        logger.warning("Falha ao carregar AlertMatrixClassifier: %s", exc)
-        return None
+        reason = f"load_failed: {exc}"
+        logger.warning("alert_ml=disabled reason=%s", reason)
+        return {
+            "classifier": None,
+            "enabled": False,
+            "reason": reason,
+            "model": spec,
+            "version": "",
+        }
+
+
+def _load_classifier():
+    """Lazy load do classificador treinado; None se flag off ou indisponível."""
+    return get_alert_ml_state().get("classifier")
 
 
 def clear_classifier_cache() -> None:
-    _load_classifier.cache_clear()
+    get_alert_ml_state.cache_clear()
+
+
+def log_alert_ml_startup() -> Dict[str, Any]:
+    """Força o log `alert_ml=enabled|disabled` no lifespan da API."""
+    return get_alert_ml_state()
+
+
+def _hit_severity(hit: Any) -> str:
+    if isinstance(hit, dict):
+        return str(hit.get("severity") or "none")
+    return str(getattr(hit, "severity", "none") or "none")
+
+
+def _apply_pilot_ml_guards(full: Dict[str, Any]) -> Dict[str, Any]:
+    """ML no piloto é sugestão: não suprime alerta de regra nem rebaixa ★★★.
+
+    A supressão por discrepância amostra↔alerta (regras, não ML) mantém-se.
+    Soft-alert e supressão por ML só se as flags explícitas estiverem ligadas.
+    """
+    out = dict(full)
+    hits = out.get("rule_hits") or []
+    rule_max = "none"
+    for hit in hits:
+        sev = _hit_severity(hit)
+        if _SEV_RANK.get(sev, 0) > _SEV_RANK.get(rule_max, 0):
+            rule_max = sev
+    had_rule_alert = bool(hits) and rule_max != "none"
+    stars = int(out.get("stars") or 0)
+    three_star = stars >= 3 or rule_max == "critico"
+    decision = str(out.get("decision") or "")
+    discrepancy = decision in _DISCREPANCY_DECISIONS
+
+    if decision == "ml_soft_alert_no_rule" and not alert_ml_allow_soft_alert():
+        out["is_true_alert"] = False
+        out["is_false_positive"] = False
+        out["severity"] = "none"
+        out["decision"] = "ml_suggestion_only"
+        out["primary_alert_name"] = None
+        out["primary_rule_id"] = None
+
+    if (
+        had_rule_alert
+        and not out.get("is_true_alert")
+        and not discrepancy
+        and not alert_ml_allow_suppress()
+    ):
+        out["is_true_alert"] = True
+        out["is_false_positive"] = False
+        out["severity"] = rule_max
+        out["decision"] = "rule_match_ml_suggestive_only"
+        if hits and not out.get("primary_alert_name"):
+            first = hits[0]
+            if isinstance(first, dict):
+                out["primary_alert_name"] = first.get("name")
+                out["primary_rule_id"] = first.get("rule_id")
+        out.pop("suppressed_alert_name", None)
+        out.pop("suppressed_rule_id", None)
+
+    if three_star and had_rule_alert and not discrepancy:
+        if out.get("severity") != "critico":
+            out["severity"] = "critico"
+        if not out.get("is_true_alert") and not alert_ml_allow_suppress():
+            out["is_true_alert"] = True
+            out["is_false_positive"] = False
+            out["decision"] = "rule_match_ml_suggestive_only"
+
+    ml = out.get("ml")
+    if isinstance(ml, dict):
+        annotated = dict(ml)
+        annotated["suggestive_only"] = not (
+            alert_ml_allow_suppress() or alert_ml_allow_soft_alert()
+        )
+        annotated["role"] = "suggestion"
+        annotated["provenance"] = (
+            os.getenv("ALERT_ML_PROVENANCE") or _DEFAULT_PROVENANCE
+        ).strip() or _DEFAULT_PROVENANCE
+        out["ml"] = annotated
+    return out
 
 
 def _num(v: Any) -> Optional[float]:
@@ -306,6 +513,7 @@ def assess_ingest_alerts(
             source_meta=meta,
             context=ctx,
         )
+        full = _apply_pilot_ml_guards(full)
     else:
         engine = AlertMatrixEngine()
         rule = engine.evaluate(vitals, context=ctx)

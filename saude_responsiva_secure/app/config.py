@@ -52,6 +52,17 @@ class Settings(BaseSettings):
     database_url: str = ""
     operational_database_url: str = ""
 
+    # Matriz de alertas — camada ML (piloto Next2U). Default OFF.
+    # Sem modelo clinicamente validado no repo; artefato histórico é sintético.
+    alert_ml_enabled: bool = False
+    alert_matrix_model_path: str = ""
+    alert_matrix_model_dir: str = "data/models"
+    alert_ml_model_version: str = ""
+    alert_ml_provenance: str = "synthetic-unvalidated"
+    alert_ml_allow_suppress: bool = False
+    alert_ml_allow_soft_alert: bool = False
+    alert_ml_cache_dir: str = "/tmp/alert_matrix_cache"
+
     @field_validator("environment")
     @classmethod
     def normalize_env(cls, v: str) -> str:
