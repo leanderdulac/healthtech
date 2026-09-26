@@ -23,6 +23,99 @@ logger = logging.getLogger(__name__)
 
 _MODEL_DIR = Path(os.getenv("ALERT_MATRIX_MODEL_DIR", "data/models"))
 
+# Opt-in explícito (default OFF): só com ALERT_ALLOW_PHANTOM_VITALS=1 a matriz
+# aceita PA/glicose estimadas (phantom/simulação) e os defaults legados de
+# sono/passos/FC-basal. Sem o flag, a matriz avalia APENAS vitais medidos:
+# sinal ausente = desconhecido (None), nunca um valor inventado.
+#
+# Isolamento (revisão Rafael, PR #22): o modo phantom exige AMBOS
+#   1) ALERT_ALLOW_PHANTOM_VITALS=1, e
+#   2) ambiente de desenvolvimento explícito (ENVIRONMENT / APP_ENV em
+#      PHANTOM_DEV_ENVIRONMENTS; nenhum dos dois pode indicar produção),
+# e NUNCA roda no Cloud Run (K_SERVICE / K_REVISION / K_CONFIGURATION /
+# CLOUD_RUN_JOB). Fora disso o flag e o parâmetro allow_phantom_vitals=True
+# são ignorados e um WARNING é emitido uma vez por processo/motivo.
+PHANTOM_VITALS_ENV = "ALERT_ALLOW_PHANTOM_VITALS"
+_TRUTHY = {"1", "true", "yes", "on"}
+PHANTOM_ENVIRONMENT_VARS = ("ENVIRONMENT", "APP_ENV")
+PHANTOM_DEV_ENVIRONMENTS = frozenset({"development", "dev", "local", "test", "testing"})
+_PRODUCTION_ENVIRONMENTS = frozenset({"production", "prod", "staging"})
+_CLOUD_RUN_ENV_MARKERS = ("K_SERVICE", "K_REVISION", "K_CONFIGURATION", "CLOUD_RUN_JOB")
+_phantom_block_warned: set = set()
+
+
+def phantom_vitals_flag_set() -> bool:
+    """True se ALERT_ALLOW_PHANTOM_VITALS está ligado (não basta para ativar)."""
+    return str(os.getenv(PHANTOM_VITALS_ENV, "")).strip().lower() in _TRUTHY
+
+
+def phantom_vitals_block_reason() -> Optional[str]:
+    """Motivo pelo qual o ambiente NÃO autoriza phantom; None se autorizado.
+
+    Fail-closed: Cloud Run, produção/staging, ambiente ausente ou qualquer
+    valor fora de PHANTOM_DEV_ENVIRONMENTS bloqueiam.
+    """
+    for marker in _CLOUD_RUN_ENV_MARKERS:
+        if str(os.getenv(marker, "")).strip():
+            return f"cloud_run({marker})"
+    envs = {}
+    for name in PHANTOM_ENVIRONMENT_VARS:
+        value = str(os.getenv(name, "")).strip().lower()
+        if value:
+            envs[name] = value
+    if not envs:
+        return "environment_unset"
+    for name, value in envs.items():
+        if value in _PRODUCTION_ENVIRONMENTS:
+            return f"production({name}={value})"
+    for name, value in envs.items():
+        if value not in PHANTOM_DEV_ENVIRONMENTS:
+            return f"environment_not_dev({name}={value})"
+    return None
+
+
+def _warn_phantom_blocked(reason: str, requested_via: str) -> None:
+    key = (reason, requested_via)
+    if key in _phantom_block_warned:
+        return
+    _phantom_block_warned.add(key)
+    logger.warning(
+        "phantom_vitals=blocked reason=%s requested_via=%s — estimativas "
+        "(PA/glicose phantom, defaults sono/passos/FC-basal) DESATIVADAS; "
+        "%s=1 só vale junto com ENVIRONMENT de dev explícito (%s) e fora do Cloud Run.",
+        reason,
+        requested_via,
+        PHANTOM_VITALS_ENV,
+        ",".join(sorted(PHANTOM_DEV_ENVIRONMENTS)),
+    )
+
+
+def reset_phantom_guard_warnings() -> None:
+    """Uso em testes: permite observar de novo o WARNING único."""
+    _phantom_block_warned.clear()
+
+
+def phantom_vitals_enabled(requested: Optional[bool] = None) -> bool:
+    """Decide (fail-closed) se o modo phantom/demo pode rodar.
+
+    requested=None → segue o flag; requested=False → sempre desligado;
+    requested=True → ainda exige flag + dev explícito (o parâmetro sozinho
+    não liga nada e é ignorado em produção/Cloud Run).
+    """
+    if requested is False:
+        return False
+    flag = phantom_vitals_flag_set()
+    if not flag and not requested:
+        return False  # ninguém pediu phantom: caminho normal, sem log
+    requested_via = "param" if requested else "env"
+    reason = phantom_vitals_block_reason()
+    if reason is None and not flag:
+        reason = f"flag_{PHANTOM_VITALS_ENV}_not_set"
+    if reason is not None:
+        _warn_phantom_blocked(reason, requested_via)
+        return False
+    return True
+
 
 @lru_cache(maxsize=1)
 def _load_classifier():
@@ -56,6 +149,84 @@ def _num(v: Any) -> Optional[float]:
         return None
 
 
+# --- Proveniência do contexto informado --------------------------------------
+# Tabela ÚNICA das fontes (dict, chave) que o CÁLCULO consome para cada campo
+# de contexto, na ordem de precedência do `or` legado. vitals_from_ingest_context
+# (cálculo) e context_informed (exportador) leem ESTA tabela, então "presente"
+# e "usado" não podem divergir: um sinal enviado mas não consumido pela matriz
+# (ex.: `_hband.preprandial`, `_hband.fall_suspected`, aliases do schema como
+# `fasting_or_preprandial`) NÃO conta como informado e sai null (desconhecido)
+# em context_informed — nunca um default (`false`) apresentado como conhecido.
+# "raw" = payload do ingest (raw_telemetry); "hband" = hband_ext (`_hband`/`hband`
+# do payload + vitais copiados pelo signal_core).
+CONTEXT_SOURCES: Dict[str, Tuple[Tuple[str, str], ...]] = {
+    "consciousness_altered": (
+        ("hband", "consciousness_altered"),
+        ("raw", "consciousness_altered"),
+    ),
+    "rest": (("raw", "rest"), ("hband", "rest")),
+    "fasting": (("raw", "fasting"), ("raw", "preprandial"), ("hband", "fasting")),
+    "steps_interrupted": (
+        ("raw", "steps_interrupted"),
+        ("hband", "steps_interrupted"),
+        ("raw", "fall_suspected"),
+    ),
+    "sleep_hours": (("raw", "sleep_hours"), ("hband", "sleep_hours")),
+    "steps_drop_days": (("raw", "steps_drop_days"), ("hband", "steps_drop_days")),
+}
+
+# Leitura anterior (histórico enviado pelo cliente) e tolerâncias da
+# "2ª leitura consecutiva válida".
+PREVIOUS_READING_KEYS = ("previous_reading", "previous_vitals")
+PREVIOUS_GLUCOSE_KEYS = ("glucose_mgdl", "glucose")
+CONSECUTIVE_SPO2_TOLERANCE = 1.0
+CONSECUTIVE_GLUCOSE_TOLERANCE = 15.0
+
+
+def _source_dict(where: str, raw: Dict[str, Any], hband: Dict[str, Any]) -> Dict[str, Any]:
+    return raw if where == "raw" else hband
+
+
+def _context_value(field: str, raw: Dict[str, Any], hband: Dict[str, Any]) -> Any:
+    """Equivale a `fonte1 or fonte2 or ...` (semântica exata do cálculo legado)."""
+    value = None
+    for where, key in CONTEXT_SOURCES[field]:
+        value = _source_dict(where, raw, hband).get(key)
+        if value:
+            return value
+    return value
+
+
+def context_signal_present(
+    field: str, raw: Optional[Dict[str, Any]], hband: Optional[Dict[str, Any]]
+) -> bool:
+    """True se alguma fonte QUE O CÁLCULO CONSOME para `field` veio não-nula."""
+    raw = raw or {}
+    hband = hband or {}
+    return any(
+        _source_dict(where, raw, hband).get(key) is not None
+        for where, key in CONTEXT_SOURCES[field]
+    )
+
+
+def _previous_reading(raw: Dict[str, Any]) -> Dict[str, Any]:
+    prev: Any = {}
+    for key in PREVIOUS_READING_KEYS:
+        prev = raw.get(key)
+        if prev:
+            break
+    return prev if isinstance(prev, dict) else {}
+
+
+def _previous_glucose(prev: Dict[str, Any]) -> Optional[float]:
+    value = None
+    for key in PREVIOUS_GLUCOSE_KEYS:
+        value = prev.get(key)
+        if value:
+            break
+    return _num(value)
+
+
 def vitals_from_ingest_context(
     *,
     heart_rate: Optional[float] = None,
@@ -67,21 +238,31 @@ def vitals_from_ingest_context(
     hband_ext: Optional[Dict[str, Any]] = None,
     raw_telemetry: Optional[Dict[str, Any]] = None,
     use_unreliable_phantom: bool = False,
+    allow_phantom_vitals: Optional[bool] = None,
 ) -> Tuple[VitalSnapshot, Dict[str, Any]]:
     """
-    Monta VitalSnapshot + metadados de origem (measured/phantom).
+    Monta VitalSnapshot + metadados de origem (measured/phantom/absent).
 
-    PA/glicose phantom só entram se reliable=True (ou use_unreliable_phantom).
+    Padrão: só vitais efetivamente presentes na leitura. Sinal ausente fica
+    None (desconhecido) e regras que dependem dele não disparam.
+
+    Modo demo legado (PA/glicose phantom se reliable=True ou
+    use_unreliable_phantom; defaults de sono/passos/FC-basal) só roda com
+    ALERT_ALLOW_PHANTOM_VITALS=1 E ambiente dev explícito fora do Cloud Run
+    (ver phantom_vitals_enabled). allow_phantom_vitals=True não basta.
     """
+    # Guard central: em produção/Cloud Run o parâmetro é ignorado (fail-closed).
+    allow_phantom_vitals = phantom_vitals_enabled(allow_phantom_vitals)
     hband = hband_ext or {}
     raw = raw_telemetry or {}
-    ph = phantom or {}
+    ph = (phantom or {}) if allow_phantom_vitals else {}
     pas = pad = glucose = None
     meta: Dict[str, Any] = {
-        "bp_source": "unknown",
-        "glucose_source": "unknown",
-        "bp_reliable": True,
-        "glucose_reliable": True,
+        "bp_source": "absent",
+        "glucose_source": "absent",
+        "bp_reliable": False,
+        "glucose_reliable": False,
+        "phantom_vitals_enabled": bool(allow_phantom_vitals),
     }
 
     def phantom_est(*keys: str) -> Tuple[Optional[float], bool]:
@@ -130,52 +311,55 @@ def vitals_from_ingest_context(
             meta["glucose_reliable"] = glu_rel
 
     temp = _num(skin_temp)
-    if temp is not None and 25.0 <= temp < 35.0:
-        body = _num(hband.get("body_temp_c")) or _num(raw.get("body_temp_c"))
-        if body is not None:
-            temp = body
+    body = _num(hband.get("body_temp_c")) or _num(raw.get("body_temp_c"))
+    if body is not None and (temp is None or 25.0 <= temp < 35.0):
+        temp = body
 
     steps_drop = _num(hband.get("steps_drop_pct")) or _num(raw.get("steps_drop_pct"))
     sleep_worsen = _num(hband.get("sleep_worsen_pct")) or _num(raw.get("sleep_worsen_pct"))
     hr_rise = _num(hband.get("hr_baseline_rise")) or _num(raw.get("hr_baseline_rise"))
     spo2_drop = _num(hband.get("spo2_drop_points")) or _num(raw.get("spo2_drop_points"))
-    consciousness = bool(
-        hband.get("consciousness_altered") or raw.get("consciousness_altered")
-    )
+    consciousness = bool(_context_value("consciousness_altered", raw, hband))
 
-    if hr_rise is None and activity_level is not None and float(activity_level) > 40:
-        hr_rise = min(25.0, float(activity_level) * 0.2)
-
-    # Sono "Bom" implícito se não informado
-    if sleep_worsen is None:
-        sleep_worsen = 5.0
-    if steps_drop is None:
-        steps_drop = 5.0
+    if allow_phantom_vitals:
+        # Heurísticas/defaults legados (modo demo). Fora do opt-in: ausente = None.
+        if hr_rise is None and activity_level is not None and float(activity_level) > 40:
+            hr_rise = min(25.0, float(activity_level) * 0.2)
+        # Sono "Bom" implícito se não informado
+        if sleep_worsen is None:
+            sleep_worsen = 5.0
+        if steps_drop is None:
+            steps_drop = 5.0
 
     basal = raw.get("basal") or raw.get("baseline") or hband.get("basal") or {}
-    prev = raw.get("previous_reading") or raw.get("previous_vitals") or {}
+    prev = _previous_reading(raw)
     if not isinstance(basal, dict):
         basal = {}
-    if not isinstance(prev, dict):
-        prev = {}
 
     pas_b = _num(basal.get("pas") or basal.get("blood_pressure_sys"))
     pad_b = _num(basal.get("pad") or basal.get("blood_pressure_dia"))
     spo2_b = _num(basal.get("spo2"))
     temp_b = _num(basal.get("temp_c") or basal.get("body_temp_c"))
     glu_b = _num(basal.get("glucose_mgdl") or basal.get("glucose"))
-    glu_prev = _num(prev.get("glucose_mgdl") or prev.get("glucose"))
+    glu_prev = _previous_glucose(prev)
     spo2_prev = _num(prev.get("spo2"))
     consecutive = 1
     cur_spo2 = _num(spo2)
     if (
         spo2_prev is not None
         and cur_spo2 is not None
-        and abs(spo2_prev - cur_spo2) <= 1.0
+        and abs(spo2_prev - cur_spo2) <= CONSECUTIVE_SPO2_TOLERANCE
     ):
         consecutive = 2
     glu_now = glucose
-    if glu_prev is not None and glu_now is not None and abs(glu_prev - glu_now) <= 15:
+    # Obs.: no modo demo (dev autorizado) glu_now pode ser phantom e confirmar a
+    # 2ª leitura para as REGRAS (comportamento de dev inalterado). O exportador
+    # context_informed recalcula só com glicose MEDIDA (ver _measured_consecutive).
+    if (
+        glu_prev is not None
+        and glu_now is not None
+        and abs(glu_prev - glu_now) <= CONSECUTIVE_GLUCOSE_TOLERANCE
+    ):
         consecutive = max(consecutive, 2)
 
     if spo2_drop is None and cur_spo2 is not None and spo2_b is not None:
@@ -185,15 +369,14 @@ def vitals_from_ingest_context(
     if hr_rise is None and hr_now is not None and hr_b is not None:
         hr_rise = hr_now - hr_b
 
-    rest = bool(raw.get("rest") or hband.get("rest") or (activity_level is not None and float(activity_level) < 20))
-    fasting = bool(raw.get("fasting") or raw.get("preprandial") or hband.get("fasting"))
-    sleep_hours = _num(raw.get("sleep_hours") or hband.get("sleep_hours"))
-    steps_days = int(raw.get("steps_drop_days") or hband.get("steps_drop_days") or 0)
-    interrupted = bool(
-        raw.get("steps_interrupted")
-        or hband.get("steps_interrupted")
-        or raw.get("fall_suspected")
+    rest = bool(
+        _context_value("rest", raw, hband)
+        or (activity_level is not None and float(activity_level) < 20)
     )
+    fasting = bool(_context_value("fasting", raw, hband))
+    sleep_hours = _num(_context_value("sleep_hours", raw, hband))
+    steps_days = int(_context_value("steps_drop_days", raw, hband) or 0)
+    interrupted = bool(_context_value("steps_interrupted", raw, hband))
     no_steps_active = bool(
         raw.get("no_steps_rest_of_active") or hband.get("no_steps_rest_of_active")
     )
@@ -227,6 +410,131 @@ def vitals_from_ingest_context(
     return vitals, meta
 
 
+_PRESENT_VITAL_FIELDS = (
+    "pas",
+    "pad",
+    "hr",
+    "spo2",
+    "temp_c",
+    "glucose_mgdl",
+    "steps_drop_pct",
+    "sleep_worsen_pct",
+    "hr_baseline_rise",
+    "spo2_drop_points",
+)
+
+
+def vitals_present(vitals: VitalSnapshot) -> Dict[str, Optional[float]]:
+    """Vitais usados pela matriz, sem imputação: ausente → None."""
+    return {k: getattr(vitals, k) for k in _PRESENT_VITAL_FIELDS}
+
+
+# Campos do vitals_used legado (to_feature_dict, 22 chaves) que saíram na
+# PR #22. Aqui voltam SEM imputação: só valor derivado de dado efetivamente
+# enviado pelo cliente (ou medido); caso contrário None. Ver
+# docs/contracts/INGEST_VITALS_USED_CONTRACT.md.
+CONTEXT_INFORMED_FIELDS = (
+    "consciousness_altered",
+    "map_approx",
+    "pulse_pressure",
+    "consecutive_valid",
+    "rest",
+    "fasting",
+    "steps_interrupted",
+    "sleep_hours",
+    "steps_drop_days",
+    "pas_rise_vs_basal",
+    "pas_drop_vs_basal",
+    "glucose_delta",
+)
+
+
+def _measured_consecutive(
+    vitals: VitalSnapshot, meta: Dict[str, Any], raw: Dict[str, Any]
+) -> Optional[int]:
+    """2ª leitura consecutiva SÓ com medidas reais comparáveis; senão None.
+
+    Compara a leitura atual com `previous_reading`/`previous_vitals` apenas
+    quando AMBOS os lados têm o mesmo sinal medido: SpO2 (sempre medida — não
+    existe SpO2 phantom) e glicose com glucose_source == "measured". Glicose
+    phantom/estimada nunca entra (nem no modo demo). Sem par comparável → None
+    (desconhecido), nunca o default 1.
+    """
+    prev = _previous_reading(raw)
+    if not prev:
+        return None
+    matches = []
+    spo2_prev = _num(prev.get("spo2"))
+    if spo2_prev is not None and vitals.spo2 is not None:
+        matches.append(abs(spo2_prev - float(vitals.spo2)) <= CONSECUTIVE_SPO2_TOLERANCE)
+    glu_prev = _previous_glucose(prev)
+    if (
+        glu_prev is not None
+        and meta.get("glucose_source") == "measured"
+        and vitals.glucose_mgdl is not None
+    ):
+        matches.append(
+            abs(glu_prev - float(vitals.glucose_mgdl)) <= CONSECUTIVE_GLUCOSE_TOLERANCE
+        )
+    if not matches:
+        return None
+    return 2 if any(matches) else 1
+
+
+def context_informed(
+    vitals: VitalSnapshot,
+    meta: Dict[str, Any],
+    *,
+    hband_ext: Optional[Dict[str, Any]] = None,
+    raw_telemetry: Optional[Dict[str, Any]] = None,
+    activity_level: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Contexto que a matriz consumiu, com proveniência medida — nunca imputado.
+
+    Regras (contrato docs/contracts/INGEST_VITALS_USED_CONTRACT.md):
+      * cada campo vem SÓ de dado efetivamente recebido na leitura atual
+        (e, para comparações, de um valor medido comparável no histórico);
+      * PA/glicose só contam se bp_source/glucose_source == "measured" —
+        phantom/estimativas nunca aparecem aqui, nem no modo demo em dev;
+      * "presente" = alguma fonte de CONTEXT_SOURCES (as mesmas que o cálculo
+        consome) veio não-nula; sinal presente mas não consumido → None;
+      * sem dado → None (desconhecido), nunca um default como false/0/1.
+    """
+    hband = hband_ext or {}
+    raw = raw_telemetry or {}
+    bp_measured = meta.get("bp_source") == "measured"
+    glu_measured = meta.get("glucose_source") == "measured"
+    both_bp = bp_measured and vitals.pas is not None and vitals.pad is not None
+
+    def present(field: str) -> bool:
+        return context_signal_present(field, raw, hband)
+
+    def rounded(v: Optional[float]) -> Optional[float]:
+        return None if v is None else round(float(v), 2)
+
+    rest_informed = present("rest") or activity_level is not None
+    return {
+        "consciousness_altered": (
+            bool(vitals.consciousness_altered) if present("consciousness_altered") else None
+        ),
+        "map_approx": rounded((vitals.pas + 2 * vitals.pad) / 3.0) if both_bp else None,
+        "pulse_pressure": rounded(vitals.pas - vitals.pad) if both_bp else None,
+        "consecutive_valid": _measured_consecutive(vitals, meta, raw),
+        "rest": bool(vitals.rest) if rest_informed else None,
+        "fasting": bool(vitals.fasting) if present("fasting") else None,
+        "steps_interrupted": (
+            bool(vitals.steps_interrupted) if present("steps_interrupted") else None
+        ),
+        "sleep_hours": vitals.sleep_hours if present("sleep_hours") else None,
+        "steps_drop_days": (
+            int(vitals.steps_drop_days or 0) if present("steps_drop_days") else None
+        ),
+        "pas_rise_vs_basal": rounded(vitals.pas_rise()) if bp_measured else None,
+        "pas_drop_vs_basal": rounded(vitals.pas_drop()) if bp_measured else None,
+        "glucose_delta": rounded(vitals.glucose_delta()) if glu_measured else None,
+    }
+
+
 def _apply_discrepancy(full: Dict[str, Any], vitals: VitalSnapshot, meta: Dict[str, Any]) -> Dict[str, Any]:
     disc = evaluate_discrepancy(
         vitals,
@@ -235,8 +543,8 @@ def _apply_discrepancy(full: Dict[str, Any], vitals: VitalSnapshot, meta: Dict[s
         primary_alert_name=full.get("primary_alert_name"),
         bp_source=meta.get("bp_source", "unknown"),
         glucose_source=meta.get("glucose_source", "unknown"),
-        glucose_reliable=bool(meta.get("glucose_reliable", True)),
-        bp_reliable=bool(meta.get("bp_reliable", True)),
+        glucose_reliable=bool(meta.get("glucose_reliable", False)),
+        bp_reliable=bool(meta.get("bp_reliable", False)),
     )
     full = dict(full)
     full["discrepancy"] = disc.to_dict()
@@ -275,9 +583,13 @@ def assess_ingest_alerts(
     phantom: Optional[Dict[str, Any]] = None,
     hband_ext: Optional[Dict[str, Any]] = None,
     raw_telemetry: Optional[Dict[str, Any]] = None,
+    allow_phantom_vitals: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Avalia alertas clínicos para um frame de ingestão.
+
+    Só vitais presentes na leitura entram na matriz (ver
+    vitals_from_ingest_context / ALERT_ALLOW_PHANTOM_VITALS).
 
     Retorno enxuto para embutir em processed_frame['clinical_alerts'].
     """
@@ -290,6 +602,7 @@ def assess_ingest_alerts(
         phantom=phantom,
         hband_ext=hband_ext,
         raw_telemetry=raw_telemetry,
+        allow_phantom_vitals=allow_phantom_vitals,
     )
 
     from src.clinical_intelligence.next2u_context import PatientContext
@@ -355,7 +668,18 @@ def assess_ingest_alerts(
         "primary_rule_id": full.get("primary_rule_id") if full.get("is_true_alert") else None,
         "rule_hits": full.get("rule_hits") or [],
         "rule_explanation": full.get("rule_explanation"),
-        "vitals_used": full.get("vitals") or vitals.to_feature_dict(),
+        # Sem imputação: só o que foi medido (ausente → None). Features do ML
+        # (com defaults de treino) ficam fora da resposta.
+        "vitals_used": vitals_present(vitals),
+        # Contexto informado (sem imputação) dos 12 campos que saíram do
+        # vitals_used legado — ausente/não enviado → None.
+        "context_informed": context_informed(
+            vitals,
+            meta,
+            hband_ext=hband_ext,
+            raw_telemetry=raw_telemetry,
+            activity_level=activity_level,
+        ),
         "ml": full.get("ml"),
         "discrepancy": full.get("discrepancy"),
         "source_meta": full.get("source_meta") or meta,
