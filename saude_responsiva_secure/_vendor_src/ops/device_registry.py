@@ -57,6 +57,8 @@ _last_flush = 0.0
 _loaded = False
 _last_load = 0.0
 _local_write_warned = False
+_local_write_logged = False
+_gcs_write_logged = False
 RELOAD_EVERY_SECONDS = 4.0
 
 
@@ -181,12 +183,19 @@ def _evict_unlocked() -> None:
 
 def _write_local_fleet(text: str) -> None:
     """Grava o snapshot local. Falha de mkdir/write não escapa nem bloqueia GCS."""
-    global _local_write_warned
+    global _local_write_warned, _local_write_logged
     path = local_fleet_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text + "\n", encoding="utf-8")
         _local_write_warned = False
+        if not _local_write_logged:
+            logger.info(
+                "Frota gravada localmente: %s (%s devices)",
+                path,
+                len(_devices),
+            )
+            _local_write_logged = True
     except Exception as exc:
         if not _local_write_warned:
             logger.warning("Falha ao gravar frota local: %s", exc)
@@ -194,7 +203,7 @@ def _write_local_fleet(text: str) -> None:
 
 
 def _flush_unlocked(force: bool = False) -> None:
-    global _dirty, _last_flush
+    global _dirty, _last_flush, _gcs_write_logged
     if not _dirty and not force:
         return
     now = time.time()
@@ -219,6 +228,14 @@ def _flush_unlocked(force: bool = False) -> None:
             client = storage.Client()
             blob = client.bucket(bucket_name).blob(object_name)
             blob.upload_from_string(text, content_type="application/json")
+            if not _gcs_write_logged:
+                logger.info(
+                    "Frota gravada no GCS: gs://%s/%s (%s devices)",
+                    bucket_name,
+                    object_name,
+                    snapshot["count"],
+                )
+                _gcs_write_logged = True
         except Exception as exc:
             logger.warning("Falha ao gravar frota no GCS: %s", exc)
     _dirty = False
@@ -359,7 +376,10 @@ def clear_all() -> None:
     with _lock:
         _devices.clear()
         global _dirty, _loaded, _last_flush, _local_write_warned
+        global _local_write_logged, _gcs_write_logged
         _dirty = False
         _loaded = True
         _last_flush = 0.0
         _local_write_warned = False
+        _local_write_logged = False
+        _gcs_write_logged = False

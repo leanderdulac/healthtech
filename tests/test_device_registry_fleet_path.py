@@ -34,11 +34,39 @@ INGEST_HEADERS = {"X-API-Key": "ht_ingest_test_key_32chars_long_token"}
 FLEET_LOGGER = "src.ops.device_registry"
 REGISTER_WARNING = "Falha ao registrar relógio na frota"
 LOCAL_WARNING = "Falha ao gravar frota local"
+LOCAL_SUCCESS = "Frota gravada localmente"
+GCS_SUCCESS = "Frota gravada no GCS"
+SECURE_REQUIREMENTS = SECURE / "requirements.txt"
 
 
 def _enable_flush(monkeypatch: pytest.MonkeyPatch) -> None:
     """_flush_unlocked short-circuits while pytest sets PYTEST_CURRENT_TEST."""
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.setattr(dr, "FLUSH_EVERY_SECONDS", 0.0)
+
+
+def _install_fake_storage(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Return the mocked blob; upload_from_string is asserted by callers."""
+    blob = MagicMock()
+    blob.exists.return_value = False
+    client = MagicMock()
+    client.bucket.return_value.blob.return_value = blob
+    fake_client_cls = MagicMock(return_value=client)
+    try:
+        from google.cloud import storage as real_storage
+
+        monkeypatch.setattr(real_storage, "Client", fake_client_cls)
+    except ImportError:
+        storage_mod = types.ModuleType("google.cloud.storage")
+        storage_mod.Client = fake_client_cls
+        cloud_mod = types.ModuleType("google.cloud")
+        cloud_mod.storage = storage_mod
+        google_mod = types.ModuleType("google")
+        google_mod.cloud = cloud_mod
+        monkeypatch.setitem(sys.modules, "google", google_mod)
+        monkeypatch.setitem(sys.modules, "google.cloud", cloud_mod)
+        monkeypatch.setitem(sys.modules, "google.cloud.storage", storage_mod)
+    return blob
 
 
 def _frame(device_id: str, patient_id: str = "PAT-FLEET-001") -> dict:
@@ -154,25 +182,7 @@ def test_gcs_upload_attempted_after_local_failure(monkeypatch, tmp_path):
     monkeypatch.setenv("GCS_STAGING_BUCKET", "gs://fleet-test-bucket")
     _enable_flush(monkeypatch)
 
-    blob = MagicMock()
-    blob.exists.return_value = False
-    client = MagicMock()
-    client.bucket.return_value.blob.return_value = blob
-    fake_client_cls = MagicMock(return_value=client)
-    try:
-        from google.cloud import storage as real_storage
-
-        monkeypatch.setattr(real_storage, "Client", fake_client_cls)
-    except ImportError:
-        storage_mod = types.ModuleType("google.cloud.storage")
-        storage_mod.Client = fake_client_cls
-        cloud_mod = types.ModuleType("google.cloud")
-        cloud_mod.storage = storage_mod
-        google_mod = types.ModuleType("google")
-        google_mod.cloud = cloud_mod
-        monkeypatch.setitem(sys.modules, "google", google_mod)
-        monkeypatch.setitem(sys.modules, "google.cloud", cloud_mod)
-        monkeypatch.setitem(sys.modules, "google.cloud.storage", storage_mod)
+    blob = _install_fake_storage(monkeypatch)
 
     dr.upsert_frame(_frame("VE30-FLEET-GCS"))
 
@@ -183,3 +193,84 @@ def test_gcs_upload_attempted_after_local_failure(monkeypatch, tmp_path):
     assert snapshot["count"] == 1
     assert snapshot["devices"][0]["device_id"] == "VE30-FLEET-GCS"
     assert not target.exists()
+
+
+def test_successful_local_write_logs_info_once(monkeypatch, tmp_path, caplog):
+    path = tmp_path / "ops" / "fleet_devices.json"
+    monkeypatch.setenv("FLEET_DEVICES_PATH", str(path))
+    monkeypatch.delenv("GCS_STAGING_BUCKET", raising=False)
+    _enable_flush(monkeypatch)
+
+    with caplog.at_level(logging.INFO, logger=FLEET_LOGGER):
+        dr.upsert_frame(_frame("VE30-FLEET-LOG-1"))
+        dr.upsert_frame(_frame("VE30-FLEET-LOG-2"))
+
+    hits = [
+        rec.getMessage()
+        for rec in caplog.records
+        if rec.name == FLEET_LOGGER and LOCAL_SUCCESS in rec.getMessage()
+    ]
+    assert len(hits) == 1
+    assert str(path) in hits[0]
+    assert "1 devices" in hits[0]
+    assert path.is_file()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["count"] == 2
+
+
+def test_successful_gcs_upload_logs_info_once(monkeypatch, tmp_path, caplog):
+    path = tmp_path / "ops" / "fleet_devices.json"
+    monkeypatch.setenv("FLEET_DEVICES_PATH", str(path))
+    monkeypatch.setenv("GCS_STAGING_BUCKET", "gs://healthtech-gcp-2026-vertex-staging")
+    _enable_flush(monkeypatch)
+    blob = _install_fake_storage(monkeypatch)
+
+    with caplog.at_level(logging.INFO, logger=FLEET_LOGGER):
+        dr.upsert_frame(_frame("VE30-FLEET-GCS-LOG-1"))
+        dr.upsert_frame(_frame("VE30-FLEET-GCS-LOG-2"))
+
+    assert blob.upload_from_string.call_count == 2
+    hits = [
+        rec.getMessage()
+        for rec in caplog.records
+        if rec.name == FLEET_LOGGER and GCS_SUCCESS in rec.getMessage()
+    ]
+    assert len(hits) == 1
+    assert "gs://healthtech-gcp-2026-vertex-staging/ops/fleet/devices.json" in hits[0]
+    assert "1 devices" in hits[0]
+    lowered = hits[0].lower()
+    assert "credential" not in lowered
+    assert "token" not in lowered
+    assert "key" not in lowered
+
+
+def test_secure_requirements_pins_google_cloud_storage():
+    text = SECURE_REQUIREMENTS.read_text(encoding="utf-8")
+    assert "google-cloud-storage>=2.10.0" in text
+    assert "pandas" not in text
+    assert "scikit-learn" not in text
+
+
+def test_gcs_import_path_works_when_library_present(monkeypatch, tmp_path):
+    storage = pytest.importorskip("google.cloud.storage")
+    from google.cloud import storage as imported
+
+    assert imported is storage
+    assert hasattr(storage, "Client")
+
+    path = tmp_path / "ops" / "fleet_devices.json"
+    monkeypatch.setenv("FLEET_DEVICES_PATH", str(path))
+    monkeypatch.setenv("GCS_STAGING_BUCKET", "gs://fleet-import-bucket")
+    _enable_flush(monkeypatch)
+
+    blob = MagicMock()
+    blob.exists.return_value = False
+    client = MagicMock()
+    client.bucket.return_value.blob.return_value = blob
+    monkeypatch.setattr(storage, "Client", MagicMock(return_value=client))
+
+    dr.upsert_frame(_frame("VE30-FLEET-IMPORT"))
+
+    blob.upload_from_string.assert_called_once()
+    snapshot = json.loads(blob.upload_from_string.call_args[0][0])
+    assert snapshot["devices"][0]["device_id"] == "VE30-FLEET-IMPORT"
