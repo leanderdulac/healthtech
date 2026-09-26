@@ -8,3 +8,7 @@ numpy>=1.26.0
 httpx>=0.27.0
 sqlalchemy>=2.0.35,<2.1.0
 psycopg2-binary>=2.9.9,<3
+# Fleet snapshot sync (device_registry → gs://…/ops/fleet/devices.json).
+# Same lower bound as the root requirements.txt; no google-auth/protobuf pins
+# here, so pip resolves the storage extras without the monolith ML stack.
+google-cloud-storage>=2.10.0
