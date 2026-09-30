@@ -35,7 +35,7 @@ def get_connection_status(
     except DurableStoreUnavailable as exc:
         raise HTTPException(
             status_code=503,
-            detail=f"Armazenamento durável de telemetria indisponível. ({exc})",
+            detail="Armazenamento durável de telemetria indisponível.",
         ) from exc
     full = build_connection_status(
         history,
@@ -62,7 +62,7 @@ def get_connection_status_public(
     except DurableStoreUnavailable as exc:
         raise HTTPException(
             status_code=503,
-            detail=f"Armazenamento durável de telemetria indisponível. ({exc})",
+            detail="Armazenamento durável de telemetria indisponível.",
         ) from exc
     full = build_connection_status(
         history,
