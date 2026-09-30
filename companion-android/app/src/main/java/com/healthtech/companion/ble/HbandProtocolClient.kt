@@ -86,9 +86,12 @@ class HbandProtocolClient(
         override fun onConnectStatusChanged(mac: String?, status: Int) {
             if (status == Constants.STATUS_DISCONNECTED) {
                 val lost = mac ?: connectedMac
+                val gen = handshakeGen
                 handler.post {
+                    if (gen != handshakeGen) return@post
+                    if (lost.isNullOrBlank() || lost != connectedMac) return@post
                     resetHandshake("link dropped")
-                    listener.onDisconnected(lost.orEmpty(), "BLE desconectou")
+                    listener.onDisconnected(lost, "BLE desconectou")
                 }
             }
         }
@@ -168,7 +171,7 @@ class HbandProtocolClient(
                         )
                         return@post
                     }
-                    listener.onStatus("Notify ok. Validando senha 0000…")
+                    listener.onStatus("Notify ok. Validando o acesso do dispositivo…")
                     confirmPassword(mac, gen)
                 }
             },

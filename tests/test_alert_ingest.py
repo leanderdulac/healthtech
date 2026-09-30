@@ -81,6 +81,61 @@ def test_assess_suppresses_borderline_hr_false_positive():
     assert alerts["severity"] == "none"
 
 
+def test_rules_only_does_not_load_classifier(monkeypatch):
+    def _boom():
+        raise AssertionError("classificador não pode entrar no piloto")
+
+    monkeypatch.setattr(
+        "src.clinical_intelligence.alert_ingest._load_classifier",
+        _boom,
+    )
+    alerts = assess_ingest_alerts(
+        heart_rate=85,
+        spo2=88,
+        skin_temp=33.0,
+        phantom={},
+        raw_telemetry={"ingest_source": "ble_hband"},
+        rules_only=True,
+    )
+    assert alerts["engine"] == "alert_matrix_rules"
+    assert alerts["ml"] is None
+    assert alerts["is_true_alert"] is True
+    assert alerts["pilot_eligible"] is True
+    assert alerts["ingest_source"] == "ble_hband"
+    provenance = alerts["provenance"]
+    assert provenance["rules_count"] == 158
+    assert len(provenance["rules_sha256"]) == 64
+    assert provenance["git_sha"]
+
+
+def test_ble_standard_is_pilot_eligible():
+    alerts = assess_ingest_alerts(
+        heart_rate=72,
+        spo2=98,
+        skin_temp=33.0,
+        phantom={},
+        raw_telemetry={"ingest_source": "ble_standard"},
+        rules_only=True,
+    )
+    assert alerts["pilot_eligible"] is True
+    assert alerts["ingest_source"] == "ble_standard"
+    assert alerts["engine"] == "alert_matrix_rules"
+
+
+def test_ble_sim_is_recorded_but_not_pilot_eligible():
+    alerts = assess_ingest_alerts(
+        heart_rate=78,
+        spo2=98,
+        skin_temp=33.0,
+        phantom={},
+        raw_telemetry={"ingest_source": "ble_sim"},
+        rules_only=True,
+    )
+    assert alerts["engine"] == "alert_matrix_rules"
+    assert alerts["pilot_eligible"] is False
+    assert alerts["ingest_source"] == "ble_sim"
+
+
 def test_merge_anomaly_reinforces_true_alert():
     anomaly = {"alerta": False, "score": 0.05, "modo": "Detecção Local BMO"}
     alerts = {

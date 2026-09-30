@@ -22,7 +22,8 @@ from app.services.ingest_idempotency import DedupIdentity
 
 logger = logging.getLogger(__name__)
 
-ONLINE_WITHIN_SECONDS = 120.0
+# Igual a src/ops/timestamps.py: 30 min de medição + 15 min de reconexão + folga.
+ONLINE_WITHIN_SECONDS = 50 * 60.0
 _SYNTHETIC_TOKENS = ("smoke", "probe", "timecheck")
 _MAX_REQUEST_CACHE = 2048
 
@@ -389,7 +390,10 @@ def _list_devices_from_frames(
 
 
 def anonymize_patient(patient_id: str) -> bool:
-    """Remove histórico do paciente (LGPD). Retorna True se havia dados."""
+    """Remove telemetria, frota, revisão de piloto, cadastro e o banco durável."""
+    from src.ops.device_registry import purge_patient as purge_device_registry
+    from app.services.pilot_review import purge_patient as purge_pilot_review
+
     durable_had = False
     if _use_durable():
         from app.services import durable_readings
@@ -410,7 +414,24 @@ def anonymize_patient(patient_id: str) -> bool:
             _request_cache.pop(key, None)
             if key in _request_cache_order:
                 _request_cache_order.remove(key)
-        return had or durable_had
+    fleet = 0
+    review = 0
+    enrollment = 0
+    try:
+        fleet = int(purge_device_registry(patient_id) or 0)
+    except Exception as exc:
+        logger.warning("Falha ao purgar device_registry: %s", exc)
+    try:
+        review = int(purge_pilot_review(patient_id) or 0)
+    except Exception as exc:
+        logger.warning("Falha ao purgar pilot_review: %s", exc)
+    try:
+        from src.ops.operational_patients import purge_patient as purge_enrollment
+
+        enrollment = int(purge_enrollment(patient_id) or 0)
+    except Exception as exc:
+        logger.warning("Falha ao purgar cadastro operacional: %s", exc)
+    return bool(had or durable_had or fleet or review or enrollment)
 
 
 def stats() -> Dict[str, int]:

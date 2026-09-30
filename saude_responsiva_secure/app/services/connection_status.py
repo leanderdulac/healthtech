@@ -6,14 +6,16 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 KNOWN_INGEST_SOURCES = frozenset(
-    {"companion_manual", "ble_sim", "ble_hband", "http"}
+    {"companion_manual", "ble_sim", "ble_hband", "ble_standard", "http"}
 )
+PILOT_SOURCES = frozenset({"ble_hband", "ble_standard"})
 
 DEVICE_LABELS = {
     "ble_hband": "HBand pareado via BLE (SDK)",
+    "ble_standard": "Smartwatch no perfil Bluetooth padrão (FC, SpO2, pressão ou temperatura)",
     "ble_sim": "Device simulado no companion (não é BLE físico)",
     "via_app": "Device visto só via ingest HTTP (sem BLE)",
-    "planned": "BLE nativo: pairing HBand ainda não feito",
+    "planned": "BLE nativo: nenhum relógio físico nesta sessão",
     "offline": "Device sem telemetria recente",
 }
 
@@ -79,6 +81,8 @@ def _device_status(ingest_source: str, mobile_link: str, device_id: str) -> str:
         return "offline"
     if ingest_source == "ble_hband":
         return "ble_hband"
+    if ingest_source == "ble_standard":
+        return "ble_standard"
     if ingest_source == "ble_sim":
         return "ble_sim"
     if device_id and device_id not in {"unknown", "wrist_wearable"}:
@@ -88,7 +92,7 @@ def _device_status(ingest_source: str, mobile_link: str, device_id: str) -> str:
 
 def _pick_device_overall(sessions: List[Dict[str, Any]], mobile_overall: str) -> str:
     active = [s for s in sessions if s["mobile_status"] != "offline"]
-    for wanted in ("ble_hband", "ble_sim", "via_app"):
+    for wanted in ("ble_hband", "ble_standard", "ble_sim", "via_app"):
         if any(s["device_status"] == wanted for s in active):
             return wanted
     if mobile_overall == "offline":
@@ -122,6 +126,7 @@ def public_connection_view(full: Dict[str, Any]) -> Dict[str, Any]:
         "stale_threshold_sec": full.get("stale_threshold_sec"),
         "mobile_app": mobile,
         "device": full.get("device"),
+        "pilot": full.get("pilot"),
         "pipeline": full.get("pipeline"),
         "sessions": [],
     }
@@ -202,10 +207,19 @@ def build_connection_status(
         mobile_overall = "offline"
 
     device_overall = _pick_device_overall(sessions, mobile_overall)
-    pairing_ready = device_overall in {"ble_sim", "ble_hband"}
+    pairing_ready = device_overall in {"ble_sim", "ble_hband", "ble_standard"}
 
     ble_native_done = any(s["device_status"] == "ble_hband" for s in sessions)
+    ble_standard_done = any(s["device_status"] == "ble_standard" for s in sessions)
     ble_sim_done = any(s["device_status"] == "ble_sim" for s in sessions)
+    pilot_sessions = [s for s in sessions if s.get("ingest_source") in PILOT_SOURCES]
+    excluded_sources = sorted(
+        {
+            s.get("ingest_source")
+            for s in sessions
+            if s.get("ingest_source") not in PILOT_SOURCES
+        }
+    )
 
     return {
         "server_time": now.isoformat().replace("+00:00", "Z"),
@@ -228,6 +242,7 @@ def build_connection_status(
             "label": DEVICE_LABELS.get(device_overall, device_overall),
             "protocol_current": {
                 "ble_hband": "BLE GATT / HBand SDK → app → HTTPS",
+                "ble_standard": "Perfil Bluetooth SIG (FC, SpO2, pressão, temperatura) → HTTPS",
                 "ble_sim": "Simulador no companion (sem rádio) → HTTPS",
                 "via_app": "Ingest HTTP manual / smoke no companion",
                 "planned": "Aguardando simulador BLE ou SDK HBand",
@@ -236,7 +251,7 @@ def build_connection_status(
             "protocol_planned": "BLE GATT / HBand SDK (companion Android)",
             "model_hint": (best or {}).get("device_id") if best else None,
             "pairing_ready": pairing_ready,
-            "ble_physical": ble_native_done,
+            "ble_physical": ble_native_done or ble_standard_done,
             "ble_simulated": ble_sim_done,
             "roadmap": [
                 {"id": "https_ingest", "done": True, "label": "App envia telemetria via HTTPS"},
@@ -251,11 +266,23 @@ def build_connection_status(
                     "label": "Pairing HBand real (SDK Veepoo) — requer AAR + pulseira",
                 },
                 {
+                    "id": "ble_standard",
+                    "done": ble_standard_done,
+                    "label": "Smartwatch com perfil Bluetooth padrão",
+                },
+                {
                     "id": "dashboard",
                     "done": True,
                     "label": "Dashboard mostra status honesto (sim vs BLE real)",
                 },
             ],
+        },
+        "pilot": {
+            "eligible": bool(pilot_sessions),
+            "eligible_sessions": len(pilot_sessions),
+            "excluded_sessions": len(sessions) - len(pilot_sessions),
+            "excluded_sources": excluded_sources,
+            "note": "Entram no piloto ble_hband e ble_standard. ble_sim e HTTP manual ficam de fora.",
         },
         "pipeline": [
             {"id": "device", "name": "Device (HBand / simulador)", "status": device_overall},

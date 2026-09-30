@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.healthtech.companion.ble.ScannedDevice
+import com.healthtech.companion.data.ConsentNotice
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -101,15 +102,49 @@ fun MainScreen(viewModel: MainViewModel) {
         ) {
             StatusCard(state)
 
+            ConsentCard(state, viewModel)
+
             ConfigCard(state, viewModel)
 
-            BleCard(state, viewModel)
-
-            ActionsCard(state, viewModel)
-
-            TelemetryCard(state)
+            if (state.consentGranted) {
+                BleCard(state, viewModel)
+                ActionsCard(state, viewModel)
+                TelemetryCard(state)
+            }
 
             Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun ConsentCard(state: UiState, viewModel: MainViewModel) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                ConsentNotice.TITLE,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (state.consentGranted) {
+                Text(
+                    "Consentimento específico registrado${state.consentAt.takeIf { it.isNotBlank() }?.let { " em $it" } ?: ""}. O alerta é apoio à decisão, sem conduta obrigatória.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedButton(onClick = viewModel::revokeConsent, modifier = Modifier.fillMaxWidth()) {
+                    Text("Revogar consentimento")
+                }
+            } else {
+                Text(ConsentNotice.BODY, style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = viewModel::acceptConsent, modifier = Modifier.fillMaxWidth()) {
+                    Text("Aceitar e permitir o envio")
+                }
+            }
         }
     }
 }
@@ -232,6 +267,12 @@ private fun ConfigCard(state: UiState, viewModel: MainViewModel) {
     }
 }
 
+private fun linkLabel(kind: String): String = when (kind) {
+    "hband" -> "HBand · "
+    "standard" -> "Padrão · "
+    else -> ""
+}
+
 @Composable
 private fun BleCard(state: UiState, viewModel: MainViewModel) {
     Card(
@@ -249,13 +290,22 @@ private fun BleCard(state: UiState, viewModel: MainViewModel) {
             Text(
                 when {
                     state.lastLiveBpm != null ->
-                        "FC ao vivo ${state.lastLiveBpm} bpm" +
-                            (state.lastSpo2?.let { " · SpO2 $it%" } ?: "")
-                    state.handshakeReady -> "Handshake ok. Medindo…"
-                    state.connectedMac != null -> "Conectado ${state.connectedMac}. Handshake em curso."
+                        linkLabel(state.linkKind) +
+                            "FC ao vivo ${state.lastLiveBpm} bpm" +
+                            (state.lastSpo2?.let { " · SpO2 $it%" } ?: "") +
+                            (if (state.lastBpSys != null && state.lastBpDia != null) {
+                                " · PA ${state.lastBpSys}/${state.lastBpDia}"
+                            } else {
+                                ""
+                            }) +
+                            (state.lastTempC?.let { " · ${"%.1f".format(it)} °C" } ?: "")
+                    state.handshakeReady ->
+                        linkLabel(state.linkKind) + "Conectado. Aguardando medida do relógio…"
+                    state.connectedMac != null ->
+                        linkLabel(state.linkKind) + "Conectado ${state.connectedMac}."
                     else ->
-                        "O scan vê todos os BLE. Conecte na pulseira (nome no topo). " +
-                            "Fone/TV não enviam FC. A leitura só vale após senha 0000 + perfil."
+                        "Toque no relógio. HBand e VE30 usam o protocolo Veepoo. Os outros usam o " +
+                            "perfil Bluetooth de FC, SpO2, pressão ou temperatura, se o relógio publicar."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -289,11 +339,11 @@ private fun BleCard(state: UiState, viewModel: MainViewModel) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = viewModel::tryGattFallback,
+                    onClick = viewModel::connectAlternateProtocol,
                     enabled = state.connectedMac != null && !state.busy,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("GATT SIG")
+                    Text(if (state.linkKind == "standard") "Protocolo HBand" else "Perfil padrão")
                 }
                 OutlinedButton(
                     onClick = viewModel::toggleBleSimulator,
