@@ -7,7 +7,7 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -21,27 +21,51 @@ def cached_devices() -> List[Dict[str, Any]]:
     return list(_state["cache"])
 
 
-def fetch_secure_devices(timeout: float = 8.0) -> List[Dict[str, Any]]:
+def _bridge_config() -> Tuple[str, str]:
     base = (os.environ.get("SECURE_API_BASE_URL") or "").rstrip("/")
-    key = (os.environ.get("SECURE_READ_API_KEY") or os.environ.get("SECURE_API_KEY") or "").strip()
+    key = (
+        os.environ.get("SECURE_READ_API_KEY")
+        or os.environ.get("SECURE_API_KEY")
+        or os.environ.get("READ_API_KEY")
+        or ""
+    ).strip()
+    return base, key
+
+
+def fetch_secure_fleet(timeout: float = 8.0) -> Optional[List[Dict[str, Any]]]:
+    """Lista ao vivo da API segura.
+
+    None quando a ponte não está configurada ou a consulta falhou sem cache.
+    Lista vazia é uma resposta real: não há relógio na API segura.
+    """
+    base, key = _bridge_config()
     if not base or not key:
-        return list(_state["cache"])
+        return None
     req = urllib.request.Request(
-        f"{base}/api/v1/wearables/devices?limit=500",
+        f"{base}/api/v1/wearables/devices?limit=500&include_synthetic=true",
         headers={"X-API-Key": key, "Accept": "application/json"},
         method="GET",
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
         logger.warning("Falha ao listar relógios na API segura: %s", exc)
-        return list(_state["cache"])
+        cached = list(_state["cache"])
+        return cached if cached else None
     devices = payload.get("devices") if isinstance(payload, dict) else None
     if not isinstance(devices, list):
-        return list(_state["cache"])
+        cached = list(_state["cache"])
+        return cached if cached else None
     _state["cache"] = devices
     return devices
+
+
+def fetch_secure_devices(timeout: float = 8.0) -> List[Dict[str, Any]]:
+    rows = fetch_secure_fleet(timeout=timeout)
+    if rows is None:
+        return list(_state["cache"])
+    return rows
 
 
 def new_ingest_frames(devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

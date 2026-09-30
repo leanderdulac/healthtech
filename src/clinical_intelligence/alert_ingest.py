@@ -22,6 +22,70 @@ from src.clinical_intelligence.alert_matrix_rules import (
 logger = logging.getLogger(__name__)
 
 _MODEL_DIR = Path(os.getenv("ALERT_MATRIX_MODEL_DIR", "data/models"))
+_MATRIX_VERSION = "next2u-158-971-2026-08-16"
+_PILOT_SOURCES = frozenset({"ble_hband", "ble_standard"})
+_KNOWN_SOURCES = frozenset(
+    {"companion_manual", "ble_sim", "ble_hband", "ble_standard", "http"}
+)
+
+
+def _ingest_source(raw: Optional[Dict[str, Any]]) -> str:
+    raw = raw or {}
+    val = str(raw.get("ingest_source") or "companion_manual").strip().lower()
+    if val in _KNOWN_SOURCES:
+        return val
+    return "companion_manual"
+
+
+@lru_cache(maxsize=1)
+def rules_fingerprint() -> Dict[str, Any]:
+    """Hash do catálogo vivo das regras. É o que o piloto executa."""
+    import hashlib
+    import json
+
+    from src.clinical_intelligence.alert_matrix_rules import rules_catalog
+
+    catalog = rules_catalog()
+    blob = json.dumps(
+        catalog, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return {
+        "rules_sha256": hashlib.sha256(blob).hexdigest(),
+        "rules_count": len(catalog),
+    }
+
+
+@lru_cache(maxsize=1)
+def git_sha() -> str:
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+        sha = (out.stdout or "").strip()
+        if out.returncode == 0 and sha:
+            return sha
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return "unknown"
+
+
+def alert_provenance(ingest_source: str) -> Dict[str, Any]:
+    fp = rules_fingerprint()
+    return {
+        "git_sha": git_sha(),
+        "rules_sha256": fp["rules_sha256"],
+        "rules_count": fp["rules_count"],
+        "matrix_version": _MATRIX_VERSION,
+        "ingest_source": ingest_source,
+        "pilot_eligible": ingest_source in _PILOT_SOURCES,
+    }
 
 
 @lru_cache(maxsize=1)
@@ -275,11 +339,13 @@ def assess_ingest_alerts(
     phantom: Optional[Dict[str, Any]] = None,
     hband_ext: Optional[Dict[str, Any]] = None,
     raw_telemetry: Optional[Dict[str, Any]] = None,
+    rules_only: bool = False,
 ) -> Dict[str, Any]:
     """
     Avalia alertas clínicos para um frame de ingestão.
 
     Retorno enxuto para embutir em processed_frame['clinical_alerts'].
+    rules_only ignora o classificador mesmo quando o .pkl está no disco.
     """
     vitals, meta = vitals_from_ingest_context(
         heart_rate=heart_rate,
@@ -299,7 +365,9 @@ def assess_ingest_alerts(
     if (vitals.consecutive_valid or 1) >= 2:
         ctx.confirmation_or_persistence = True
 
-    clf = _load_classifier()
+    source = _ingest_source(raw_telemetry)
+    provenance = alert_provenance(source)
+    clf = None if rules_only else _load_classifier()
     if clf is not None:
         full = clf.assess(
             vitals,
@@ -341,6 +409,9 @@ def assess_ingest_alerts(
 
     flow = evaluate_care_flows(vitals, ctx)
     full = apply_care_flow_overlay(full, flow)
+    full["provenance"] = provenance
+    full["ingest_source"] = source
+    full["pilot_eligible"] = provenance["pilot_eligible"]
 
     # Payload estável para API / WebSocket / dashboard.
     # Estrelas, escore e rota operacional ficam em staff_only (não expor ao paciente).
@@ -356,12 +427,15 @@ def assess_ingest_alerts(
         "rule_hits": full.get("rule_hits") or [],
         "rule_explanation": full.get("rule_explanation"),
         "vitals_used": full.get("vitals") or vitals.to_feature_dict(),
-        "ml": full.get("ml"),
+        "ml": None if rules_only else full.get("ml"),
         "discrepancy": full.get("discrepancy"),
         "source_meta": full.get("source_meta") or meta,
         "suppressed_alert_name": full.get("suppressed_alert_name"),
-        "engine": "alert_matrix_ml" if clf is not None else "alert_matrix_rules",
-        "matrix_version": "next2u-158-971-2026-08-16",
+        "engine": "alert_matrix_rules" if clf is None else "alert_matrix_ml",
+        "matrix_version": _MATRIX_VERSION,
+        "ingest_source": source,
+        "pilot_eligible": provenance["pilot_eligible"],
+        "provenance": provenance,
         "care_line": full.get("care_line"),
         "decision_support": full.get("decision_support"),
         "clinical_notes": full.get("clinical_notes") or [],

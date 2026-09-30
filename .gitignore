@@ -46,6 +46,7 @@ data/vertex_deploy/online_smoke_last.json
 data/clinical_cache/baselines/
 data/clinical_intelligence/prediction_*.json
 data/clinical_intelligence/batch_summary.json
+data/pilot_review/
 
 # Formatos voláteis (exceto scraping USP)
 *.csv

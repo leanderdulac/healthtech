@@ -221,24 +221,53 @@ def test_pydantic_input_validation_and_sanitization():
     assert res_filter.status_code == 422
 
 
-def test_lgpd_patient_anonymization_endpoint():
+def test_lgpd_patient_anonymization_endpoint(tmp_path, monkeypatch, caplog):
+    import json
+    import logging
+
+    from app.services.pilot_review import record_ingest, review_path
+    from src.ops.device_registry import list_devices
+
+    monkeypatch.setenv("PILOT_REVIEW_PATH", str(tmp_path / "events.jsonl"))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("OPERATIONAL_DATABASE_URL", raising=False)
     client.post(
         "/api/v1/wearables/ingest",
         headers={"X-API-Key": INGEST_KEY},
-        json={"patient_id": "PAT-LGPD-DEL", "heart_rate": 80.0},
+        json={"patient_id": "PAT-LGPD-DEL", "device_id": "DEV-LGPD-DEL", "heart_rate": 80.0},
     )
+    record_ingest(
+        {
+            "patient_id": "PAT-LGPD-DEL",
+            "device_id": "DEV-LGPD-DEL",
+            "clinical_alerts": {"engine": "alert_matrix_rules", "pilot_eligible": False},
+        }
+    )
+    assert any(
+        row.get("patient_id") == "PAT-LGPD-DEL"
+        for row in list_devices(patient_id="PAT-LGPD-DEL", include_synthetic=True)["devices"]
+    )
+
+    caplog.set_level(logging.INFO, logger="saude_responsiva.audit")
     del_res = client.delete(
         "/api/v1/patient/PAT-LGPD-DEL/anonymize",
         headers={"X-API-Key": ADMIN_KEY},
     )
     assert del_res.status_code == 200
     assert del_res.json()["status"] == "success"
+    assert "PAT-LGPD-DEL" not in caplog.text
+    assert "redigido" in caplog.text
 
     get_res = client.get(
         "/api/v1/wearables/patient/PAT-LGPD-DEL/latest",
         headers={"X-API-Key": ADMIN_KEY},
     )
     assert get_res.status_code == 404
+    fleet = list_devices(patient_id="PAT-LGPD-DEL", include_synthetic=True)
+    assert fleet["devices"] == []
+    leftover = review_path().read_text(encoding="utf-8") if review_path().is_file() else ""
+    assert "PAT-LGPD-DEL" not in leftover
+    assert json.loads(caplog.records[-1].message)["path"].endswith("/anonymize") or "redigido" in caplog.text
 
 
 def test_batch_ingest():

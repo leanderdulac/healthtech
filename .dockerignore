@@ -6,6 +6,7 @@ node_modules
 next2u-web/node_modules
 next2u-web/.next
 companion-android
+next2u-instalar
 **/__pycache__
 **/*.pyc
 data/chroma_db

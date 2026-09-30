@@ -1,10 +1,10 @@
 package com.healthtech.companion.net
 
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Configuração padrão OkHttp + Retrofit para a Secure API.
  *
- * Base URL e API key vêm da UI / local.properties — nunca de constantes de produção.
+ * Base URL e API key vêm da UI. A chave não entra no APK.
  */
 object HealthtechRetrofitFactory {
 
@@ -41,10 +41,7 @@ object HealthtechRetrofitFactory {
             .addInterceptor(userAgentInterceptor())
 
         if (enableHttpLogging) {
-            val log = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
-            }
-            builder.addInterceptor(log)
+            builder.addInterceptor(safeLogInterceptor())
         }
         return builder.build()
     }
@@ -53,8 +50,10 @@ object HealthtechRetrofitFactory {
         baseUrl: String,
         apiKey: String,
         enableHttpLogging: Boolean = false,
+        allowPrivateCleartext: Boolean = false,
     ): Retrofit {
-        val root = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        val normalized = BaseUrlPolicy.normalize(baseUrl, allowPrivateCleartext)
+        val root = if (normalized.endsWith("/")) normalized else "$normalized/"
         return Retrofit.Builder()
             .baseUrl(root)
             .client(okHttp(apiKey, enableHttpLogging))
@@ -66,20 +65,24 @@ object HealthtechRetrofitFactory {
         baseUrl: String = DEFAULT_LOCAL_BASE,
         apiKey: String,
         enableHttpLogging: Boolean = false,
-    ): HealthtechApi = retrofit(baseUrl, apiKey, enableHttpLogging).create(HealthtechApi::class.java)
+        allowPrivateCleartext: Boolean = false,
+    ): HealthtechApi = retrofit(
+        baseUrl,
+        apiKey,
+        enableHttpLogging,
+        allowPrivateCleartext,
+    ).create(HealthtechApi::class.java)
 
     private fun apiKeyInterceptor(apiKey: String): Interceptor = Interceptor { chain ->
         val original = chain.request()
         val path = original.url.encodedPath
-        // /api/health é público — mas enviar a key não quebra
         val req = original.newBuilder()
             .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
             .apply {
+                if (original.body != null) {
+                    header("Content-Type", "application/json")
+                }
                 if (apiKey.isNotBlank() && !path.endsWith("/api/health")) {
-                    header("X-API-Key", apiKey)
-                } else if (apiKey.isNotBlank()) {
-                    // health também pode carregar key sem problema
                     header("X-API-Key", apiKey)
                 }
             }
@@ -87,10 +90,19 @@ object HealthtechRetrofitFactory {
         chain.proceed(req)
     }
 
+    /** Método e status apenas. Corpo e cabeçalho da chave não vão para o logcat. */
+    private fun safeLogInterceptor(): Interceptor = Interceptor { chain ->
+        val response = chain.proceed(chain.request())
+        Log.i(HTTP_LOG_TAG, "${chain.request().method} -> ${response.code}")
+        response
+    }
+
     private fun userAgentInterceptor(): Interceptor = Interceptor { chain ->
         val req = chain.request().newBuilder()
-            .header("User-Agent", "HealthtechCompanion/1.0 (Android)")
+            .header("User-Agent", "HealthtechCompanion/1.1 (Android)")
             .build()
         chain.proceed(req)
     }
+
+    private const val HTTP_LOG_TAG = "HealthtechHttp"
 }

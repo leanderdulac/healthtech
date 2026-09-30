@@ -34,6 +34,15 @@ def teardown_function() -> None:
     clear_all()
 
 
+def test_online_window_covers_the_half_hour_cycle_and_not_a_two_hour_gap():
+    assert ONLINE_WITHIN_SECONDS == 50 * 60
+    now = datetime.now(timezone.utc)
+    within_cycle = {"received_at": (now - timedelta(minutes=30)).isoformat()}
+    assert resolve_fleet_online(None, within_cycle, True, now=now) is True
+    two_hours = {"received_at": (now - timedelta(hours=2)).isoformat(), "online": True}
+    assert resolve_fleet_online(None, two_hours, True, now=now) is False
+
+
 def test_resolve_fleet_online_focus_does_not_fake_status():
     stale = {
         "device_id": "ve30-smoke",
@@ -164,6 +173,101 @@ def test_fleet_summary_is_public_and_hides_synthetics():
     assert opted.status_code == 200
     opted_ids = {row["device_id"] for row in opted.json()["devices"]}
     assert "VE30-PROBE-001" in opted_ids
+
+
+def _secure_row(device_id: str, patient_id: str, when: datetime, heart: float = 75, spo2: float = 99) -> dict:
+    return {
+        "device_id": device_id,
+        "patient_id": patient_id,
+        "last_seen": when.isoformat(),
+        "online": False,
+        "heart_rate": heart,
+        "spo2": spo2,
+    }
+
+
+def test_fleet_summary_uses_secure_api_and_drops_local_ghosts(monkeypatch):
+    upsert_frame(
+        {
+            "patient_id": "PAT-HBAND-001Frota",
+            "device_id": "84:03:A6:48:DD:ED",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 79, "spo2_percent": 98},
+        }
+    )
+    upsert_frame(
+        {
+            "patient_id": "smoke-ctx-patient",
+            "device_id": "smoke-ctx-device",
+            "timestamp": _fresh_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 72, "spo2_percent": 88},
+        }
+    )
+    fresh = datetime.now(timezone.utc)
+    monkeypatch.setattr(
+        "src.ops.dashboard_fleet.fetch_secure_fleet",
+        lambda timeout=8.0: [
+            _secure_row("84:03:A6:48:DD:ED", "PAT-HBAND-001", fresh, 75, 99),
+            _secure_row("smoke-ctx-device", "smoke-ctx-patient", fresh, 72, 88),
+            _secure_row(
+                "E4:A8:B6:12:89:A4",
+                "PAT-HBAND-001",
+                fresh - timedelta(hours=5),
+                74,
+                98,
+            ),
+        ],
+    )
+    res = client.get("/api/v1/ops/fleet-summary?limit=500")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["source"] == "secure-api"
+    ids = [row["device_id"] for row in body["devices"]]
+    assert ids[0] == "84:03:A6:48:DD:ED"
+    assert "smoke-ctx-device" not in ids
+    assert "E4:A8:B6:12:89:A4" in ids
+    live = body["devices"][0]
+    assert live["patient_id"] == "PAT-HBAND-001"
+    assert live["online"] is True
+    assert live["heart_rate"] == 75
+    assert live["spo2"] == 99
+    stale = next(row for row in body["devices"] if row["device_id"] == "E4:A8:B6:12:89:A4")
+    assert stale["online"] is False
+    assert body["counts"]["online"] == 1
+    assert body["counts"]["total"] == 2
+
+
+def test_fleet_summary_empty_secure_fleet_does_not_revive_ghosts(monkeypatch):
+    upsert_frame(
+        {
+            "patient_id": "PAT-OLD",
+            "device_id": "VE30-GHOST",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 60, "spo2_percent": 97},
+        }
+    )
+    monkeypatch.setattr("src.ops.dashboard_fleet.fetch_secure_fleet", lambda timeout=8.0: [])
+    res = client.get("/api/v1/ops/fleet-summary?limit=500")
+    body = res.json()
+    assert body["source"] == "secure-api"
+    assert body["devices"] == []
+    assert body["counts"]["total"] == 0
+
+
+def test_fleet_summary_falls_back_to_local_when_bridge_is_down(monkeypatch):
+    monkeypatch.setattr("src.ops.dashboard_fleet.fetch_secure_fleet", lambda timeout=8.0: None)
+    upsert_frame(
+        {
+            "patient_id": "PAT-KEEP",
+            "device_id": "VE30-LOCAL",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 70, "spo2_percent": 97},
+        }
+    )
+    res = client.get("/api/v1/ops/fleet-summary?limit=500")
+    body = res.json()
+    assert body["source"] == "local"
+    assert {row["device_id"] for row in body["devices"]} == {"VE30-LOCAL"}
 
 
 def test_authenticated_devices_default_hides_synthetic():

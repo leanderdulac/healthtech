@@ -196,7 +196,7 @@ app/
 | Tarefa | ☐ |
 |--------|---|
 | Secrets: API URL + key em BuildConfig / encrypted prefs | ☐ |
-| LGPD: consentimento + unlink device | ☐ |
+| LGPD: consentimento + unlink device | ☑ tela de consentimento específico; revogar desconecta e apaga a outbox |
 | Telemetria de erros SDK (disconnect, busy) | ☐ |
 | Testes em 2+ firmwares / chips (Nordic vs Goodix) | ☐ |
 | Documentar model SKU suportados | ☐ |

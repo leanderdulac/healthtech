@@ -341,11 +341,12 @@ components:
           default: BMO
         ingest_source:
           type: string
-          enum: [companion_manual, ble_sim, ble_hband, http]
+          enum: [companion_manual, ble_sim, ble_hband, ble_standard, http]
           default: companion_manual
           description: >
             Origem honesta do frame. ble_sim = simulador no app (não é pulseira).
-            ble_hband = SDK Veepoo. companion_manual = botão/smoke HTTP.
+            ble_hband = SDK Veepoo. ble_standard = perfil Bluetooth de saúde
+            (FC, SpO2, pressão ou temperatura). companion_manual = botão/smoke HTTP.
         client_reading_id:
           type: string
           minLength: 1

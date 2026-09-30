@@ -9,4 +9,4 @@
 //
 // local.properties (gitignored):
 //   HEALTHTECH_BASE_URL=http://10.0.2.2:8080
-//   HEALTHTECH_INGEST_API_KEY=
+//   A API key é digitada no app. Não coloque HEALTHTECH_INGEST_API_KEY no BuildConfig.

@@ -6,7 +6,6 @@
 # Default debug = emulador → API no host. Device físico: IP da LAN.
 HEALTHTECH_BASE_URL=http://10.0.2.2:8080
 
-# Cole a chave com escopo wearables:write. Nunca commitar valor real.
-HEALTHTECH_INGEST_API_KEY=
+# A API key não é compilada. Cole no app (escopo wearables:write).
 
 HEALTHTECH_PATIENT_ID=PAT-HBAND-001

@@ -329,6 +329,28 @@ WHERE patient_id = :patient_id
 """
 
 
+def purge_patient(patient_id: str) -> int:
+    """Apaga a linha de enrollments deste paciente. Sem banco, não faz nada."""
+    wanted = (patient_id or "").strip()
+    if not wanted:
+        return 0
+    engine = get_engine()
+    if engine is None:
+        return 0
+    from sqlalchemy import text
+
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(
+                text("DELETE FROM enrollments WHERE patient_id = :patient_id"),
+                {"patient_id": wanted},
+            )
+        return int(result.rowcount or 0)
+    except Exception as exc:
+        logger.warning("Falha ao apagar cadastro operacional: %s", exc)
+        return 0
+
+
 def get_patient(patient_id: str) -> Optional[Dict[str, Any]]:
     engine = get_engine()
     if engine is None:

@@ -21,19 +21,14 @@ android {
         applicationId = "com.healthtech.companion"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0-mvp"
+        versionCode = 2
+        versionName = "1.1.0-mvp"
 
-        // Default de debug = emulador → host. Produção: local.properties.
+        // URL e paciente podem vir do local.properties. A API key não entra no APK.
         buildConfigField(
             "String",
             "DEFAULT_BASE_URL",
             "\"${prop("HEALTHTECH_BASE_URL", "http://10.0.2.2:8080")}\"",
-        )
-        buildConfigField(
-            "String",
-            "DEFAULT_INGEST_API_KEY",
-            "\"${prop("HEALTHTECH_INGEST_API_KEY", "")}\"",
         )
         buildConfigField(
             "String",
@@ -95,10 +90,12 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     implementation(project(":client"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    testImplementation("junit:junit:4.13.2")
 
     // HBand / Veepoo SDK (handshake + HR). Sem isto o GATT conecta mas não lê vitais.
     implementation(fileTree("libs") { include("*.aar") })

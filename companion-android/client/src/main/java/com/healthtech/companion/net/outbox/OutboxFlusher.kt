@@ -30,6 +30,10 @@ class OutboxFlusher(
 
     fun all(): List<OutboxItem> = store.toList()
 
+    fun clear() {
+        store.clear()
+    }
+
     /**
      * Processa pendentes. Retorna resumo para log/UI.
      */
