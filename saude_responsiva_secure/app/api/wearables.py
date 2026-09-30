@@ -66,8 +66,8 @@ def _decorate_frame(frame: Dict[str, Any], status: str) -> Dict[str, Any]:
 def _raise_store_unavailable(exc: DurableStoreUnavailable) -> NoReturn:
     raise HTTPException(
         status_code=503,
-        detail=f"{_STORE_UNAVAILABLE_DETAIL} ({exc})",
-    )
+        detail=_STORE_UNAVAILABLE_DETAIL,
+    ) from exc
 
 
 def _extra_payload(payload: WearableTelemetryRequest) -> Dict[str, Any]:
