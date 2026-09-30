@@ -35,6 +35,14 @@ saude_responsiva_secure/
 
 ## Controles de segurança
 
+Falhas do armazenamento durável em ingestão, leituras de wearables e status de
+conexões retornam **503** com mensagem pública fixa. SQL, parâmetros e texto da
+exceção do driver não entram na resposta. O diagnóstico de inicialização informa
+`durable` ou `durable-unavailable`, sem URL de conexão nem detalhes da exceção.
+O comportamento sem fallback e a orientação de manter leituras na fila continuam
+inalterados. Regressões sintéticas: `tests/test_durable_error_privacy.py`; não
+constituem homologação Cloud SQL, integração REAL ou validação física do VE30.
+
 | Controle | Implementação |
 |----------|---------------|
 | Autenticação | Header `X-API-Key` com `hmac.compare_digest` (sem prefix matching) |
