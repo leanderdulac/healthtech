@@ -392,6 +392,8 @@ def ingest_wearable_reading(
             }.items()
             if value is not None
         }
+        _extra = getattr(req, "model_extra", None) or {}
+        _source = getattr(req, "ingest_source", None) or _extra.get("ingest_source") or "companion_manual"
         clinical_alerts = assess_ingest_alerts(
             heart_rate=bpm_clean,
             spo2=req.spo2,
@@ -406,7 +408,9 @@ def ingest_wearable_reading(
                 "skin_temp_celsius": req.skin_temp,
                 "blood_pressure_sys": req.blood_pressure_sys,
                 "blood_pressure_dia": req.blood_pressure_dia,
+                "ingest_source": _source,
             },
+            rules_only=True,
         )
         anomaly_res = merge_anomaly_with_alerts(anomaly_res, clinical_alerts)
     except Exception as alert_err:
@@ -552,7 +556,7 @@ def list_wearable_devices(
 ):
     """Frota de relógios (payload compacto)."""
     from src.security.auth import check_patient_authorization
-    from src.ops.device_registry import list_devices as fleet_list
+    from src.ops.dashboard_fleet import present_fleet
 
     wanted = (patient_id or "").strip() or None
     if wanted and not check_patient_authorization(_api_key, wanted):
@@ -563,7 +567,7 @@ def list_wearable_devices(
                 f"para os dados do paciente '{wanted}'."
             ),
         )
-    return fleet_list(
+    return present_fleet(
         q=q,
         online=online,
         limit=limit,
@@ -609,7 +613,21 @@ def anonymize_patient_telemetry(
     """Endpoint de conformidade LGPD: purga dados do paciente."""
     removed_history = patient_telemetry_history.pop(patient_id, None)
     removed_engine = patient_engines.pop(patient_id, None)
-    if removed_history is None and removed_engine is None:
+    fleet = 0
+    review = 0
+    try:
+        from src.ops.device_registry import purge_patient as purge_device_registry
+
+        fleet = int(purge_device_registry(patient_id) or 0)
+    except Exception as exc:
+        logger.warning("Falha ao purgar device_registry: %s", exc)
+    try:
+        from app.services.pilot_review import purge_patient as purge_pilot_review
+
+        review = int(purge_pilot_review(patient_id) or 0)
+    except Exception as exc:
+        logger.warning("Falha ao purgar pilot_review: %s", exc)
+    if removed_history is None and removed_engine is None and not fleet and not review:
         raise HTTPException(status_code=404, detail=f"Nenhum dado ativo registrado para o paciente '{patient_id}'.")
     return {
         "status": "success",

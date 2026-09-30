@@ -9,7 +9,8 @@
     }
     root.HealthtechFleetLogic = api;
 }(typeof globalThis !== "undefined" ? globalThis : this, function () {
-    const ONLINE_WITHIN_MS = 120000;
+    // 30 min de medição + 15 min de reconexão lenta + folga. 2 h sem pacote fica offline.
+    const ONLINE_WITHIN_MS = 50 * 60 * 1000;
     const SYNTHETIC_TOKENS = ["smoke", "probe", "timecheck"];
 
     function parseStamp(value) {

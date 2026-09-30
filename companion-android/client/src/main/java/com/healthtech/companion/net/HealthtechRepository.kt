@@ -116,8 +116,14 @@ class HealthtechRepository(
             baseUrl: String = HealthtechRetrofitFactory.DEFAULT_LOCAL_BASE,
             apiKey: String,
             enableHttpLogging: Boolean = false,
+            allowPrivateCleartext: Boolean = false,
         ): HealthtechRepository {
-            val api = HealthtechRetrofitFactory.createApi(baseUrl, apiKey, enableHttpLogging)
+            val api = HealthtechRetrofitFactory.createApi(
+                baseUrl,
+                apiKey,
+                enableHttpLogging,
+                allowPrivateCleartext,
+            )
             return HealthtechRepository(api)
         }
     }

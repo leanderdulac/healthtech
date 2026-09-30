@@ -85,6 +85,18 @@ def hrv_bmo_metrics(rr_intervals: List[float]) -> Dict[str, Any]:
     }
 
 
+def _record_pilot(frame: Dict[str, Any]) -> Optional[str]:
+    try:
+        from app.services.pilot_review import record_ingest
+
+        return record_ingest(frame)
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning("Falha ao gravar revisão do piloto: %s", exc)
+        return None
+
+
 def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Processa uma leitura de wearable (denoising + anomalia local + phantom simples)."""
     hr = float(payload["heart_rate"])
@@ -153,7 +165,7 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
         },
     }
 
-    # Matriz de alertas clínicos (regras + ML de falsos positivos)
+    # Piloto: só a matriz de regras. O classificador sintético não altera o alerta.
     hband_ext = payload.get("_hband") or payload.get("hband") or {}
     if not isinstance(hband_ext, dict):
         hband_ext = {}
@@ -193,6 +205,7 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
             phantom=phantom_data,
             hband_ext=hband_ext,
             raw_telemetry=payload,
+            rules_only=True,
         )
         anomaly = merge_anomaly_with_alerts(anomaly, clinical_alerts)
     except Exception as exc:
@@ -204,20 +217,21 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
             "error": str(exc),
         }
 
-    return {
+    frame = {
         "patient_id": payload["patient_id"],
         "device_id": payload.get("device_id") or "wrist_wearable",
         "timestamp": payload.get("timestamp") or "",
         "received_at": payload.get("received_at") or payload.get("timestamp") or "",
         "last_seen_local": payload.get("last_seen_local"),
         "device_time_local": payload.get("device_time_local"),
-        "ingest_source": payload.get("ingest_source") or "companion_manual",
+        "ingest_source": str(payload.get("ingest_source") or "companion_manual"),
         "raw_telemetry": {
             "heart_rate_bpm": hr,
             "hrv_rmssd_ms": hrv,
             "skin_temp_celsius": skin,
             "spo2_percent": spo2,
             "activity_level": activity,
+            "ingest_source": str(payload.get("ingest_source") or "companion_manual"),
         },
         "cleaned_telemetry": {
             "heart_rate_clean": round(bpm_clean, 2),
@@ -228,3 +242,7 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
         "anomaly_detection": anomaly,
         "clinical_alerts": clinical_alerts,
     }
+    event_id = _record_pilot(frame)
+    if event_id and isinstance(clinical_alerts, dict):
+        clinical_alerts["review_event_id"] = event_id
+    return frame

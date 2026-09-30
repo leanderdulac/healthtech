@@ -340,25 +340,31 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2. CONEXÃO WEBSOCKET E COMUNICAÇÃO BIDIRECIONAL
     // ========================================================================
     function updateStatusIndicator(status) {
-        wsStatusIndicator.className = "connection-status";
-        const indicator = wsStatusIndicator.querySelector(".status-indicator");
-        const text = wsStatusIndicator.querySelector(".status-text");
-
         if (status === "connected") {
-            indicator.className = "status-indicator green";
-            text.textContent = "Conectado";
             isConnected = true;
         } else if (status === "connecting") {
-            indicator.className = "status-indicator yellow";
-            text.textContent = "Conectando...";
             isConnected = false;
         } else {
-            indicator.className = "status-indicator red";
-            text.textContent = "Desconectado";
             isConnected = false;
-            // Desativar botões
             btnStart.disabled = true;
             btnStop.disabled = true;
+        }
+    }
+
+    function updateFleetPill(mode) {
+        if (!wsStatusIndicator) return;
+        const indicator = wsStatusIndicator.querySelector(".status-indicator");
+        const text = wsStatusIndicator.querySelector(".status-text");
+        if (!indicator || !text) return;
+        if (mode === "live") {
+            indicator.className = "status-indicator green";
+            text.textContent = "Sinal no prazo";
+        } else if (mode === "stale") {
+            indicator.className = "status-indicator yellow";
+            text.textContent = "Sem leitura recente";
+        } else {
+            indicator.className = "status-indicator red";
+            text.textContent = "Painel sem resposta";
         }
     }
 
@@ -368,7 +374,6 @@ document.addEventListener("DOMContentLoaded", () => {
             reconnectTimer = null;
         }
         if (!apiKey) {
-            updateStatusIndicator("disconnected");
             return;
         }
         updateStatusIndicator("connecting");
@@ -695,11 +700,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(`${API_URL}/api/v1/ops/fleet-summary?${qs}`, {
                 cache: "no-store"
             });
-            if (!res.ok) return;
+            if (!res.ok) {
+                updateFleetPill("down");
+                return;
+            }
             const data = await res.json();
-            renderWatchStrip(data.devices || []);
+            const devices = data.devices || [];
+            renderWatchStrip(devices);
+            updateFleetPill(devices.some((row) => row && row.online) ? "live" : "stale");
         } catch (err) {
-            /* o painel continua com o último estado conhecido */
+            updateFleetPill("down");
         }
     }
 

@@ -464,6 +464,8 @@ def ingest_wearable_reading(
             merge_anomaly_with_alerts,
         )
 
+        _extra = getattr(req, "model_extra", None) or {}
+        _source = getattr(req, "ingest_source", None) or _extra.get("ingest_source") or "companion_manual"
         clinical_alerts = assess_ingest_alerts(
             heart_rate=bpm_clean,
             spo2=req.spo2,
@@ -479,7 +481,9 @@ def ingest_wearable_reading(
                 "blood_pressure_sys": req.blood_pressure_sys,
                 "blood_pressure_dia": req.blood_pressure_dia,
                 "glucose_mgdl": req.glucose_mgdl,
+                "ingest_source": _source,
             },
+            rules_only=True,
         )
         anomaly_res = merge_anomaly_with_alerts(anomaly_res, clinical_alerts)
     except Exception as alert_err:
@@ -612,8 +616,7 @@ def list_wearable_devices(
 ):
     """Frota de relógios vista pelo dashboard (compacta, até 500 por página)."""
     from src.security.auth import check_patient_authorization
-    from src.ops.device_registry import list_devices as fleet_list, merge_remote_rows
-    from src.ops.live_watch_bridge import cached_devices
+    from src.ops.dashboard_fleet import present_fleet
 
     wanted = (patient_id or "").strip() or None
     if wanted and not check_patient_authorization(_api_key, wanted):
@@ -624,8 +627,7 @@ def list_wearable_devices(
                 f"para os dados do paciente '{wanted}'."
             ),
         )
-    merge_remote_rows(cached_devices())
-    return fleet_list(
+    return present_fleet(
         q=q,
         online=online,
         limit=limit,

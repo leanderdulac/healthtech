@@ -45,12 +45,15 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
+    flex-wrap: wrap;
 }
 
-.logo-icon {
-    font-size: 2.2rem;
-    color: #0ea5e9;
-    filter: drop-shadow(0 0 8px rgba(14, 165, 233, 0.6));
+.brand-logo {
+    height: 48px;
+    width: auto;
+    display: block;
+    flex-shrink: 0;
 }
 
 .header-logo h1 {
@@ -60,7 +63,9 @@ body {
     letter-spacing: -0.5px;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
+    min-width: 0;
 }
 
 .badge {
@@ -1107,8 +1112,25 @@ button.nav-btn.active {
         justify-content: center;
     }
 
+    .brand-logo {
+        height: 40px;
+    }
+
     .header-nav {
         width: 100%;
+    }
+}
+
+@media (max-width: 520px) {
+    .header-logo {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .header-logo h1 {
+        flex-direction: column;
+        font-size: 1.35rem;
+        text-align: center;
     }
 }
 

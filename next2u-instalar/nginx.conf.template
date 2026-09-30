@@ -1,0 +1,19 @@
+server {
+    listen ${PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    absolute_redirect off;
+
+    location = /health {
+        default_type text/plain;
+        return 200 'ok';
+    }
+
+    location = /next2u-saude.apk {
+        return 302 https://storage.googleapis.com/healthtech-gcp-2026-next2u-app/next2u-saude-1.1.apk;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
