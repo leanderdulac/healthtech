@@ -6,7 +6,6 @@ import json
 import logging
 import time
 import uuid
-from typing import Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -16,6 +15,19 @@ from app.security.auth import mask_api_key
 
 audit_logger = logging.getLogger("saude_responsiva.audit")
 audit_logger.setLevel(logging.INFO)
+
+
+def redact_subject_path(path: str) -> str:
+    """Tira o identificador cru que vem depois de /patient/."""
+    marker = "/patient/"
+    if marker not in path:
+        return path
+    head, _, tail = path.partition(marker)
+    _subject, sep, rest = tail.partition("/")
+    redacted = head + marker + "redigido"
+    if sep:
+        redacted += sep + rest
+    return redacted
 
 
 class AuditLoggingMiddleware(BaseHTTPMiddleware):
@@ -33,16 +45,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         duration_ms = round((time.time() - start) * 1000, 2)
         response.headers["X-Request-ID"] = request_id
 
-        path = request.url.path
-        patient_id: Optional[str] = None
-        if "/patient/" in path:
-            parts = path.split("/")
-            try:
-                idx = parts.index("patient")
-                if idx + 1 < len(parts):
-                    patient_id = parts[idx + 1]
-            except ValueError:
-                pass
+        path = redact_subject_path(request.url.path)
 
         log_record = {
             "event": "api_access_audit",
@@ -52,7 +55,6 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
             "masked_api_key": masked_key,
             "method": request.method,
             "path": path,
-            "patient_id": patient_id,
             "status_code": response.status_code,
             "duration_ms": duration_ms,
             "user_agent": request.headers.get("user-agent", "unknown"),

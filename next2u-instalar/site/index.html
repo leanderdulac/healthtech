@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#F8F9FF">
+    <title>Instalar next2u SAÚDE</title>
+    <link rel="icon" href="next2u-saude-logo.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="card">
+        <img class="logo" src="next2u-saude-logo.png" alt="Next2U Saúde">
+        <p class="kicker">Instalação do app</p>
+        <h1>next2u SAÚDE no Android</h1>
+        <p class="lead">Este endereço é exclusivo para instalar o app da pulseira. Abra no celular ou no tablet, baixe o arquivo e confirme a instalação.</p>
+
+        <a class="install" href="https://storage.googleapis.com/healthtech-gcp-2026-next2u-app/next2u-saude-1.1.apk">Baixar e instalar</a>
+        <p class="meta">Versão 1.1 · 29/09/2026 · Android 7 ou mais novo</p>
+
+        <ol class="steps">
+            <li>Toque em <strong>Baixar e instalar</strong> neste Android.</li>
+            <li>Quando o arquivo terminar, abra <strong>next2u-saude.apk</strong> na notificação.</li>
+            <li>Se o sistema pedir, permita a instalação por este navegador e confirme.</li>
+            <li>Abra o next2u SAÚDE. A pulseira já pareada neste aparelho continua salva.</li>
+        </ol>
+
+        <section class="qr-block">
+            <div id="qr" role="img" aria-label="Código para abrir esta página no celular"></div>
+            <p>No computador, aponte a câmera do Android para o código. Ele abre esta mesma página.</p>
+            <a id="page-link" class="page-link" href=""></a>
+        </section>
+
+        <p class="help">Se o Android disser que já existe outro next2u SAÚDE e recusar o arquivo, desinstale o app antigo e toque de novo.</p>
+    </main>
+    <script src="qrcode.js"></script>
+    <script>
+        var pageLink = document.getElementById("page-link");
+        pageLink.textContent = location.href;
+        pageLink.href = location.href;
+        var code = qrcode(0, "M");
+        code.addData(location.href);
+        code.make();
+        document.getElementById("qr").innerHTML = code.createSvgTag({cellSize: 4, margin: 2});
+    </script>
+</body>
+</html>

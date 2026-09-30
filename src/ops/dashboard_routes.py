@@ -27,16 +27,6 @@ def _public_device_row(row: Dict[str, Any]) -> Dict[str, Any]:
     return {key: row.get(key) for key in _PUBLIC_DEVICE_FIELDS if key in row}
 
 
-def _refresh_remote_fleet() -> None:
-    try:
-        from src.ops.device_registry import merge_remote_rows
-        from src.ops.live_watch_bridge import cached_devices
-
-        merge_remote_rows(cached_devices())
-    except Exception:
-        return
-
-
 @router.get("/dashboard-bootstrap")
 def dashboard_bootstrap() -> Dict[str, Any]:
     """Config pública do painel. Nunca inclui chave de API."""
@@ -66,10 +56,9 @@ def fleet_summary(
     Expõe no máximo os campos compactos já mostrados na tabela (sem `latest`,
     sem histórico, sem chave). Devices sintéticos ficam de fora por padrão.
     """
-    from src.ops.device_registry import list_devices as fleet_list
+    from src.ops.dashboard_fleet import present_fleet
 
-    _refresh_remote_fleet()
-    payload = fleet_list(
+    payload = present_fleet(
         q=q,
         online=online,
         limit=limit,
@@ -80,6 +69,7 @@ def fleet_summary(
     return {
         "ok": True,
         "public": True,
+        "source": payload.get("source"),
         "counts": payload.get("counts") or {},
         "limit": payload.get("limit"),
         "offset": payload.get("offset"),

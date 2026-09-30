@@ -124,12 +124,8 @@ graph TD
    Apache 2.0 — ver [`libs/THIRD_PARTY_NOTICE.md`](sprint-a/libs/THIRD_PARTY_NOTICE.md) para a
    proveniência de cada arquivo). Não é necessário baixar nada manualmente.
 2. **Configurar a `X-API-Key` de ingestão** (nunca commitar a chave):
-   - Criar `companion-android/local.properties` (gitignored) com:
-     ```properties
-     HEALTHTECH_INGEST_API_KEY=sua-chave-aqui
-     ```
-   - Ou exportar a variável de ambiente `HEALTHTECH_INGEST_API_KEY` antes do build.
-   - O valor é injetado em `BuildConfig.HEALTHTECH_INGEST_API_KEY` e lido por `MainActivity` e `Ve30TelemetryService` — sem chave, o app roda sem o header `X-API-Key`.
+   - Cole a chave na tela do Companion. Ela fica no cofre cifrado do aparelho e não entra no APK.
+   - Sem chave, o app não envia o header `X-API-Key`.
 3. **Compilar via Linha de Comando ou Android Studio**:
    ```bash
    cd companion-android

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.ops.live_devices import summarize_frame
-from src.ops.timestamps import is_online, parse_timestamp
+from src.ops.timestamps import age_seconds, is_online, parse_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,7 @@ def _refresh_online(row: Dict[str, Any], now: Optional[datetime] = None) -> Dict
     live_ref = row.get("received_at") or row.get("last_seen")
     out = dict(row)
     out["online"] = is_online(live_ref, now=now)
+    out["age_seconds"] = age_seconds(live_ref, now=now)
     return out
 
 
@@ -315,6 +316,27 @@ def merge_remote_rows(rows: List[Dict[str, Any]]) -> None:
             _dirty = True
             _evict_unlocked()
             _flush_unlocked()
+
+
+def purge_patient(patient_id: str) -> int:
+    """Apaga da frota os relógios ligados a este paciente e regrava o arquivo."""
+    wanted = (patient_id or "").strip()
+    if not wanted:
+        return 0
+    with _lock:
+        _load_unlocked()
+        doomed = [
+            device_id
+            for device_id, row in _devices.items()
+            if str(row.get("patient_id") or "") == wanted
+        ]
+        for device_id in doomed:
+            _devices.pop(device_id, None)
+        if doomed:
+            global _dirty
+            _dirty = True
+            _flush_unlocked(force=True)
+        return len(doomed)
 
 
 def clear_all() -> None:

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 # Fonte única: validador Pydantic e /openapi.json (docs/openapi/hband-wearable.yaml).
-INGEST_SOURCES = ("companion_manual", "ble_sim", "ble_hband", "http")
+INGEST_SOURCES = ("companion_manual", "ble_sim", "ble_hband", "ble_standard", "http")
 FILTER_TYPES = ("BMO", "Wavelet", "Butterworth", "Raw", "Adaptive")
 
 

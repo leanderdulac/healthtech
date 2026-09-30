@@ -16,7 +16,7 @@ def anonymize_patient(
     request: Request,
     _api_key: str = Depends(require_scope("admin")),
 ):
-    """LGPD: purga histórico em memória do paciente. Requer admin."""
+    """LGPD: apaga telemetria, frota, revisão de piloto e cadastro. Requer admin."""
     _ = request
     had = telemetry_store.anonymize_patient(patient_id)
     if not had:

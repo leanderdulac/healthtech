@@ -7,7 +7,9 @@ from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
 DISPLAY_TZ = ZoneInfo("America/Sao_Paulo")
-ONLINE_WITHIN_SECONDS = 120.0
+# Uma rodada a cada 30 min, mais a reconexão lenta de 15 min e uma folga curta.
+# Duas horas sem pacote continuam offline.
+ONLINE_WITHIN_SECONDS = 50 * 60.0
 
 
 def now_utc() -> datetime:
