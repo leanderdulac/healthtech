@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     admin_api_key: str = ""
     ingest_api_key: str = ""
     read_api_key: str = ""
+    # Chave read-only exclusiva do SM Click (escopo wearables:read). Revogável sem afetar a Web.
+    smclick_read_api_key: str = ""
     auth_disabled: bool = False
     secret_salt: str = "default-salt"
     allowed_patient_ids: str = ""
