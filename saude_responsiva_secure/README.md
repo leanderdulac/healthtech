@@ -152,3 +152,7 @@ Veja [`.env.example`](.env.example). Em **production**:
 2. `SECRET_SALT` fraco aborta o startup
 3. API keys fracas/curtas abortam o startup
 4. CORS com `*` é rejeitado
+5. `ALERT_ML_ENABLED` default `false` — piloto usa só regras (`engine=alert_matrix_rules`).
+   Ligar exige `ALERT_MATRIX_MODEL_PATH` (local ou `gs://`) e modelo **clinicamente validado**.
+   O artefato histórico foi treinado em dados sintéticos; ML só sugere e não suprime
+   alerta de regra nem rebaixa ★★★ salvo `ALERT_ML_ALLOW_SUPPRESS` / `ALERT_ML_ALLOW_SOFT_ALERT`.

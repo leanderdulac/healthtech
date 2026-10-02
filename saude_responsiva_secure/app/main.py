@@ -12,6 +12,7 @@ Modos (APP_MODE):
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -49,6 +50,26 @@ def _ensure_project_root_on_path() -> None:
             sys.path.insert(0, s)
 
 
+def _sync_alert_ml_env(settings) -> None:
+    """Espelha Settings → os.environ para alert_ingest (lê getenv).
+
+    Não sobrescreve variáveis já definidas (Cloud Run / testes).
+    """
+    pairs = {
+        "ALERT_ML_ENABLED": "true" if settings.alert_ml_enabled else "false",
+        "ALERT_MATRIX_MODEL_PATH": settings.alert_matrix_model_path or "",
+        "ALERT_MATRIX_MODEL_DIR": settings.alert_matrix_model_dir or "data/models",
+        "ALERT_ML_MODEL_VERSION": settings.alert_ml_model_version or "",
+        "ALERT_ML_PROVENANCE": settings.alert_ml_provenance or "synthetic-unvalidated",
+        "ALERT_ML_ALLOW_SUPPRESS": "true" if settings.alert_ml_allow_suppress else "false",
+        "ALERT_ML_ALLOW_SOFT_ALERT": "true" if settings.alert_ml_allow_soft_alert else "false",
+        "ALERT_ML_CACHE_DIR": settings.alert_ml_cache_dir or "/tmp/alert_matrix_cache",
+    }
+    for key, value in pairs.items():
+        if key not in os.environ:
+            os.environ[key] = value
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
@@ -67,6 +88,13 @@ async def lifespan(app: FastAPI):
         log_store_backend()
     except Exception as exc:
         logger.warning("Não foi possível determinar o backend de telemetria: %s", exc)
+    _sync_alert_ml_env(settings)
+    try:
+        from src.clinical_intelligence.alert_ingest import log_alert_ml_startup
+
+        log_alert_ml_startup()
+    except Exception as exc:
+        logger.warning("alert_ml=disabled reason=startup_error error=%s", exc)
     yield
     logger.info("Encerrando aplicação.")
 

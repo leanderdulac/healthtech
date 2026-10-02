@@ -93,6 +93,10 @@ def test_ingest_key_can_write_telemetry():
     data = response.json()
     assert data["patient_id"] == "PAT-TEST-001"
     assert data["cleaned_telemetry"]["heart_rate_clean"] == 82.0
+    # Piloto: ML desligado por omissão — só motor de regras.
+    alerts = data.get("clinical_alerts") or {}
+    assert alerts.get("engine") == "alert_matrix_rules"
+    assert alerts.get("ml") is None
 
 
 def test_read_key_cannot_write_telemetry():

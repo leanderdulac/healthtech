@@ -33,6 +33,8 @@ COPY --chown=appuser:appuser requirements.txt /app/
 #   ops — timestamps, patients_routes, operational_patients, live_devices, device_registry
 # Fonte local: _vendor_src/ (evita sombrear monorepo `src/` no PYTHONPATH do host)
 COPY --chown=appuser:appuser _vendor_src/ /app/src/
+# Catálogo Next2U (estrelas/nomes). Sem este JSON as 158 regras caem para 1★/leve.
+COPY --chown=appuser:appuser data/ /app/data/
 
 USER appuser
 
