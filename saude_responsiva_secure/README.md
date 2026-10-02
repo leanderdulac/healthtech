@@ -43,6 +43,7 @@ saude_responsiva_secure/
 | Rate limit | janela deslizante por path/chave (`RATE_LIMIT_INGEST` default 300/min) |
 | Clinical alerts | subset `clinical_intelligence` via `scripts/sync_secure_vendor.py` (`_vendor_src/`) |
 | Cadastro operacional | subset `ops`: `timestamps`, `patients_routes`, `operational_patients`, `live_devices`, `device_registry` (sem billing / live_watch_bridge) |
+| Snapshot da frota | arquivo local (`FLEET_DEVICES_PATH`) + GCS (`GCS_STAGING_BUCKET` / `ops/fleet/devices.json`) via `google-cloud-storage` |
 | Headers | HSTS, CSP, nosniff, X-Frame-Options, Referrer-Policy |
 | Auditoria | Middleware JSON com `X-Request-ID` e chave mascarada |
 | Validação | Pydantic v2 (limites fisiológicos, patient_id sanitizado) |
