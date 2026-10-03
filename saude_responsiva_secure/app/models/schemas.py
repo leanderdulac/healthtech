@@ -32,10 +32,12 @@ class WearableTelemetryRequest(BaseModel):
     device_id: Optional[str] = Field("wrist_wearable", max_length=64)
     timestamp: Optional[str] = Field(None, max_length=64)
     heart_rate: float = Field(..., ge=20.0, le=250.0)
-    hrv_rmssd: Optional[float] = Field(40.0, ge=0.0, le=300.0)
-    skin_temp: Optional[float] = Field(33.0, ge=25.0, le=45.0)
-    spo2: Optional[float] = Field(98.0, ge=50.0, le=100.0)
-    activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
+    # Vitais opcionais SEM default: ausente = desconhecido (None), nunca um
+    # valor inventado (antes: hrv 40, pele 33 °C, SpO2 98 %, atividade 0).
+    hrv_rmssd: Optional[float] = Field(None, ge=0.0, le=300.0)
+    skin_temp: Optional[float] = Field(None, ge=25.0, le=45.0)
+    spo2: Optional[float] = Field(None, ge=50.0, le=100.0)
+    activity_level: Optional[float] = Field(None, ge=0.0, le=100.0)
     ppg_signal: Optional[List[float]] = None
     filter_type: Optional[str] = Field(
         "BMO",

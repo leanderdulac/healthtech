@@ -8,14 +8,21 @@ depois, em next2u_promotion — aqui só o padrão original.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.clinical_intelligence.alert_matrix_rules import VitalSnapshot, _ge, _in, _le
 
+logger = logging.getLogger(__name__)
+
 Pred = Callable[[VitalSnapshot], bool]
 STAR_SEV = {1: "leve", 2: "moderado", 3: "critico"}
+# Relativo ao CWD: /app na imagem secure (WORKDIR), raiz do repo nos testes.
+DEFAULT_CATALOG_PATH = Path("data/models/next2u_expanded_matrix.json")
+# (status, path) já logados — load_base_meta roda em build_rules e next2u_mapping.
+_CATALOG_STATUS_LOGGED: set = set()
 PROFILE_CAT = {
     1: "pa_alta",
     2: "pa_baixa",
@@ -462,9 +469,33 @@ def _short_name(suggested: str) -> str:
     ).strip()
 
 
+def _log_catalog_status(status: str, path: Path, cat: Dict[str, Any], n_rules: int) -> None:
+    """Uma linha por (status, path) por processo: loaded (INFO) ou missing (WARNING)."""
+    path = path.absolute()
+    key = (status, str(path))
+    if key in _CATALOG_STATUS_LOGGED:
+        return
+    _CATALOG_STATUS_LOGGED.add(key)
+    if status == "loaded":
+        logger.info(
+            "alert_matrix_catalog=loaded path=%s rules=%d patterns=%d version=%s",
+            path,
+            n_rules,
+            len(cat.get("patterns", [])),
+            cat.get("version", ""),
+        )
+    else:
+        logger.warning(
+            "alert_matrix_catalog=missing path=%s — as 158 regras caem para "
+            "1 estrela/leve, perfil 1 (pa_alta) e nome placeholder",
+            path,
+        )
+
+
 def load_base_meta(catalog_path: Optional[Path] = None) -> Dict[int, Dict[str, Any]]:
-    path = catalog_path or Path("data/models/next2u_expanded_matrix.json")
-    cat = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"patterns": []}
+    path = Path(catalog_path) if catalog_path is not None else DEFAULT_CATALOG_PATH
+    present = path.is_file()
+    cat = json.loads(path.read_text(encoding="utf-8")) if present else {"patterns": []}
     meta: Dict[int, Dict[str, Any]] = {}
     for p in cat.get("patterns", []):
         b = int(p["base_id"])
@@ -481,11 +512,12 @@ def load_base_meta(catalog_path: Optional[Path] = None) -> Dict[int, Dict[str, A
             if p.get("variant") == 1:
                 meta[b]["name"] = _short_name(p["suggested_name"])
                 meta[b]["pattern"] = p["original_pattern"]
+    _log_catalog_status("loaded" if present else "missing", path, cat, len(meta))
     return meta
 
 
-def build_rules() -> List[Dict[str, Any]]:
-    meta = load_base_meta()
+def build_rules(catalog_path: Optional[Path] = None) -> List[Dict[str, Any]]:
+    meta = load_base_meta(catalog_path)
     rules: List[Dict[str, Any]] = []
     for i in range(1, 159):
         pred = PREDICATES.get(i)
