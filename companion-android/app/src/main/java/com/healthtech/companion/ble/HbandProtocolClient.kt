@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.healthtech.companion.telemetry.OriginVitalSample
 import com.inuker.bluetooth.library.Code
 import com.inuker.bluetooth.library.Constants
 import com.inuker.bluetooth.library.model.BleGattProfile
@@ -14,13 +15,15 @@ import com.veepoo.protocol.listener.base.IABleConnectStatusListener
 import com.veepoo.protocol.listener.base.IBleWriteResponse
 import com.veepoo.protocol.listener.base.IConnectResponse
 import com.veepoo.protocol.listener.base.INotifyResponse
+import com.veepoo.protocol.listener.data.ICustomSettingDataListener
 import com.veepoo.protocol.listener.data.IDeviceFuctionDataListener
 import com.veepoo.protocol.listener.data.IHeartDataListener
+import com.veepoo.protocol.listener.data.IOriginData3Listener
 import com.veepoo.protocol.listener.data.IPersonInfoDataListener
 import com.veepoo.protocol.listener.data.IPwdDataListener
 import com.veepoo.protocol.listener.data.ISocialMsgDataListener
-import com.veepoo.protocol.listener.data.ICustomSettingDataListener
 import com.veepoo.protocol.listener.data.ISpo2hDataListener
+import com.veepoo.protocol.listener.data.ITemptureDetectDataListener
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage1
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage2
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage3
@@ -28,10 +31,14 @@ import com.veepoo.protocol.model.datas.DeviceFunctionPackage4
 import com.veepoo.protocol.model.datas.DeviceFunctionPackage5
 import com.veepoo.protocol.model.datas.FunctionDeviceSupportData
 import com.veepoo.protocol.model.datas.FunctionSocailMsgData
+import com.veepoo.protocol.model.datas.HRVOriginData
 import com.veepoo.protocol.model.datas.HeartData
+import com.veepoo.protocol.model.datas.OriginData3
+import com.veepoo.protocol.model.datas.OriginHalfHourData
 import com.veepoo.protocol.model.datas.PersonInfoData
 import com.veepoo.protocol.model.datas.PwdData
-import com.veepoo.protocol.model.datas.Spo2hData
+import com.veepoo.protocol.model.datas.Spo2hOriginData
+import com.veepoo.protocol.model.enums.EBPDetectModel
 import com.veepoo.protocol.model.enums.EHeartStatus
 import com.veepoo.protocol.model.enums.EOprateStauts
 import com.veepoo.protocol.model.enums.EPwdStatus
@@ -45,7 +52,7 @@ import com.veepoo.protocol.model.settings.CustomSettingData
  * → (1.2s) → startDetectHeart.
  *
  * Só emite BPM quando [EHeartStatus.STATE_HEART_NORMAL] e o valor está em 20–250.
- * STATE_INIT / DETECT / BUSY devolvem 0 ou lixo — isso era a leitura "errada".
+ * `startDetectHeart` e `readOriginData*` nunca rodam em paralelo.
  */
 class HbandProtocolClient(
     context: Context,
@@ -61,6 +68,10 @@ class HbandProtocolClient(
         fun onSpo2(percent: Int, mac: String)
         fun onDisconnected(mac: String, reason: String?)
         fun onError(message: String)
+        fun onPpgSample(sample: Double) {}
+        fun onOriginProgress(day: Int, date: String, samples: Int) {}
+        fun onOriginComplete(samples: List<OriginVitalSample>) {}
+        fun onOriginError(message: String) {}
     }
 
     private val appContext = context.applicationContext
@@ -74,6 +85,9 @@ class HbandProtocolClient(
         private set
 
     @Volatile private var heartRunning = false
+    @Volatile private var spo2Running = false
+    @Volatile private var originSyncRunning = false
+    @Volatile private var resumeHeartAfterOrigin = false
     @Volatile private var handshakeGen = 0
 
     private val writeAck = IBleWriteResponse { code ->
@@ -177,7 +191,7 @@ class HbandProtocolClient(
 
     fun disconnect() {
         handshakeGen++
-        stopHeartInternal()
+        stopAllSensorsInternal()
         disconnectInternal()
     }
 
@@ -185,6 +199,10 @@ class HbandProtocolClient(
         val mac = connectedMac
         if (!isReady || mac == null) {
             listener.onError("Device ainda não está ready (senha/personInfo).")
+            return
+        }
+        if (originSyncRunning) {
+            listener.onError("Aguarde o sync OriginData3 terminar antes de medir FC.")
             return
         }
         if (heartRunning) return
@@ -196,7 +214,93 @@ class HbandProtocolClient(
     }
 
     fun stopHeart() {
-        stopHeartInternal()
+        stopHeartDetectOnly()
+    }
+
+    /** Para HR, SpO2, temp, PA e HRV — o stub antigo só chamava stopDetectHeart. */
+    fun stopAllSensors() {
+        stopAllSensorsInternal()
+        listener.onStatus("Sensores parados.")
+    }
+
+    /**
+     * Lê OriginData3 da flash. **Para** detect realtime antes (regra serial do SDK).
+     */
+    fun syncOriginHistory() {
+        if (!isReady) {
+            listener.onOriginError("Device ainda não está ready para histórico.")
+            return
+        }
+        if (originSyncRunning) {
+            listener.onStatus("Sync OriginData3 já em andamento.")
+            return
+        }
+        val gen = handshakeGen
+        originSyncRunning = true
+        resumeHeartAfterOrigin = heartRunning
+        stopAllSensorsInternal()
+        listener.onStatus("Lendo histórico OriginData3 (sensores realtime pausados)…")
+
+        val rawBlocks = mutableListOf<OriginData3>()
+        val hrvByDate = mutableMapOf<String, Double>()
+
+        manager.readOriginData(
+            writeAck,
+            object : IOriginData3Listener {
+                override fun onOriginFiveMinuteListDataChange(originDataList: List<OriginData3>?) {
+                    if (originDataList != null) rawBlocks += originDataList
+                    handler.post {
+                        if (gen != handshakeGen) return@post
+                        listener.onOriginProgress(0, "", rawBlocks.size)
+                    }
+                }
+
+                override fun onOriginHalfHourDataChange(originHalfHourData: OriginHalfHourData?) = Unit
+
+                override fun onOriginHRVOriginListDataChange(originHrvDataList: List<HRVOriginData>?) {
+                    originHrvDataList.orEmpty().forEach { row ->
+                        OriginDataMapper.hrvValue(row)?.let { (key, value) ->
+                            hrvByDate[key] = value
+                        }
+                    }
+                }
+
+                override fun onOriginSpo2OriginListDataChange(originSpo2hDataList: List<Spo2hOriginData>?) = Unit
+
+                override fun onReadOriginProgressDetail(day: Int, date: String?, allPackage: Int, currentPackage: Int) {
+                    handler.post {
+                        if (gen != handshakeGen) return@post
+                        listener.onOriginProgress(day, date.orEmpty(), rawBlocks.size)
+                    }
+                }
+
+                override fun onReadOriginProgress(progress: Float) = Unit
+
+                override fun onReadOriginComplete() {
+                    handler.post {
+                        if (gen != handshakeGen) return@post
+                        originSyncRunning = false
+                        val samples = rawBlocks.map { OriginDataMapper.toSample(it, hrvByDate) }
+                        listener.onOriginComplete(samples)
+                        if (resumeHeartAfterOrigin && isReady && connectedMac != null) {
+                            startHeart()
+                        }
+                    }
+                }
+
+                override fun onReadTimeout(day: Int) {
+                    handler.post {
+                        if (gen != handshakeGen) return@post
+                        originSyncRunning = false
+                        listener.onOriginError("Timeout ao ler histórico do dia $day.")
+                        if (resumeHeartAfterOrigin && isReady && connectedMac != null) {
+                            startHeart()
+                        }
+                    }
+                }
+            },
+            ORIGIN_DATA_PROTOCOL_VERSION,
+        )
     }
 
     private fun confirmPassword(mac: String, gen: Int) {
@@ -310,10 +414,11 @@ class HbandProtocolClient(
             listener.onError("Device não está ready para SpO2.")
             return
         }
-        if (heartRunning) {
-            listener.onError("Pare a FC antes de medir SpO2 (SDK não aceita paralelo).")
+        if (heartRunning || originSyncRunning) {
+            listener.onError("Pare a FC / sync histórico antes de medir SpO2 (SDK não aceita paralelo).")
             return
         }
+        spo2Running = true
         manager.startDetectSPO2H(
             writeAck,
             ISpo2hDataListener { spo2 ->
@@ -329,12 +434,20 @@ class HbandProtocolClient(
         )
     }
 
-    private fun stopHeartInternal() {
+    private fun stopHeartDetectOnly() {
         if (heartRunning) {
             runCatching { manager.stopDetectHeart(writeAck) }
             heartRunning = false
         }
+    }
+
+    private fun stopAllSensorsInternal() {
+        stopHeartDetectOnly()
         runCatching { manager.stopDetectSPO2H(writeAck, ISpo2hDataListener { }) }
+        runCatching { manager.stopDetectTempture(writeAck, ITemptureDetectDataListener { }) }
+        runCatching { manager.stopDetectBP(writeAck, EBPDetectModel.DETECT_MODEL_PUBLIC) }
+        // stopDetectHrv exige IHrvDetectListener compilado com Kotlin 2.1; o módulo está em 1.9.
+        spo2Running = false
     }
 
     private fun disconnectInternal() {
@@ -350,6 +463,9 @@ class HbandProtocolClient(
     private fun resetHandshake(reason: String?) {
         isReady = false
         heartRunning = false
+        spo2Running = false
+        originSyncRunning = false
+        resumeHeartAfterOrigin = false
         if (reason != null) Log.i(TAG, "handshake reset: $reason")
     }
 
@@ -357,5 +473,6 @@ class HbandProtocolClient(
         private const val TAG = "HbandProtocol"
         const val DEFAULT_PWD = "0000"
         private const val READY_DELAY_MS = 1_200L
+        private const val ORIGIN_DATA_PROTOCOL_VERSION = 3
     }
 }
