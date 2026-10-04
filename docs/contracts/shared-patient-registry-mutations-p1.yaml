@@ -1,11 +1,28 @@
 openapi: 3.0.3
 info:
   title: HealthTech Core — Shared Patient Registry Mutations (P1)
-  version: 0.1.0-draft
+  version: 0.2.0-draft
   description: |
     DRAFT for workshop — NOT CONFIRMED.
-    Extends P0 patient reads with create/update/search/dedup/consents/attachments.
-    Service-to-service auth only (X-API-Key). Human identity stays in Next2U BFF.
+
+    Extends CONFIRMED P0 patient reads with create/update/search/dedup/merge/
+    consents/attachments. Service-to-service auth only (X-API-Key). Human
+    identity stays in the Next2U BFF.
+
+    Semantic source: SHARED_PATIENT_REGISTRY_MUTATIONS_P1.md (same revision).
+    HTTP types/status codes in this file win; territory / idempotency / merge /
+    PATCH rules in the markdown win.
+
+    Breaking inconsistencies vs 0.1.0-draft (still DRAFT, not CONFIRMED):
+    - Patient.registry_version is additive (not required on P0 GET).
+    - Idempotent replay is 2xx + Idempotent-Replayed, never 409.
+    - 409 idempotency_key_reuse = same key, different body.
+    - Search/dedup use the same territorial fail-closed recorte as GET /patients.
+    - links do not write programs (programs remains the P0 SoT).
+    - PUT /consents is upsert-by-purpose, not a wipe.
+    - Merge retires the duplicate (410 already_merged) and refuses distinct
+      defined territories (409 territory_mismatch).
+    - Attachments do not increment registry_version.
   contact:
     name: HealthTech Core
     url: https://github.com/leanderdulac/healthtech
@@ -16,20 +33,28 @@ servers:
     description: Local
 tags:
   - name: patients-read
-    description: CONFIRMED P0 surfaces (continuity)
+    description: CONFIRMED P0 surfaces (additive P1 fields only)
   - name: patients-write
-    description: DRAFT mutations
+    description: DRAFT mutations (create / patch / links / history)
   - name: patients-dedup
     description: DRAFT search / dedup / merge
   - name: patients-consents
-    description: DRAFT consents
+    description: DRAFT consents (upsert by purpose)
   - name: patients-attachments
-    description: DRAFT attachment metadata
+    description: DRAFT attachment metadata (does not bump registry_version)
 paths:
   /api/v1/patients:
     get:
       tags: [patients-read]
       summary: Authorized enumeration (CONFIRMED P0)
+      description: |
+        Unchanged P0 contract. `items` and `patients` are the same array.
+        Authz-before-page. Undefined territory is excluded. Non-admin without
+        a finite allow-list and without territorial scopes returns an empty page.
+        P1 fields on each item are additive / null when unknown.
+        `registry_version` is present on P1-aware responses (synthesized for
+        P0-only rows) and echoed as ETag per item is NOT required; list has
+        no single ETag.
       operationId: listPatientsAuthorized
       security: [{ ApiKeyAuth: [] }]
       parameters:
@@ -40,7 +65,7 @@ paths:
         - $ref: '#/components/parameters/UbsId'
       responses:
         '200':
-          description: Authorized page
+          description: Authorized page (may be empty — fail-closed, not 403)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PatientListResponse' }
@@ -50,10 +75,21 @@ paths:
     post:
       tags: [patients-write]
       summary: Create patient (DRAFT)
+      description: |
+        Requires Idempotency-Key. Strong collision on a non-empty
+        cpf_fingerprint of an active patient → 409 duplicate_fingerprint
+        (existing_patient_id only if the caller is authorized to see it).
+        Suggested patient_id already active → 409 duplicate_patient_id.
+        Undefined territory is allowed and stays out of P0 enumeration.
+        Defined territory must belong to the request's territorial union
+        (non-admin). Replay of the same key+body → 201 + Idempotent-Replayed.
       operationId: createPatient
       security: [{ ApiKeyAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       requestBody:
         required: true
         content:
@@ -61,11 +97,14 @@ paths:
             schema: { $ref: '#/components/schemas/PatientCreateRequest' }
       responses:
         '201':
-          description: Created
+          description: Created (or idempotent replay of a successful create)
           headers:
             ETag:
               schema: { type: string }
               description: registry_version
+            Idempotent-Replayed:
+              schema: { type: boolean }
+              description: true when this is a replay of a prior success
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Patient' }
@@ -73,7 +112,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
-          description: Idempotency or fingerprint conflict
+          description: |
+            duplicate_fingerprint | duplicate_patient_id | already_merged |
+            idempotency_key_reuse — not a successful replay.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ConflictError' }
@@ -84,10 +125,18 @@ paths:
       tags: [patients-dedup]
       summary: Search registry (DRAFT)
       description: |
-        Operator search. Does NOT replace territorial GET /patients.
-        BFF must still enforce professional territory before exposing hits.
+        Operator search inside the authorized set. Does NOT replace territorial
+        GET /patients. Query territory / municipality_id / ubs_id are the P0
+        authz scopes (fail-closed empty hits). Body municipality_id / ubs_id
+        are additional filters inside that set. Retired (merged) ids are
+        excluded. BFF still must not expose hits outside the professional
+        assignment; Core does not receive the human JWT.
       operationId: searchPatients
       security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       requestBody:
         required: true
         content:
@@ -95,20 +144,29 @@ paths:
             schema: { $ref: '#/components/schemas/PatientSearchRequest' }
       responses:
         '200':
-          description: Ranked hits
+          description: Ranked hits (empty when fail-closed)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PatientSearchResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /api/v1/patients/dedup/candidates:
     post:
       tags: [patients-dedup]
       summary: Suggest duplicates (DRAFT) — never auto-merge
+      description: |
+        Ranking only. authz-before-rank uses the same P0 territorial query
+        params as GET /patients. Retired ids are excluded. Does not persist
+        and does not merge.
       operationId: suggestDedupCandidates
       security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       requestBody:
         required: true
         content:
@@ -116,19 +174,26 @@ paths:
             schema: { $ref: '#/components/schemas/DedupRequest' }
       responses:
         '200':
-          description: Suggestions
+          description: Suggestions (empty when fail-closed or no candidates)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DedupResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /api/v1/patients/{patient_id}:
     parameters:
       - $ref: '#/components/parameters/PatientId'
     get:
       tags: [patients-read]
-      summary: Get patient (P0 + DRAFT registry_version)
+      summary: Get patient (P0 + additive DRAFT fields)
+      description: |
+        P0 fields always present. P1 fields additive. Retired (merged) id →
+        410 already_merged with survivor_patient_id. Out of authorized set →
+        404 (preferred; do not confirm existence with 403).
       operationId: getPatient
       security: [{ ApiKeyAuth: [] }]
       responses:
@@ -137,19 +202,30 @@ paths:
           headers:
             ETag:
               schema: { type: string }
+              description: Opaque registry_version (synthesized on P0-only rows)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Patient' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/GoneMerged' }
         '503': { $ref: '#/components/responses/Unavailable' }
     patch:
       tags: [patients-write]
       summary: Patch patient with optimistic concurrency (DRAFT)
+      description: |
+        Omitted key = unchanged. Null scalar/object = clear. Arrays replace
+        wholly ([] clears; null array → 400). links if present replaces the
+        links object (same as PUT /links). consents are not patchable here.
+        If-Match required (428 if missing). If-Match: * is rejected (400).
+        Does not create. Retired id → 410.
       operationId: patchPatient
       security: [{ ApiKeyAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       requestBody:
         required: true
         content:
@@ -161,28 +237,42 @@ paths:
           headers:
             ETag:
               schema: { type: string }
+              description: New registry_version
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Patient' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: Version conflict
+          description: registry_version mismatch
           content:
             application/json:
               schema: { $ref: '#/components/schemas/VersionConflictError' }
+        '410': { $ref: '#/components/responses/GoneMerged' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
         '503': { $ref: '#/components/responses/Unavailable' }
 
   /api/v1/patients/{patient_id}/merge:
     post:
       tags: [patients-dedup]
       summary: Merge duplicate into path survivor (DRAFT)
+      description: |
+        Path id = survivor. Body.duplicate_patient_id = retired. Never
+        automatic. Requires patients:merge, Idempotency-Key, and If-Match of
+        the survivor. Distinct defined territories → 409 territory_mismatch.
+        GET of the retired id afterwards → 410 already_merged.
+        Same key+body after success → 200 + Idempotent-Replayed.
       operationId: mergePatients
       security: [{ ApiKeyAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/PatientId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       requestBody:
         required: true
         content:
@@ -190,23 +280,41 @@ paths:
             schema: { $ref: '#/components/schemas/MergeRequest' }
       responses:
         '200':
-          description: Survivor
+          description: Survivor (or idempotent replay)
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Survivor registry_version after merge
+            Idempotent-Replayed:
+              schema: { type: boolean }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MergeResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/GoneMerged' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /api/v1/patients/{patient_id}/links:
     put:
       tags: [patients-write]
-      summary: Replace ACS / caregiver / program links (DRAFT)
+      summary: Replace ACS / caregiver links (DRAFT)
+      description: |
+        Full replace of links (acs_agent_id, caregiver_subject_id,
+        caregiver_relationship). Does not write programs or caregiver_phone.
+        Increments registry_version. If-Match required.
       operationId: putPatientLinks
       security: [{ ApiKeyAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/PatientId'
         - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       requestBody:
         required: true
         content:
@@ -215,53 +323,98 @@ paths:
       responses:
         '200':
           description: Updated patient
+          headers:
+            ETag:
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Patient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: Version conflict
           content:
             application/json:
               schema: { $ref: '#/components/schemas/VersionConflictError' }
+        '410': { $ref: '#/components/responses/GoneMerged' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /api/v1/patients/{patient_id}/consents:
     get:
       tags: [patients-consents]
       summary: List consents (DRAFT)
+      description: |
+        Echoes Patient.registry_version. Requires patients:consent (proposed).
+        Out of authorized set → 404. Retired → 410.
       operationId: listConsents
       security: [{ ApiKeyAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       responses:
         '200':
           description: Consents
+          headers:
+            ETag:
+              schema: { type: string }
+              description: Patient registry_version
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ConsentList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/GoneMerged' }
+        '503': { $ref: '#/components/responses/Unavailable' }
     put:
       tags: [patients-consents]
-      summary: Upsert consents (DRAFT)
+      summary: Upsert consents by purpose (DRAFT)
+      description: |
+        Upsert-by-purpose, not a wipe. Omitted purposes stay. Revoke with
+        status=revoked. Duplicate purpose in the body → 400. If-Match is the
+        Patient registry_version; success increments it. Body.registry_version
+        if sent must equal If-Match or 400. Requires patients:consent
+        (patients:write is not sufficient — proposed split).
       operationId: putConsents
       security: [{ ApiKeyAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/PatientId'
         - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ConsentList' }
+            schema: { $ref: '#/components/schemas/ConsentWriteRequest' }
       responses:
         '200':
           description: Updated
+          headers:
+            ETag:
+              schema: { type: string }
+              description: New Patient registry_version
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ConsentList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: Version conflict
           content:
             application/json:
               schema: { $ref: '#/components/schemas/VersionConflictError' }
+        '410': { $ref: '#/components/responses/GoneMerged' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /api/v1/patients/{patient_id}/attachments:
     get:
@@ -271,20 +424,36 @@ paths:
       security: [{ ApiKeyAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       responses:
         '200':
           description: Metadata list
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AttachmentList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/GoneMerged' }
+        '503': { $ref: '#/components/responses/Unavailable' }
     post:
       tags: [patients-attachments]
       summary: Register attachment; return signed upload URL (DRAFT)
+      description: |
+        Registers metadata and returns a signed upload URL. Does NOT increment
+        Patient.registry_version (so concurrent PATCH If-Match is not busted).
+        Audited on GET /history. Idempotency-Key required. Bucket and LGPD
+        retention remain workshop-open.
       operationId: createAttachment
       security: [{ ApiKeyAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/PatientId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       requestBody:
         required: true
         content:
@@ -292,27 +461,49 @@ paths:
             schema: { $ref: '#/components/schemas/AttachmentCreateRequest' }
       responses:
         '201':
-          description: Metadata + upload URL
+          description: Metadata + upload URL (or idempotent replay)
+          headers:
+            Idempotent-Replayed:
+              schema: { type: boolean }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AttachmentCreateResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { $ref: '#/components/responses/GoneMerged' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
   /api/v1/patients/{patient_id}/history:
     get:
       tags: [patients-write]
       summary: Version history summary (DRAFT)
+      description: |
+        Includes cadastro version bumps, consent upserts, merges, and
+        attachment registrations (attachments appear here even though they
+        do not change registry_version). Retired id → 410.
       operationId: getPatientHistory
       security: [{ ApiKeyAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/PatientId'
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
       responses:
         '200':
           description: History page
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PatientHistoryResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/GoneMerged' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 
 components:
   securitySchemes:
@@ -321,15 +512,21 @@ components:
       in: header
       name: X-API-Key
       description: |
-        Service key. Proposed scopes — patients:read (P0), patients:write,
-        patients:merge, patients:consent. Human JWT never sent to Core.
+        Service key. Proposed scopes — wearables:read (P0 GET, until
+        patients:read exists), patients:write, patients:merge,
+        patients:consent. Human JWT never sent to Core. patients:write does
+        not imply merge or consent.
 
   parameters:
     PatientId:
       name: patient_id
       in: path
       required: true
-      schema: { type: string, minLength: 1, maxLength: 64 }
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 64
+        pattern: '^[A-Za-z0-9\-_]+$'
     Limit:
       name: limit
       in: query
@@ -341,19 +538,27 @@ components:
     Territory:
       name: territory
       in: query
-      description: Repeatable. municipality_id or municipality_id:ubs_id
+      description: |
+        Repeatable P0 authz scope. municipality_id (municipal) or
+        municipality_id:ubs_id (UBS). ubs_id ≡ health_unit_id. Union, no
+        duplicate Patient. On search/dedup/writes this is the same recorte
+        as GET /patients — not a free-text filter.
       schema: { type: array, items: { type: string } }
       style: form
       explode: true
     MunicipalityId:
       name: municipality_id
       in: query
+      description: P0 authz shortcut; pair by index with ubs_id when both sent.
       schema: { type: array, items: { type: string } }
       style: form
       explode: true
     UbsId:
       name: ubs_id
       in: query
+      description: |
+        P0 authz shortcut. Orphan ubs_id (more tokens than municipality_id)
+        → 400. String-equal to Next2U health_unit_id.
       schema: { type: array, items: { type: string } }
       style: form
       explode: true
@@ -361,17 +566,24 @@ components:
       name: Idempotency-Key
       in: header
       required: true
+      description: |
+        Required on POST create / merge / attachments. 24h window (proposed).
+        Same key + same canonical body → replay original status/body.
+        Same key + different body → 409 idempotency_key_reuse.
       schema: { type: string, minLength: 8, maxLength: 128 }
     IfMatch:
       name: If-Match
       in: header
       required: true
-      description: Opaque registry_version from last ETag
+      description: |
+        Opaque registry_version from last ETag. Required on PATCH Patient,
+        PUT links, PUT consents, POST merge. If-Match: * is rejected (400).
+        Missing → 428.
       schema: { type: string, minLength: 1 }
 
   responses:
     BadRequest:
-      description: Invalid input
+      description: "Invalid input (including If-Match: * and null arrays)"
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -381,20 +593,32 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
-      description: Scope or allow-list denied
+      description: Scope denied (not used to hide an out-of-territory Patient)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     NotFound:
-      description: Patient not found
+      description: |
+        Patient not found, or not visible under the caller's authorized set
+        (preferred over 403 so existence is not confirmed).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Conflict:
-      description: Conflict
+      description: Conflict (idempotency reuse, fingerprint, merge, territory)
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ConflictError' }
+    GoneMerged:
+      description: Patient id retired by merge
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/GoneMergedError' }
+    PreconditionRequired:
+      description: If-Match header missing
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     Unavailable:
       description: Operational DB unavailable
       content:
@@ -415,14 +639,49 @@ components:
           properties:
             conflict_code:
               type: string
-              enum: [idempotency_replay, duplicate_fingerprint, merge_race]
+              enum:
+                - idempotency_key_reuse
+                - duplicate_fingerprint
+                - duplicate_patient_id
+                - already_merged
+                - merge_race
+                - territory_mismatch
+            existing_patient_id:
+              type: string
+              nullable: true
+              description: |
+                Set on duplicate_fingerprint / duplicate_patient_id only when
+                the caller is authorized to see that Patient. Omitted otherwise
+                (no territorial leak).
+            survivor_patient_id:
+              type: string
+              nullable: true
+              description: Set on already_merged when the retired id is known.
+            current:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/Patient'
+              description: Present only when leaking it is authorized.
 
     VersionConflictError:
       type: object
-      required: [detail, current]
+      required: [detail, conflict_code, current]
       properties:
         detail: { type: string, example: registry_version mismatch }
+        conflict_code:
+          type: string
+          enum: [registry_version_mismatch]
         current: { $ref: '#/components/schemas/Patient' }
+
+    GoneMergedError:
+      type: object
+      required: [detail, conflict_code, survivor_patient_id]
+      properties:
+        detail: { type: string, example: patient retired by merge }
+        conflict_code:
+          type: string
+          enum: [already_merged]
+        survivor_patient_id: { type: string }
 
     PatientListResponse:
       type: object
@@ -434,21 +693,35 @@ components:
         patients:
           type: array
           items: { $ref: '#/components/schemas/Patient' }
+          description: Stable alias of items (P0 operational runtime)
         total: { type: integer, minimum: 0 }
         limit: { type: integer }
         offset: { type: integer }
 
     Patient:
       type: object
-      required: [patient_id, registry_version, updated_at]
+      required: [patient_id, updated_at]
+      description: |
+        P0 fields are stable. P1 fields are additive. registry_version is
+        not required so a strict P0 client can keep validating GET. P1-aware
+        responses always include it (synthesized for never-mutated P0 rows).
       properties:
-        patient_id: { type: string }
+        patient_id:
+          type: string
+          minLength: 3
+          maxLength: 64
+          pattern: '^[A-Za-z0-9\-_]+$'
         registry_version:
           type: string
-          description: Opaque monotonic version (ETag)
+          description: |
+            Opaque version / ETag. Synthesized from updated_at+patient_id on
+            P0-only rows; monotonic after the first P1 cadastro write.
         display_name: { type: string, nullable: true }
         phone: { type: string, nullable: true }
-        caregiver_phone: { type: string, nullable: true }
+        caregiver_phone:
+          type: string
+          nullable: true
+          description: Phone only — not caregiver identity
         birth_date: { type: string, format: date, nullable: true }
         sex:
           type: string
@@ -462,13 +735,14 @@ components:
         programs:
           type: array
           items: { type: string }
+          description: Canonical program list (P0 SoT)
         diseases:
           type: array
           items: { type: string }
         clinical_flags:
           type: object
           additionalProperties: true
-        isolation_social: { type: boolean, nullable: true }
+        isolation_social: { type: boolean }
         is_demo: { type: boolean, default: false }
         municipality_id: { type: string, nullable: true }
         ubs_id:
@@ -479,11 +753,13 @@ components:
         consent_summary:
           type: array
           items: { $ref: '#/components/schemas/ConsentSummaryItem' }
+          description: Projection of GET /consents — not writable on PATCH
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
     Address:
       type: object
+      nullable: true
       properties:
         street: { type: string }
         number: { type: string }
@@ -501,10 +777,14 @@ components:
     PatientCreateRequest:
       type: object
       required: [display_name]
+      additionalProperties: false
       properties:
         patient_id:
           type: string
-          description: Optional client suggestion; Core may mint instead
+          minLength: 3
+          maxLength: 64
+          pattern: '^[A-Za-z0-9\-_]+$'
+          description: Optional client suggestion; Core mints if omitted
         display_name: { type: string, minLength: 1 }
         phone: { type: string }
         caregiver_phone: { type: string }
@@ -518,6 +798,9 @@ components:
         diseases:
           type: array
           items: { type: string }
+        clinical_flags:
+          type: object
+          additionalProperties: true
         isolation_social: { type: boolean }
         is_demo: { type: boolean, default: false }
         municipality_id: { type: string }
@@ -526,13 +809,20 @@ components:
 
     PatientPatchRequest:
       type: object
-      description: Partial update; omitted = unchanged
+      description: |
+        Partial update. Omitted = unchanged. Null scalar/object = clear.
+        Arrays replace ([] clears). Null array is 400. Do not send consents
+        or consent_summary.
+      additionalProperties: false
       properties:
         display_name: { type: string, nullable: true }
         phone: { type: string, nullable: true }
         caregiver_phone: { type: string, nullable: true }
         birth_date: { type: string, format: date, nullable: true }
-        sex: { type: string, nullable: true }
+        sex:
+          type: string
+          enum: [female, male, other, unknown]
+          nullable: true
         cpf_fingerprint: { type: string, nullable: true }
         address: { $ref: '#/components/schemas/Address' }
         programs:
@@ -544,13 +834,19 @@ components:
         clinical_flags:
           type: object
           additionalProperties: true
+          nullable: true
         isolation_social: { type: boolean, nullable: true }
+        is_demo: { type: boolean }
         municipality_id: { type: string, nullable: true }
         ubs_id: { type: string, nullable: true }
         links: { $ref: '#/components/schemas/PatientLinks' }
 
     PatientLinks:
       type: object
+      additionalProperties: false
+      description: |
+        ACS / caregiver identity bindings. Does not carry programs
+        (use Patient.programs) or caregiver phone (use caregiver_phone).
       properties:
         acs_agent_id: { type: string, nullable: true }
         caregiver_subject_id:
@@ -558,18 +854,20 @@ components:
           nullable: true
           description: Caregiver identity subject (not raw login)
         caregiver_relationship: { type: string, nullable: true }
-        program_enrollments:
-          type: array
-          items: { type: string }
 
     PatientSearchRequest:
       type: object
+      additionalProperties: false
       properties:
         q: { type: string, description: Free text name/phone }
         cpf_fingerprint: { type: string }
         phone: { type: string }
-        municipality_id: { type: string }
-        ubs_id: { type: string }
+        municipality_id:
+          type: string
+          description: Filter inside the authorized set (not the authz scope)
+        ubs_id:
+          type: string
+          description: Filter inside the authorized set (not the authz scope)
         limit: { type: integer, minimum: 1, maximum: 50, default: 20 }
 
     PatientSearchResponse:
@@ -591,13 +889,19 @@ components:
     DedupRequest:
       type: object
       required: [anchor]
+      additionalProperties: false
       properties:
         anchor:
           oneOf:
             - type: object
               required: [patient_id]
+              additionalProperties: false
               properties:
-                patient_id: { type: string }
+                patient_id:
+                  type: string
+                  minLength: 3
+                  maxLength: 64
+                  pattern: '^[A-Za-z0-9\-_]+$'
             - $ref: '#/components/schemas/PatientCreateRequest'
         limit: { type: integer, minimum: 1, maximum: 20, default: 10 }
 
@@ -620,11 +924,22 @@ components:
     MergeRequest:
       type: object
       required: [duplicate_patient_id, reason]
+      additionalProperties: false
       properties:
-        duplicate_patient_id: { type: string }
+        duplicate_patient_id:
+          type: string
+          minLength: 3
+          maxLength: 64
+          pattern: '^[A-Za-z0-9\-_]+$'
         reason: { type: string, minLength: 3 }
+        duplicate_registry_version:
+          type: string
+          description: Recommended. Stale value → 409 merge_race.
         reassign_wearables: { type: boolean, default: true }
-        reassign_open_work: { type: boolean, default: false }
+        reassign_open_work:
+          type: boolean
+          default: false
+          description: Open OS/visita reassignment is workshop-TBD (frentes 3–4).
 
     MergeResult:
       type: object
@@ -635,6 +950,7 @@ components:
         reassigned:
           type: object
           additionalProperties: { type: integer }
+          description: Counts by resource (e.g. wearables, attachments)
 
     ConsentSummaryItem:
       type: object
@@ -657,18 +973,51 @@ components:
             actor_subject_id: { type: string }
             note: { type: string }
 
-    ConsentList:
+    ConsentWriteItem:
+      type: object
+      required: [purpose, status]
+      additionalProperties: false
+      properties:
+        purpose:
+          type: string
+          enum: [care, telemetry, messaging_sm_click, research, caregiver_share]
+        status:
+          type: string
+          enum: [granted, denied, revoked, unknown]
+        evidence_attachment_id: { type: string, nullable: true }
+        actor_subject_id: { type: string }
+        note: { type: string }
+
+    ConsentWriteRequest:
       type: object
       required: [items]
+      additionalProperties: false
+      description: |
+        Upsert by purpose. Omitted purposes unchanged. Duplicate purpose in
+        items → 400. Optional registry_version must match If-Match.
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ConsentWriteItem' }
+        registry_version:
+          type: string
+          description: If sent, must equal If-Match
+
+    ConsentList:
+      type: object
+      required: [items, registry_version]
       properties:
         items:
           type: array
           items: { $ref: '#/components/schemas/ConsentRecord' }
-        registry_version: { type: string }
+        registry_version:
+          type: string
+          description: Echo of Patient.registry_version (not a parallel clock)
 
     AttachmentCreateRequest:
       type: object
       required: [filename, content_type, byte_size, kind]
+      additionalProperties: false
       properties:
         filename: { type: string }
         content_type: { type: string }
@@ -714,9 +1063,17 @@ components:
           type: array
           items:
             type: object
-            required: [registry_version, at, actor_type]
+            required: [at, actor_type]
             properties:
-              registry_version: { type: string }
+              registry_version:
+                type: string
+                nullable: true
+                description: Null for attachment events that do not bump version
               at: { type: string, format: date-time }
-              actor_type: { type: string, enum: [service, professional_bff, system] }
+              actor_type:
+                type: string
+                enum: [service, professional_bff, system]
               summary: { type: string }
+              event_kind:
+                type: string
+                enum: [create, patch, links, consents, merge, attachment]
