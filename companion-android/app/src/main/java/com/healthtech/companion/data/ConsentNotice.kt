@@ -9,7 +9,7 @@ object ConsentNotice {
 
     const val TITLE = "Consentimento para dados de saúde"
 
-    const val BODY = """
+    val BODY = """
         O Saúde Responsiva trata frequência cardíaca, SpO2, pressão, temperatura e o identificador deste paciente para o piloto de monitoramento.
 
         A finalidade é o apoio à decisão. O alerta não impõe conduta obrigatória. Você pode pedir a revisão de uma decisão automatizada.

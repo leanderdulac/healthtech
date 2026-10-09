@@ -18,7 +18,10 @@ import com.healthtech.companion.net.BaseUrlPolicy
 import com.healthtech.companion.net.HealthtechRepository
 import com.healthtech.companion.net.dto.ProcessedTelemetry
 import com.healthtech.companion.net.dto.WearableIngestRequest
+import com.healthtech.companion.net.outbox.FileOutboxStore
 import com.healthtech.companion.net.outbox.OutboxFlusher
+import com.healthtech.companion.net.outbox.OutboxItem
+import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,7 +78,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     private var repository: HealthtechRepository = buildRepoOrPlaceholder()
-    private var outbox: OutboxFlusher = OutboxFlusher(repository)
+    private val outboxStore = FileOutboxStore(File(app.filesDir, "outbox.json"))
+    private var outboxItems: MutableList<OutboxItem> = outboxStore.load()
+    private var outbox: OutboxFlusher = bindOutbox(repository, outboxItems)
     private var bleSim: BleTransport? = null
     private var activeGen = 0
     private var standardGen = 0
@@ -242,6 +247,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     init {
+        _state.update { it.copy(outboxPending = outbox.pending().size) }
         if (runCatching { BaseUrlPolicy.normalize(prefs.baseUrl, BuildConfig.DEBUG) }.isFailure) {
             _state.update {
                 it.copy(statusLine = "A URL salva não é aceita. Use HTTPS ou, no debug, um IP privado.")
@@ -288,10 +294,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun bindOutbox(
+        repo: HealthtechRepository,
+        items: MutableList<OutboxItem>,
+    ): OutboxFlusher {
+        return OutboxFlusher(repo, items).also { flusher ->
+            flusher.onChanged = {
+                outboxStore.save(items)
+                _state.update { it.copy(outboxPending = flusher.pending().size) }
+            }
+        }
+    }
+
     private fun rebuildClients(): Boolean {
         return try {
             repository = buildRepo()
-            outbox = OutboxFlusher(repository)
+            outboxItems = outboxStore.load()
+            outbox = bindOutbox(repository, outboxItems)
+            _state.update { it.copy(outboxPending = outbox.pending().size) }
             true
         } catch (e: IllegalArgumentException) {
             _state.update { it.copy(statusLine = e.message ?: "URL inválida.") }

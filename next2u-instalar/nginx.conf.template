@@ -10,7 +10,7 @@ server {
     }
 
     location = /next2u-saude.apk {
-        return 302 https://storage.googleapis.com/healthtech-gcp-2026-next2u-app/next2u-saude-1.1.apk;
+        return 302 https://storage.googleapis.com/healthtech-gcp-2026-next2u-app/next2u-saude-1.5.apk;
     }
 
     location / {

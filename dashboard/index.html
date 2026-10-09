@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saúde Responsiva — Telemetria Fisiológica & API Wearables</title>
+    <link rel="icon" href="favicon.ico?v=20260930a" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=20260930a">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png?v=20260930a">
     <!-- Fonte Premium -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Roboto:wght@400;500;700&display=swap">
     <!-- Icones Material -->
@@ -139,11 +142,13 @@
                                         <th>Paciente / app</th>
                                         <th>BPM</th>
                                         <th>SpO₂</th>
+                                        <th>Passos</th>
+                                        <th>Pressão</th>
                                         <th>Horário (Brasília)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="fleet-body">
-                                    <tr><td colspan="6" class="fleet-empty">Aguardando relógios…</td></tr>
+                                    <tr><td colspan="8" class="fleet-empty">Aguardando relógios…</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -959,7 +964,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
 
     <!-- Script da Aplicação -->
     <script src="fleet_logic.js?v=20260929b"></script>
-    <script src="app.js?v=20260929b"></script>
+    <script src="app.js?v=20260930b"></script>
     <script src="gcp-billing.js?v=20260831b"></script>
 </body>
 </html>

@@ -46,6 +46,10 @@ def summarize_frame(frame: Mapping[str, Any], now: Optional[datetime] = None) ->
         "age_seconds": age_seconds(live_ref, now=now),
         "heart_rate": _heart_rate(frame),
         "spo2": raw.get("spo2_percent"),
+        "steps": raw.get("steps"),
+        "blood_pressure_sys": raw.get("blood_pressure_sys"),
+        "blood_pressure_dia": raw.get("blood_pressure_dia"),
+        "device_model": raw.get("device_model"),
         "latest": dict(frame),
     }
 

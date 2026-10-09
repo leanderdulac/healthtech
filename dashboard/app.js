@@ -540,7 +540,11 @@ document.addEventListener("DOMContentLoaded", () => {
             device_time_local: row.device_time_local,
             raw_telemetry: {
                 heart_rate_bpm: row.heart_rate,
-                spo2_percent: row.spo2
+                spo2_percent: row.spo2,
+                steps: row.steps,
+                blood_pressure_sys: row.blood_pressure_sys,
+                blood_pressure_dia: row.blood_pressure_dia,
+                device_model: row.device_model
             },
             cleaned_telemetry: { heart_rate_clean: row.heart_rate }
         };
@@ -618,7 +622,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (pageEl) pageEl.textContent = `${fleetPage + 1} / ${pages}`;
         const slice = rows.slice(fleetPage * FLEET_PAGE_SIZE, (fleetPage + 1) * FLEET_PAGE_SIZE);
         if (!slice.length) {
-            body.innerHTML = '<tr><td colspan="6" class="fleet-empty">Nenhum relógio nesta página.</td></tr>';
+            body.innerHTML = '<tr><td colspan="8" class="fleet-empty">Nenhum relógio nesta página.</td></tr>';
             return;
         }
         const esc = (value) => String(value ?? "")
@@ -632,12 +636,20 @@ document.addEventListener("DOMContentLoaded", () => {
             const age = formatAge(d.received_at || d.last_seen);
             const hr = d.heart_rate != null ? Math.round(Number(d.heart_rate)) : "—";
             const spo2 = d.spo2 != null ? Number(d.spo2).toFixed(0) + "%" : "—";
+            const steps = d.steps != null ? Math.round(Number(d.steps)).toLocaleString("pt-BR") : "—";
+            const sys = d.blood_pressure_sys;
+            const dia = d.blood_pressure_dia;
+            const bp = sys != null && dia != null
+                ? `${Math.round(Number(sys))}/${Math.round(Number(dia))}`
+                : "—";
             return `<tr data-device="${esc(d.device_id)}" class="${selected}">
                 <td><span class="fleet-dot ${d.online ? "on" : "off"}"></span>${d.online ? "Online" : "Offline"}</td>
                 <td>${esc(d.device_id)}</td>
                 <td>${esc(d.patient_id || "—")}</td>
                 <td>${hr}</td>
                 <td>${spo2}</td>
+                <td>${esc(steps)}</td>
+                <td>${esc(bp)}</td>
                 <td>${esc(age ? `${when} · ${age}` : when)}</td>
             </tr>`;
         }).join("");

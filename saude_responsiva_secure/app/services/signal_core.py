@@ -97,71 +97,201 @@ def _record_pilot(frame: Dict[str, Any]) -> Optional[str]:
         return None
 
 
+def _has(payload: Dict[str, Any], key: str) -> bool:
+    return key in payload and payload.get(key) is not None
+
+
+def _as_float(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _measured_blood_pressure(payload: Dict[str, Any]) -> tuple[Optional[float], Optional[float]]:
+    """Pressão que o app mandou. O schema antigo não tem o objeto aninhado."""
+    nested = payload.get("blood_pressure") if _has(payload, "blood_pressure") else None
+    if isinstance(nested, dict):
+        systolic = _as_float(nested.get("systolic", nested.get("sys")))
+        diastolic = _as_float(nested.get("diastolic", nested.get("dia")))
+        return systolic, diastolic
+    if _has(payload, "blood_pressure_sys") or _has(payload, "blood_pressure_dia"):
+        return _as_float(payload.get("blood_pressure_sys")), _as_float(payload.get("blood_pressure_dia"))
+    return None, None
+
+
+def _measured_raw(
+    payload: Dict[str, Any],
+    *,
+    heart_rate: float,
+    hrv_rmssd: Optional[float],
+    hrv_score: Optional[float],
+    skin_measured: Optional[float],
+    spo2: Optional[float],
+    activity: Optional[float],
+    systolic: Optional[float],
+    diastolic: Optional[float],
+) -> Dict[str, Any]:
+    """Sinais que chegaram no POST. Ausência fica de fora — não vira 98/40/33."""
+    raw: Dict[str, Any] = {
+        "heart_rate_bpm": heart_rate,
+        "ingest_source": str(payload.get("ingest_source") or "companion_manual"),
+    }
+    if hrv_rmssd is not None:
+        raw["hrv_rmssd_ms"] = hrv_rmssd
+    if hrv_score is not None and hrv_score > 0:
+        raw["hrv_score"] = hrv_score
+    if skin_measured is not None and _has(payload, "skin_temp"):
+        raw["skin_temp_celsius"] = skin_measured
+    if _has(payload, "temperature"):
+        temperature = _as_float(payload.get("temperature"))
+        if temperature is not None and temperature > 0:
+            raw["temperature_celsius"] = temperature
+    if _has(payload, "body_temp_c"):
+        body = _as_float(payload.get("body_temp_c"))
+        if body is not None:
+            raw["body_temp_celsius"] = body
+    if spo2 is not None:
+        raw["spo2_percent"] = spo2
+    if activity is not None:
+        raw["activity_level"] = activity
+    if _has(payload, "glucose_mgdl"):
+        glucose = _as_float(payload.get("glucose_mgdl"))
+        if glucose is not None:
+            raw["glucose_mgdl"] = glucose
+    if "wear_status" in payload and payload.get("wear_status") is not None:
+        raw["wear_status"] = bool(payload.get("wear_status"))
+    if _has(payload, "steps"):
+        steps = _as_float(payload.get("steps"))
+        if steps is not None and steps >= 0:
+            raw["steps"] = int(steps)
+    if systolic is not None and diastolic is not None and systolic > 0 and diastolic > 0:
+        raw["blood_pressure_sys"] = systolic
+        raw["blood_pressure_dia"] = diastolic
+    model = payload.get("device_model") if _has(payload, "device_model") else None
+    if isinstance(model, str) and model.strip():
+        raw["device_model"] = model.strip()[:80]
+    calories = _as_float(payload.get("calories")) if _has(payload, "calories") else None
+    if calories is not None and calories > 0:
+        raw["calories"] = calories
+    distance = _as_float(payload.get("distance")) if _has(payload, "distance") else None
+    if distance is not None and distance > 0:
+        raw["distance_m"] = distance
+    return raw
+
+
+def _resolve_heart_rate(measured: float, ppg: Optional[List[float]]) -> tuple[Optional[float], Dict[str, Any]]:
+    """FC medida. A onda PPG não substitui o batimento."""
+    try:
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[3]
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+        from src.clinical_intelligence.alert_ingest import resolve_heart_rate
+
+        return resolve_heart_rate(measured, ppg)
+    except Exception:
+        samples = list(ppg) if ppg else []
+        accepted = measured if 20.0 <= float(measured) <= 250.0 else None
+        return accepted, {
+            "heart_rate_source": "measured" if accepted is not None else "rejected",
+            "ppg_role": "waveform" if len(samples) >= 4 else "absent",
+            "ppg_samples": len(samples),
+            "ppg_not_used_as_bpm": len(samples) >= 4,
+        }
+
+
+def _with_prior_reading(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """A leitura anterior do mesmo paciente, se ainda cabe na janela."""
+    patient_id = str(payload.get("patient_id") or "")
+    if not patient_id:
+        return payload
+    try:
+        from app.services import telemetry_store
+        from src.clinical_intelligence.alert_ingest import attach_previous_reading
+    except Exception:
+        return payload
+    try:
+        previous = telemetry_store.get_latest(patient_id)
+    except Exception:
+        return payload
+    return attach_previous_reading(payload, previous)
+
+
 def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Processa uma leitura de wearable (denoising + anomalia local + phantom simples)."""
+    payload = _with_prior_reading(dict(payload))
+    systolic, diastolic = _measured_blood_pressure(payload)
+    if systolic is not None and systolic > 0 and not _has(payload, "blood_pressure_sys"):
+        payload["blood_pressure_sys"] = systolic
+    if diastolic is not None and diastolic > 0 and not _has(payload, "blood_pressure_dia"):
+        payload["blood_pressure_dia"] = diastolic
+
     hr = float(payload["heart_rate"])
-    hrv = float(payload.get("hrv_rmssd") or 40.0)
-    skin = float(payload.get("skin_temp") or 33.0)
-    spo2 = payload.get("spo2")
-    activity = float(payload.get("activity_level") or 0.0)
+    # 40 ms e 33 °C são só o prior interno do phantom. Não são medição.
+    hrv_rmssd = _as_float(payload.get("hrv_rmssd")) if _has(payload, "hrv_rmssd") else None
+    hrv_score = _as_float(payload.get("hrv_score")) if _has(payload, "hrv_score") else None
+    skin_measured = _as_float(payload.get("skin_temp")) if _has(payload, "skin_temp") else None
+    if skin_measured is None and _has(payload, "temperature"):
+        temperature = _as_float(payload.get("temperature"))
+        if temperature is not None and temperature > 0:
+            skin_measured = temperature
+    if skin_measured is None and _has(payload, "body_temp_c"):
+        skin_measured = _as_float(payload.get("body_temp_c"))
+    spo2 = _as_float(payload.get("spo2")) if _has(payload, "spo2") else None
+    activity = _as_float(payload.get("activity_level")) if _has(payload, "activity_level") else None
+    hrv_prior = hrv_rmssd if hrv_rmssd is not None else 40.0
+    skin_prior = skin_measured if skin_measured is not None else 33.0
+    activity_prior = activity if activity is not None else 0.0
     filter_type = payload.get("filter_type") or "BMO"
     ppg = payload.get("ppg_signal")
 
-    bpm_clean = hr
+    bpm_clean, hr_note = _resolve_heart_rate(hr, ppg if isinstance(ppg, list) else None)
     bmo_metrics: Dict[str, Any] = {}
-    if ppg and len(ppg) >= 4:
+    if isinstance(ppg, list) and len(ppg) >= 4:
         bmo_metrics = multiscale_bmo(ppg)
-        if filter_type == "BMO":
-            filtered = denoise_signal(ppg, window_size=8, alpha=0.5)
-            mean_f = float(np.mean(filtered))
-            if mean_f > 30:
-                bpm_clean = mean_f
 
-    is_anomalia = bpm_clean > 100 or bpm_clean < 40 or (spo2 is not None and float(spo2) < 92)
+    is_anomalia = (
+        bpm_clean is not None and (bpm_clean > 100 or bpm_clean < 40)
+    ) or (spo2 is not None and float(spo2) < 92)
     anomaly = {
         "alerta": bool(is_anomalia),
         "score": 0.95 if is_anomalia else 0.05,
         "modo": "Detecção Local BMO",
     }
 
-    # Phantom simplificado (estimativas heurísticas — produção usa Kalman no monólito)
-    map_est = 70.0 + (bpm_clean - 70.0) * 0.3 + (skin - 33.0) * 2.0
-    glucose_est = 95.0 + max(0.0, activity - 30) * 0.2
-    vagal = max(0.0, min(1.0, hrv / 80.0))
-    # PAS/PAD a partir do MAP (PP≈40) para alimentar a matriz de alertas
+    # Heurística local. Não é medição e não entra na matriz (reliable=False).
+    hr_prior = bpm_clean if bpm_clean is not None else 70.0
+    map_est = 70.0 + (hr_prior - 70.0) * 0.3 + (skin_prior - 33.0) * 2.0
+    glucose_est = 95.0 + max(0.0, activity_prior - 30) * 0.2
+    vagal = max(0.0, min(1.0, hrv_prior / 80.0))
     pas_est = map_est + 13.3
     pad_est = map_est - 6.7
 
+    def _heuristic(estimate: float, half_width: float) -> Dict[str, Any]:
+        return {
+            "estimate": round(estimate, 2),
+            "ci_lower": round(estimate - half_width, 2),
+            "ci_upper": round(estimate + half_width, 2),
+            "reliable": False,
+            "method": "heuristic",
+        }
+
     phantom_data = {
-        "map_mmhg": {
-            "estimate": round(map_est, 2),
-            "ci_lower": round(map_est - 5, 2),
-            "ci_upper": round(map_est + 5, 2),
-            "reliable": True,
-        },
-        "systolic_bp": {
-            "estimate": round(pas_est, 2),
-            "ci_lower": round(pas_est - 8, 2),
-            "ci_upper": round(pas_est + 8, 2),
-            "reliable": True,
-        },
-        "diastolic_bp": {
-            "estimate": round(pad_est, 2),
-            "ci_lower": round(pad_est - 6, 2),
-            "ci_upper": round(pad_est + 6, 2),
-            "reliable": True,
-        },
-        "glucose_mgdl": {
-            "estimate": round(glucose_est, 2),
-            "ci_lower": round(glucose_est - 10, 2),
-            "ci_upper": round(glucose_est + 10, 2),
-            "reliable": activity < 80,
-        },
+        "map_mmhg": _heuristic(map_est, 5),
+        "systolic_bp": _heuristic(pas_est, 8),
+        "diastolic_bp": _heuristic(pad_est, 6),
+        "glucose_mgdl": _heuristic(glucose_est, 10),
         "vagal_tone": {
             "estimate": round(vagal, 3),
             "ci_lower": round(max(0, vagal - 0.1), 3),
             "ci_upper": round(min(1, vagal + 0.1), 3),
-            "reliable": True,
+            "reliable": False,
+            "method": "heuristic",
         },
     }
 
@@ -197,10 +327,10 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         clinical_alerts = assess_ingest_alerts(
-            heart_rate=bpm_clean,
+            heart_rate=hr,
             spo2=float(spo2) if spo2 is not None else None,
-            skin_temp=float(body_temp) if body_temp is not None else skin,
-            hrv_rmssd=hrv,
+            skin_temp=float(body_temp) if body_temp is not None else skin_measured,
+            hrv_rmssd=hrv_rmssd,
             activity_level=activity,
             phantom=phantom_data,
             hband_ext=hband_ext,
@@ -225,16 +355,22 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
         "last_seen_local": payload.get("last_seen_local"),
         "device_time_local": payload.get("device_time_local"),
         "ingest_source": str(payload.get("ingest_source") or "companion_manual"),
-        "raw_telemetry": {
-            "heart_rate_bpm": hr,
-            "hrv_rmssd_ms": hrv,
-            "skin_temp_celsius": skin,
-            "spo2_percent": spo2,
-            "activity_level": activity,
-            "ingest_source": str(payload.get("ingest_source") or "companion_manual"),
-        },
+        "raw_telemetry": _measured_raw(
+            payload,
+            heart_rate=hr,
+            hrv_rmssd=hrv_rmssd,
+            hrv_score=hrv_score,
+            skin_measured=skin_measured,
+            spo2=spo2,
+            activity=activity,
+            systolic=systolic,
+            diastolic=diastolic,
+        ),
         "cleaned_telemetry": {
-            "heart_rate_clean": round(bpm_clean, 2),
+            "heart_rate_clean": None if bpm_clean is None else round(bpm_clean, 2),
+            "heart_rate_source": hr_note.get("heart_rate_source"),
+            "ppg_role": hr_note.get("ppg_role"),
+            "ppg_samples": hr_note.get("ppg_samples", 0),
             "filter_applied": filter_type,
             "bmo_metrics": bmo_metrics,
         },

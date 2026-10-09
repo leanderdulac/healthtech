@@ -72,6 +72,10 @@ def _compact(summary: Dict[str, Any]) -> Dict[str, Any]:
         "age_seconds": summary.get("age_seconds"),
         "heart_rate": summary.get("heart_rate"),
         "spo2": summary.get("spo2"),
+        "steps": summary.get("steps"),
+        "blood_pressure_sys": summary.get("blood_pressure_sys"),
+        "blood_pressure_dia": summary.get("blood_pressure_dia"),
+        "device_model": summary.get("device_model"),
     }
     if is_synthetic_device(summary) or is_synthetic_device(item):
         item["synthetic"] = True
@@ -169,8 +173,10 @@ def _flush_unlocked(force: bool = False) -> None:
         "devices": [_compact(row) for row in _devices.values()],
     }
     text = json.dumps(snapshot, ensure_ascii=False)
-    LOCAL_FLEET_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # O disco local é só cache. Se data/ não for gravável (imagem non-root),
+    # a frota ainda precisa subir para o GCS — senão o painel não vê o relógio.
     try:
+        LOCAL_FLEET_PATH.parent.mkdir(parents=True, exist_ok=True)
         LOCAL_FLEET_PATH.write_text(text + "\n", encoding="utf-8")
     except Exception as exc:
         logger.warning("Falha ao gravar frota local: %s", exc)

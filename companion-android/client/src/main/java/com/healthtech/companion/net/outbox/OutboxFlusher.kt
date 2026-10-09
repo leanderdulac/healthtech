@@ -5,8 +5,7 @@ import com.healthtech.companion.net.HealthtechRepository
 import com.healthtech.companion.net.dto.WearableIngestRequest
 
 /**
- * Flush da outbox em memória (protótipo).
- * No app real: Room DAO + WorkManager chamando [flush].
+ * Flush da outbox. A lista pode ser a que o [FileOutboxStore] gravou.
  *
  * Estratégia:
  * - 1 item  → POST /ingest
@@ -16,9 +15,13 @@ class OutboxFlusher(
     private val repository: HealthtechRepository,
     private val store: MutableList<OutboxItem> = mutableListOf(),
 ) {
+    /** Chamado depois de cada mudança. O app grava o arquivo aqui. */
+    var onChanged: (() -> Unit)? = null
+
     fun enqueue(request: WearableIngestRequest): OutboxItem {
         val item = OutboxItem(payload = request)
         store += item
+        notifyChanged()
         return item
     }
 
@@ -32,6 +35,7 @@ class OutboxFlusher(
 
     fun clear() {
         store.clear()
+        notifyChanged()
     }
 
     /**
@@ -187,7 +191,14 @@ class OutboxFlusher(
 
     private fun update(item: OutboxItem, transform: OutboxItem.() -> OutboxItem) {
         val idx = store.indexOfFirst { it.id == item.id }
-        if (idx >= 0) store[idx] = store[idx].transform()
+        if (idx >= 0) {
+            store[idx] = store[idx].transform()
+            notifyChanged()
+        }
+    }
+
+    private fun notifyChanged() {
+        onChanged?.invoke()
     }
 
     data class FlushSummary(

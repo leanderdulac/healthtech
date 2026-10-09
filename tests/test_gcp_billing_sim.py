@@ -21,6 +21,7 @@ def test_cloud_budget_matches_c6_pix_and_weekly_credits():
     assert amounts["2026-08-24"] == 4800
     assert amounts["2026-08-31"] == 4000
     assert amounts["2026-09-28"] == 2000
+    assert amounts["2026-10-09"] == 2000
 
 
 def test_4780_and_4800_split_ultra_from_training():
@@ -143,6 +144,35 @@ def test_sep28_weekly_2000_is_posted_and_spread_across_services():
     cloud_today = round(ledger["kpis"]["spent_today_brl"] - ledger["kpis"]["gemini_ultra_today_brl"], 2)
     assert cloud_today == ledger["kpis"]["spent_today_brl"]
     assert "28/09 R$ 2.000" in ledger["meta"]["disclaimer"]
+
+
+def test_oct09_weekly_2000_is_posted():
+    ledger = build_ledger(as_of=date(2026, 10, 9))
+    credit = next(c for c in ledger["credits"] if c["date"] == "2026-10-09")
+    assert credit["document"] == "PIX-20261009-2000"
+    assert credit["amount_brl"] == 2000
+    assert credit["allocation"]["training_brl"] == 2000
+    assert credit["allocation"]["cloud_tokens_brl"] == 2000
+    assert credit["allocation"]["gemini_ultra_brl"] == 0
+    assert credit["allocation"]["purpose"] == TRAINING_PURPOSE
+    assert "complemento" in credit["description"]
+    assert ledger["kpis"]["credits_today_brl"] == 2000
+    assert ledger["kpis"]["credits_posted_brl"] == 23580
+    assert ledger["kpis"]["credits_prior_brl"] == 21580
+    assert ledger["kpis"]["gemini_ultra_today_brl"] == 0
+    assert ledger["kpis"]["cloud_from_today_credit_brl"] == 2000
+    assert ledger["meta"]["as_of"] == "2026-10-09"
+    assert ledger["kpis"]["spent_last_3_weeks_brl"] == 21580
+    assert 0 < ledger["kpis"]["spent_today_brl"] < 2000
+    assert ledger["kpis"]["balance_brl"] == round(
+        23580 - ledger["kpis"]["spent_to_date_brl"], 2
+    )
+    assert ledger["kpis"]["balance_brl"] > 0
+    open_invoice = ledger["invoices"][-1]
+    assert open_invoice["status"] == "open"
+    assert open_invoice["period_start"] == "2026-10-09"
+    assert open_invoice["credit_brl"] == 2000
+    assert "09/10 R$ 2.000" in ledger["meta"]["disclaimer"]
 
 
 def test_disclaimer_states_ultra_and_training_split():
