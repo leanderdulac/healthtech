@@ -136,6 +136,27 @@ class VitalSnapshot:
             "glucose_delta": f(self.glucose_delta(), 0.0),
         }
 
+    def to_reading_dict(self) -> Dict[str, Any]:
+        """O que a regra viu. Ausência continua ausência — não vira 120/80 ou 98%."""
+        return {
+            "pas": self.pas,
+            "pad": self.pad,
+            "hr": self.hr,
+            "spo2": self.spo2,
+            "temp_c": self.temp_c,
+            "glucose_mgdl": self.glucose_mgdl,
+            "steps_drop_pct": self.steps_drop_pct,
+            "sleep_worsen_pct": self.sleep_worsen_pct,
+            "hr_baseline_rise": self.hr_baseline_rise,
+            "spo2_drop_points": self.spo2_drop_points,
+            "consciousness_altered": bool(self.consciousness_altered),
+            "rest": bool(self.rest),
+            "fasting": bool(self.fasting),
+            "sleep_hours": self.sleep_hours,
+            "steps_drop_days": int(self.steps_drop_days or 0),
+            "consecutive_valid": int(self.consecutive_valid or 1),
+        }
+
 
 @dataclass
 class AlertHit:

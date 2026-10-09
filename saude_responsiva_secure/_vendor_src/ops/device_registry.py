@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.ops.live_devices import summarize_frame
-from src.ops.timestamps import is_online, parse_timestamp
+from src.ops.timestamps import age_seconds, is_online, parse_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,10 @@ def _compact(summary: Dict[str, Any]) -> Dict[str, Any]:
         "age_seconds": summary.get("age_seconds"),
         "heart_rate": summary.get("heart_rate"),
         "spo2": summary.get("spo2"),
+        "steps": summary.get("steps"),
+        "blood_pressure_sys": summary.get("blood_pressure_sys"),
+        "blood_pressure_dia": summary.get("blood_pressure_dia"),
+        "device_model": summary.get("device_model"),
     }
     if is_synthetic_device(summary) or is_synthetic_device(item):
         item["synthetic"] = True
@@ -83,6 +87,7 @@ def _refresh_online(row: Dict[str, Any], now: Optional[datetime] = None) -> Dict
     live_ref = row.get("received_at") or row.get("last_seen")
     out = dict(row)
     out["online"] = is_online(live_ref, now=now)
+    out["age_seconds"] = age_seconds(live_ref, now=now)
     return out
 
 
@@ -168,8 +173,10 @@ def _flush_unlocked(force: bool = False) -> None:
         "devices": [_compact(row) for row in _devices.values()],
     }
     text = json.dumps(snapshot, ensure_ascii=False)
-    LOCAL_FLEET_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # O disco local é só cache. Se data/ não for gravável (imagem non-root),
+    # a frota ainda precisa subir para o GCS — senão o painel não vê o relógio.
     try:
+        LOCAL_FLEET_PATH.parent.mkdir(parents=True, exist_ok=True)
         LOCAL_FLEET_PATH.write_text(text + "\n", encoding="utf-8")
     except Exception as exc:
         logger.warning("Falha ao gravar frota local: %s", exc)

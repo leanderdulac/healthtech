@@ -37,7 +37,22 @@ _INGEST_STATUSES = ("accepted", "duplicate", "rejected")
 
 
 def _with_timestamp(payload: WearableTelemetryRequest) -> Dict[str, Any]:
-    data = payload.model_dump()
+    """Só entra o que o app enviou.
+
+    Campo omitido não vira SpO2, HRV, pele nem atividade. O zero de
+    atividade, quando o app envia, continua sendo repouso. Campos extras
+    (passos, pressão aninhada, modelo) não saem no model_dump.
+    """
+    data = payload.model_dump(exclude_unset=True)
+    for key, value in (payload.model_extra or {}).items():
+        if key not in data and value is not None:
+            data[key] = value
+    if not data.get("device_id"):
+        data["device_id"] = payload.device_id or "wrist_wearable"
+    if not data.get("ingest_source"):
+        data["ingest_source"] = payload.ingest_source or "companion_manual"
+    if not data.get("filter_type"):
+        data["filter_type"] = payload.filter_type or "BMO"
     from src.ops.timestamps import stamp_ingest
 
     data.update(stamp_ingest(data.get("timestamp")))

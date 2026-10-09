@@ -34,6 +34,10 @@ COPY --chown=appuser:appuser requirements.txt /app/
 # Fonte local: _vendor_src/ (evita sombrear monorepo `src/` no PYTHONPATH do host)
 COPY --chown=appuser:appuser _vendor_src/ /app/src/
 
+# appuser (uid 10001) grava a frota local aqui. Sem este diretório,
+# o mkdir de data/ops estoura Permission denied e a cópia no GCS não roda.
+RUN mkdir -p /app/data/ops && chown -R appuser:appuser /app/data
+
 USER appuser
 
 # Falha o build se o vendor não incluir o src.ops usado em ingest + /patients.

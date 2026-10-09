@@ -33,6 +33,10 @@ def _normalize(row: Dict[str, Any], now: datetime) -> Optional[Dict[str, Any]]:
         "age_seconds": age_seconds(live, now=now) if live else None,
         "heart_rate": row.get("heart_rate"),
         "spo2": row.get("spo2"),
+        "steps": row.get("steps"),
+        "blood_pressure_sys": row.get("blood_pressure_sys"),
+        "blood_pressure_dia": row.get("blood_pressure_dia"),
+        "device_model": row.get("device_model"),
     }
     if is_synthetic_device(row) or is_synthetic_device(item):
         item["synthetic"] = True
