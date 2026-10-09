@@ -26,7 +26,7 @@ from pydantic import BaseModel
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from pydantic import BaseModel, Field, field_validator
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.requests import Request
 
 from src.security.auth import (
@@ -104,6 +104,13 @@ app.mount("/dashboard", StaticFiles(directory="dashboard"), name="dashboard")
 def read_root():
     """Redireciona a raiz para o dashboard estático."""
     return RedirectResponse(url="/dashboard/index.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Ícone da aba: logo Next2U Saúde."""
+    icon = os.path.join(os.path.dirname(__file__), "..", "dashboard", "favicon.ico")
+    return FileResponse(icon, media_type="image/x-icon")
 
 
 # Carregar configurações do GCP
@@ -324,10 +331,10 @@ class WearableTelemetryRequest(BaseModel):
     device_id: Optional[str] = Field("wrist_wearable", max_length=64)
     timestamp: Optional[str] = Field(None, max_length=64)
     heart_rate: float = Field(..., ge=20.0, le=250.0)
-    hrv_rmssd: Optional[float] = Field(40.0, ge=0.0, le=300.0)
-    skin_temp: Optional[float] = Field(33.0, ge=25.0, le=45.0)
-    spo2: Optional[float] = Field(98.0, ge=50.0, le=100.0)
-    activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
+    hrv_rmssd: Optional[float] = Field(None, ge=0.0, le=300.0)
+    skin_temp: Optional[float] = Field(None, ge=25.0, le=45.0)
+    spo2: Optional[float] = Field(None, ge=50.0, le=100.0)
+    activity_level: Optional[float] = Field(None, ge=0.0, le=100.0)
     ppg_signal: Optional[list[float]] = None
     filter_type: Optional[str] = Field("BMO", max_length=32)
     # Opcionais HBand / matriz de alertas
@@ -337,6 +344,7 @@ class WearableTelemetryRequest(BaseModel):
     body_temp_c: Optional[float] = Field(None, ge=30.0, le=45.0)
     steps_drop_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
     sleep_worsen_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
+    wear_status: Optional[bool] = None
 
     @field_validator("filter_type")
     @classmethod
@@ -372,37 +380,40 @@ def ingest_wearable_reading(
     if req.heart_rate <= 0 or req.heart_rate > 300:
         raise HTTPException(status_code=400, detail="Frequência cardíaca fora dos limites fisiológicos válidos (1-300 BPM).")
 
-    # 1. Denoising do Sinal Heart Rate / PPG se fornecido
-    bpm_clean = req.heart_rate
+    # 1. A FC medida não é a média da onda PPG. A onda segue só para o perfil BMO.
+    from src.clinical_intelligence.alert_ingest import resolve_heart_rate
+
+    bpm_clean, hr_note = resolve_heart_rate(req.heart_rate, req.ppg_signal)
     bmo_metrics = {}
     if req.ppg_signal and len(req.ppg_signal) >= 4:
         analyzer = BMOAnalyzer()
         bmo_metrics = analyzer.multiscale_bmo_profile(np.array(req.ppg_signal))
-        if req.filter_type == "BMO":
-            denoiser = BMODenoiser(window_size=8, alpha=0.5)
-            filtered_ppg = denoiser.denoise(np.array(req.ppg_signal))
-            bpm_clean = float(np.mean(filtered_ppg)) if np.mean(filtered_ppg) > 30 else req.heart_rate
 
-    # 2. Inferência de Dados Fantasmas via Filtro de Kalman por Paciente
+    # 2. Inferência de Dados Fantasmas. Prior ausente fica no filtro.
     engine = get_patient_engine(req.patient_id, use_ukf=sim_config.use_ukf)
     wearable_data = {
-        'heart_rate': bpm_clean,
-        'hrv_rmssd': req.hrv_rmssd or 40.0,
-        'skin_temp': req.skin_temp or 33.0,
-        'activity_level': req.activity_level or 0.0
+        "heart_rate": bpm_clean if bpm_clean is not None else req.heart_rate,
     }
+    if req.hrv_rmssd is not None:
+        wearable_data["hrv_rmssd"] = req.hrv_rmssd
+    if req.skin_temp is not None:
+        wearable_data["skin_temp"] = req.skin_temp
+    if req.activity_level is not None:
+        wearable_data["activity_level"] = req.activity_level
     phantom_res = engine.process_reading(wearable_data)
     states = phantom_res['states']
 
     # 3. Detecção de Anomalias Fisiológicas
     anomaly_res = {"alerta": False, "score": 0.0, "modo": "Deteção Local"}
-    if vertex_detector:
+    if vertex_detector and bpm_clean is not None:
         try:
             anomaly_res = vertex_detector.processar_nova_leitura(bpm_clean)
         except Exception as e:
             logger.error(f"Erro no Vertex AI: {e}")
     else:
-        is_anomalia = bpm_clean > 100 or bpm_clean < 40 or (req.spo2 is not None and req.spo2 < 92)
+        is_anomalia = (
+            bpm_clean is not None and (bpm_clean > 100 or bpm_clean < 40)
+        ) or (req.spo2 is not None and req.spo2 < 92)
         anomaly_res = {
             "alerta": bool(is_anomalia),
             "score": 0.95 if is_anomalia else 0.05,
@@ -411,7 +422,7 @@ def ingest_wearable_reading(
 
     # 4. Diagnóstico Ontológico e Rede Bayesiana
     current_phantom = {k: v['estimate'] for k, v in states.items()}
-    hrv_metrics = {'rmssd': req.hrv_rmssd or 40.0}
+    hrv_metrics = {"rmssd": req.hrv_rmssd} if req.hrv_rmssd is not None else None
     
     hypotheses = bayes_net.generate_diagnostic_hypotheses(
         phantom_data=current_phantom,
@@ -438,9 +449,12 @@ def ingest_wearable_reading(
             "estimate": float(details["estimate"]),
             "ci_lower": float(details["ci_lower"]),
             "ci_upper": float(details["ci_upper"]),
-            "reliable": details["reliable"],
+            "reliable": False,
+            "filter_reliable": bool(details.get("reliable", False)),
+            "method": "ukf",
         }
         for name, details in states.items()
+        if isinstance(details, dict) and "estimate" in details
     }
     # Extensões HBand / campos opcionais da matriz de alertas
     extra = getattr(req, "model_extra", None) or {}
@@ -461,28 +475,39 @@ def ingest_wearable_reading(
     try:
         from src.clinical_intelligence.alert_ingest import (
             assess_ingest_alerts,
+            attach_previous_reading,
             merge_anomaly_with_alerts,
         )
 
         _extra = getattr(req, "model_extra", None) or {}
         _source = getattr(req, "ingest_source", None) or _extra.get("ingest_source") or "companion_manual"
+        prior = patient_history.get(req.patient_id) or []
+        raw_for_alerts = {
+            "heart_rate_bpm": req.heart_rate,
+            "spo2_percent": req.spo2,
+            "skin_temp_celsius": req.skin_temp,
+            "blood_pressure_sys": req.blood_pressure_sys,
+            "blood_pressure_dia": req.blood_pressure_dia,
+            "glucose_mgdl": req.glucose_mgdl,
+            "ingest_source": _source,
+            "timestamp": ts,
+        }
+        if req.activity_level is not None:
+            raw_for_alerts["activity_level"] = req.activity_level
+        if req.wear_status is not None:
+            raw_for_alerts["wear_status"] = req.wear_status
+        raw_for_alerts = attach_previous_reading(
+            raw_for_alerts, prior[-1] if prior else None
+        )
         clinical_alerts = assess_ingest_alerts(
-            heart_rate=bpm_clean,
+            heart_rate=req.heart_rate,
             spo2=req.spo2,
             skin_temp=req.body_temp_c if req.body_temp_c is not None else req.skin_temp,
             hrv_rmssd=req.hrv_rmssd,
             activity_level=req.activity_level,
             phantom=phantom_for_alerts,
             hband_ext=hband_ext,
-            raw_telemetry={
-                "heart_rate_bpm": req.heart_rate,
-                "spo2_percent": req.spo2,
-                "skin_temp_celsius": req.skin_temp,
-                "blood_pressure_sys": req.blood_pressure_sys,
-                "blood_pressure_dia": req.blood_pressure_dia,
-                "glucose_mgdl": req.glucose_mgdl,
-                "ingest_source": _source,
-            },
+            raw_telemetry=raw_for_alerts,
             rules_only=True,
         )
         anomaly_res = merge_anomaly_with_alerts(anomaly_res, clinical_alerts)
@@ -511,7 +536,10 @@ def ingest_wearable_reading(
             "activity_level": req.activity_level
         },
         "cleaned_telemetry": {
-            "heart_rate_clean": round(bpm_clean, 2),
+            "heart_rate_clean": None if bpm_clean is None else round(bpm_clean, 2),
+            "heart_rate_source": hr_note["heart_rate_source"],
+            "ppg_role": hr_note["ppg_role"],
+            "ppg_samples": hr_note["ppg_samples"],
             "filter_applied": req.filter_type,
             "bmo_metrics": bmo_metrics
         },

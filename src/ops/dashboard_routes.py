@@ -19,6 +19,10 @@ _PUBLIC_DEVICE_FIELDS = (
     "age_seconds",
     "heart_rate",
     "spo2",
+    "steps",
+    "blood_pressure_sys",
+    "blood_pressure_dia",
+    "device_model",
     "synthetic",
 )
 

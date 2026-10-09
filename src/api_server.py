@@ -22,7 +22,7 @@ import pandas as pd
 from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, Field, field_validator
 
 from src.security.auth import (
@@ -80,6 +80,13 @@ if os.path.exists("dashboard"):
 def read_root():
     """Redireciona a raiz para o dashboard estático."""
     return RedirectResponse(url="/dashboard/index.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Ícone da aba: logo Next2U Saúde."""
+    icon = os.path.join(os.path.dirname(__file__), "..", "dashboard", "favicon.ico")
+    return FileResponse(icon, media_type="image/x-icon")
 
 
 # Carregar configurações do GCP
@@ -167,10 +174,10 @@ class WearableTelemetryRequest(BaseModel):
     blood_pressure_sys: Optional[float] = Field(None, ge=50.0, le=300.0)
     blood_pressure_dia: Optional[float] = Field(None, ge=30.0, le=200.0)
     hrv_rmssd: Optional[float] = Field(None, ge=0.0, le=300.0)
-    activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
+    activity_level: Optional[float] = Field(None, ge=0.0, le=100.0)
     steps: Optional[int] = Field(None, ge=0)
     calories: Optional[float] = Field(None, ge=0.0)
-    wear_status: Optional[bool] = True
+    wear_status: Optional[bool] = None
     ppg_signal: Optional[List[float]] = None
     filter_type: Optional[str] = Field("BMO", max_length=32)
     device: Optional[Dict[str, Any]] = None
@@ -300,36 +307,36 @@ def ingest_wearable_reading(
     if req.heart_rate <= 0 or req.heart_rate > 300:
         raise HTTPException(status_code=400, detail="Frequência cardíaca fora dos limites fisiológicos (1-300 BPM).")
 
-    # 1. Denoising Fisiológico
-    bpm_clean = req.heart_rate
-    if req.ppg_signal and len(req.ppg_signal) >= 4:
-        try:
-            w_denoiser = WaveletDenoiser()
-            clean_ppg = w_denoiser.denoise(np.array(req.ppg_signal))
-            bpm_clean = float(np.mean(clean_ppg)) if 30.0 < np.mean(clean_ppg) < 220.0 else req.heart_rate
-        except Exception:
-            bpm_clean = req.heart_rate
+    # 1. A FC medida não é a média da onda PPG.
+    from src.clinical_intelligence.alert_ingest import resolve_heart_rate
 
-    # 2. Inferência de Dados Fantasmas via UKF/EKF por Paciente
+    bpm_clean, hr_note = resolve_heart_rate(req.heart_rate, req.ppg_signal)
+
+    # 2. Inferência UKF. Prior ausente fica no filtro; não é medição.
     engine = get_patient_engine(req.patient_id, use_ukf=sim_config.use_ukf)
     wearable_data = {
-        'heart_rate': bpm_clean,
-        'hrv_rmssd': req.hrv_rmssd or 42.0,
-        'skin_temp': req.skin_temp or 33.2,
-        'activity_level': req.activity_level or 0.0
+        "heart_rate": bpm_clean if bpm_clean is not None else req.heart_rate,
     }
+    if req.hrv_rmssd is not None:
+        wearable_data["hrv_rmssd"] = req.hrv_rmssd
+    if req.skin_temp is not None:
+        wearable_data["skin_temp"] = req.skin_temp
+    if req.activity_level is not None:
+        wearable_data["activity_level"] = req.activity_level
     phantom_res = engine.process_reading(wearable_data)
     phantom_states = phantom_res.get('states', phantom_res)
 
     # 3. Detecção de Anomalias Fisiológicas
     anomaly_res = {"alerta": False, "score": 0.0, "modo": "Simulação Local"}
-    if vertex_detector:
+    if vertex_detector and bpm_clean is not None:
         try:
             anomaly_res = vertex_detector.processar_nova_leitura(bpm_clean)
         except Exception as e:
             logger.error(f"Erro no Vertex AI: {e}")
     else:
-        is_anomalia = bpm_clean > 105 or bpm_clean < 45 or (req.spo2 is not None and req.spo2 < 92)
+        is_anomalia = (
+            bpm_clean is not None and (bpm_clean > 105 or bpm_clean < 45)
+        ) or (req.spo2 is not None and req.spo2 < 92)
         anomaly_res = {
             "alerta": bool(is_anomalia),
             "score": 0.95 if is_anomalia else 0.05,
@@ -338,7 +345,7 @@ def ingest_wearable_reading(
 
     # 4. Diagnóstico Ontológico e Rede Bayesiana
     current_phantom_vals = {k: v['estimate'] for k, v in phantom_states.items() if isinstance(v, dict) and 'estimate' in v}
-    hrv_metrics = {'rmssd': req.hrv_rmssd or 42.0, 'sdnn': 50.0, 'pnn50': 20.0}
+    hrv_metrics = {"rmssd": req.hrv_rmssd} if req.hrv_rmssd is not None else None
 
     hypotheses = bayes_net.generate_diagnostic_hypotheses(
         phantom_data=phantom_states,
@@ -355,11 +362,16 @@ def ingest_wearable_reading(
     )
 
     # 5. Parecer do Conselho Clínico Multi-Agente (Dempster-Shafer)
+    consensus_vitals = {
+        "heart_rate": bpm_clean if bpm_clean is not None else req.heart_rate,
+    }
+    if req.spo2 is not None:
+        consensus_vitals["spo2"] = req.spo2
     consensus_data = consensus_coordinator.reach_consensus(
         patient_id=req.patient_id,
-        vitals={"heart_rate": bpm_clean, "spo2": req.spo2 or 98.0},
+        vitals=consensus_vitals,
         phantom_data=phantom_states,
-        hrv_metrics=hrv_metrics
+        hrv_metrics=hrv_metrics,
     )
 
     from src.ops.timestamps import stamp_ingest
@@ -368,17 +380,23 @@ def ingest_wearable_reading(
     ts = stamps["timestamp"]
 
     try:
-        from src.clinical_intelligence.alert_ingest import assess_ingest_alerts, merge_anomaly_with_alerts
+        from src.clinical_intelligence.alert_ingest import (
+            assess_ingest_alerts,
+            attach_previous_reading,
+            merge_anomaly_with_alerts,
+        )
 
         phantom_for_alerts = {
             name: {
                 "estimate": float(details["estimate"]),
                 "ci_lower": float(details.get("ci_lower", details["estimate"])),
                 "ci_upper": float(details.get("ci_upper", details["estimate"])),
-                "reliable": bool(details.get("reliable", True)),
+                "reliable": False,
+                "filter_reliable": bool(details.get("reliable", False)),
+                "method": "ukf",
             }
             for name, details in phantom_states.items()
-            if isinstance(details, dict)
+            if isinstance(details, dict) and "estimate" in details
         }
         hband_ext = {
             key: value
@@ -394,22 +412,32 @@ def ingest_wearable_reading(
         }
         _extra = getattr(req, "model_extra", None) or {}
         _source = getattr(req, "ingest_source", None) or _extra.get("ingest_source") or "companion_manual"
+        prior = patient_telemetry_history.get(req.patient_id) or []
+        raw_for_alerts = {
+            "heart_rate_bpm": req.heart_rate,
+            "spo2_percent": req.spo2,
+            "skin_temp_celsius": req.skin_temp,
+            "blood_pressure_sys": req.blood_pressure_sys,
+            "blood_pressure_dia": req.blood_pressure_dia,
+            "ingest_source": _source,
+            "timestamp": ts,
+        }
+        if req.activity_level is not None:
+            raw_for_alerts["activity_level"] = req.activity_level
+        if req.wear_status is not None:
+            raw_for_alerts["wear_status"] = req.wear_status
+        raw_for_alerts = attach_previous_reading(
+            raw_for_alerts, prior[-1] if prior else None
+        )
         clinical_alerts = assess_ingest_alerts(
-            heart_rate=bpm_clean,
+            heart_rate=req.heart_rate,
             spo2=req.spo2,
             skin_temp=req.skin_temp,
             hrv_rmssd=req.hrv_rmssd,
             activity_level=req.activity_level,
             phantom=phantom_for_alerts,
             hband_ext=hband_ext,
-            raw_telemetry={
-                "heart_rate_bpm": req.heart_rate,
-                "spo2_percent": req.spo2,
-                "skin_temp_celsius": req.skin_temp,
-                "blood_pressure_sys": req.blood_pressure_sys,
-                "blood_pressure_dia": req.blood_pressure_dia,
-                "ingest_source": _source,
-            },
+            raw_telemetry=raw_for_alerts,
             rules_only=True,
         )
         anomaly_res = merge_anomaly_with_alerts(anomaly_res, clinical_alerts)
@@ -439,14 +467,23 @@ def ingest_wearable_reading(
             "blood_pressure_dia": req.blood_pressure_dia,
             "hrv_rmssd_ms": req.hrv_rmssd,
             "steps": req.steps,
-            "wear_status": req.wear_status,
+            **(
+                {"wear_status": req.wear_status}
+                if req.wear_status is not None
+                else {}
+            ),
         },
         "cleaned_telemetry": {
-            "heart_rate_clean": round(float(bpm_clean), 2),
+            "heart_rate_clean": None if bpm_clean is None else round(float(bpm_clean), 2),
+            "heart_rate_source": hr_note["heart_rate_source"],
+            "ppg_role": hr_note["ppg_role"],
+            "ppg_samples": hr_note["ppg_samples"],
             "filter_applied": req.filter_type,
             "bmo_metrics": {},
         },
         "phantom_data": {
+            "method": "ukf",
+            "not_a_measurement": True,
             "systolic_bp": phantom_states.get("systolic_bp", {}),
             "diastolic_bp": phantom_states.get("diastolic_bp", {}),
             "spo2": phantom_states.get("spo2", {}),
@@ -502,18 +539,22 @@ def ingest_wearable_batch(
     processed_count = 0
     results = []
     for item in req.readings:
-        hr = float(item.get("heart_rate") or item.get("rate_value") or 72.0)
+        raw_hr = item.get("heart_rate", item.get("rate_value"))
+        if raw_hr is None:
+            continue
+        hr = float(raw_hr)
         if hr > 0:
+            raw_spo2 = item.get("spo2", item.get("spo2_value"))
             single_req = WearableTelemetryRequest(
                 patient_id=req.patient_id,
                 device_id=req.device_id,
                 timestamp=str(item.get("timestamp") or datetime.datetime.now(datetime.timezone.utc).isoformat()),
                 heart_rate=hr,
-                spo2=float(item.get("spo2") or item.get("spo2_value") or 98.0),
+                spo2=float(raw_spo2) if raw_spo2 is not None else None,
                 blood_pressure_sys=float(item["blood_pressure_sys"]) if item.get("blood_pressure_sys") else None,
                 blood_pressure_dia=float(item["blood_pressure_dia"]) if item.get("blood_pressure_dia") else None,
-                hrv_rmssd=float(item["hrv"]) if item.get("hrv") else 42.0,
-                steps=int(item["step_count"]) if item.get("step_count") else None
+                hrv_rmssd=float(item["hrv"]) if item.get("hrv") is not None else None,
+                steps=int(item["step_count"]) if item.get("step_count") is not None else None
             )
             result = ingest_wearable_reading(single_req)
             results.append(result)
