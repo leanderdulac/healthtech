@@ -14,6 +14,32 @@ INGEST_HEADERS = {"X-API-Key": "ht_ingest_test_key_32chars_long_token"}
 READ_HEADERS = {"X-API-Key": "ht_read_test_key_32chars_long_token"}
 
 
+def test_ppg_waveform_keeps_measured_heart_rate_and_measured_alerts():
+    response = client.post(
+        "/api/v1/wearables/ingest",
+        headers=INGEST_HEADERS,
+        json={
+            "patient_id": "TEST_PATIENT_PPG",
+            "device_id": "VE30",
+            "heart_rate": 76.0,
+            "spo2": 98.0,
+            "skin_temp": 33.4,
+            "ppg_signal": [500.0, 520.0, 560.0, 610.0, 580.0, 530.0, 505.0, 495.0],
+            "filter_type": "BMO",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["cleaned_telemetry"]["heart_rate_clean"] == 76.0
+    assert data["cleaned_telemetry"]["ppg_role"] == "waveform"
+    assert data["phantom_data"]["not_a_measurement"] is True
+    alerts = data["clinical_alerts"]
+    assert alerts["is_true_alert"] is False
+    assert alerts["vitals_used"]["hr"] == 76.0
+    assert alerts["vitals_used"]["pas"] is None
+    assert alerts["engine"] == "alert_matrix_rules"
+
+
 def test_wearable_ingest_endpoint():
     payload = {
         "patient_id": "TEST_PATIENT_101",

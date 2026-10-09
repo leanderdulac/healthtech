@@ -164,6 +164,10 @@ def test_fleet_summary_is_public_and_hides_synthetics():
                 "age_seconds",
                 "heart_rate",
                 "spo2",
+                "steps",
+                "blood_pressure_sys",
+                "blood_pressure_dia",
+                "device_model",
                 "synthetic",
             }
         )

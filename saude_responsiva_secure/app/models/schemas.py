@@ -32,10 +32,11 @@ class WearableTelemetryRequest(BaseModel):
     device_id: Optional[str] = Field("wrist_wearable", max_length=64)
     timestamp: Optional[str] = Field(None, max_length=64)
     heart_rate: float = Field(..., ge=20.0, le=250.0)
-    hrv_rmssd: Optional[float] = Field(40.0, ge=0.0, le=300.0)
-    skin_temp: Optional[float] = Field(33.0, ge=25.0, le=45.0)
-    spo2: Optional[float] = Field(98.0, ge=50.0, le=100.0)
-    activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
+    # Ausência fica ausente. 98 / 40 / 33 / 0 não são medição.
+    hrv_rmssd: Optional[float] = Field(None, ge=0.0, le=300.0)
+    skin_temp: Optional[float] = Field(None, ge=25.0, le=45.0)
+    spo2: Optional[float] = Field(None, ge=50.0, le=100.0)
+    activity_level: Optional[float] = Field(None, ge=0.0, le=100.0)
     ppg_signal: Optional[List[float]] = None
     filter_type: Optional[str] = Field(
         "BMO",
@@ -68,6 +69,7 @@ class WearableTelemetryRequest(BaseModel):
     abrupt_steps_stop: Optional[bool] = None
     inactivity_rest_of_active_period: Optional[bool] = None
     consciousness_altered: Optional[bool] = None
+    wear_status: Optional[bool] = None
     # Origem do ingest: HTTP manual, simulador BLE ou HBand SDK
     ingest_source: Optional[str] = Field(
         "companion_manual",
