@@ -21,6 +21,15 @@ O formulário é em inglês; a versão em português serve de referência.
 | Which are being considered? | TensorRT, Triton Inference Server, RAPIDS (cuDF) |
 | Non-NVIDIA technologies | Google Cloud (Cloud Run, Vertex AI, BigQuery, Cloud Storage), PyTorch, scikit-learn, FastAPI, PostgreSQL, Android/Kotlin, Bluetooth Low Energy, HL7 FHIR R4 |
 
+## Product Logo
+
+Arquivos em `docs/next2u/logo/`, quadrados, feitos a partir do logo oficial
+(`dashboard/next2u-saude-logo.png`) centralizado com margem:
+
+- `next2u-saude-logo-1024-branco.png` (1024×1024, fundo branco) — recomendado para o upload
+- `next2u-saude-logo-600-branco.png` (600×600, fundo branco, logo em resolução nativa)
+- `next2u-saude-logo-600-transparente.png` (600×600, fundo transparente)
+
 ## Description and value proposition (200–500 caracteres)
 
 **EN (490 caracteres)**
