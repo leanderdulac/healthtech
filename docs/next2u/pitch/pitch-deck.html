@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>next2u SAÚDE — Pitch Deck</title>
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  :root {
+    --teal: #009fad; --teal-dark: #00707a; --teal-soft: #e6f6f7;
+    --orange: #ff8c27; --orange-soft: #fff1e4;
+    --ink: #10262c; --muted: #5b6f75; --line: #dbe4e6; --bg: #ffffff;
+    --fill: #fff3b0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); }
+  body { font-family: "Inter", "DejaVu Sans", sans-serif; color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .slide { width: 1280px; height: 720px; position: relative; overflow: hidden; page-break-after: always; break-after: page; padding: 64px 80px 72px; display: flex; flex-direction: column; }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  .kicker { font-size: 15px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--teal); margin-bottom: 14px; }
+  h1 { font-size: 44px; line-height: 1.12; font-weight: 800; letter-spacing: -.02em; max-width: 1040px; }
+  h1 em { font-style: normal; color: var(--orange); }
+  h2 { font-size: 21px; font-weight: 700; margin-bottom: 8px; }
+  p, li { font-size: 18px; line-height: 1.5; color: var(--muted); }
+  ul { list-style: none; }
+  li { padding-left: 22px; position: relative; margin-bottom: 9px; }
+  li::before { content: ""; position: absolute; left: 0; top: 10px; width: 9px; height: 9px; border-radius: 2px; background: var(--orange); }
+  strong { color: var(--ink); font-weight: 700; }
+  .body { flex: 1; margin-top: 36px; display: flex; flex-direction: column; justify-content: center; }
+  .footer { position: absolute; left: 80px; right: 80px; bottom: 26px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+  .footer img { height: 22px; }
+  .src { font-size: 11.5px; color: var(--muted); margin-top: 18px; line-height: 1.45; }
+  .grid { display: grid; gap: 22px; }
+  .g2 { grid-template-columns: 1fr 1fr; } .g3 { grid-template-columns: repeat(3, 1fr); } .g4 { grid-template-columns: repeat(4, 1fr); }
+  .card { border: 1px solid var(--line); border-radius: 14px; padding: 24px 26px; background: #fff; }
+  .card.teal { background: var(--teal-soft); border-color: transparent; }
+  .card.orange { background: var(--orange-soft); border-color: transparent; }
+  .card p { font-size: 16.5px; }
+  .stat { font-size: 52px; font-weight: 800; color: var(--teal-dark); letter-spacing: -.03em; line-height: 1; margin-bottom: 10px; }
+  .stat.o { color: var(--orange); }
+  .fill { background: var(--fill); color: #6b5300; border-radius: 4px; padding: 1px 7px; font-weight: 600; }
+  .tag { display: inline-block; font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--teal-soft); color: var(--teal-dark); margin-bottom: 12px; }
+  .tag.o { background: var(--orange-soft); color: #b85a00; }
+  .tag.g { background: #eef1f2; color: var(--muted); }
+  /* cover */
+  .cover { background: linear-gradient(135deg, #ffffff 0%, #ffffff 58%, var(--teal-soft) 100%); justify-content: center; }
+  .cover img.logo { width: 400px; margin-bottom: 44px; }
+  .cover h1 { font-size: 50px; max-width: 860px; }
+  .cover p.lead { font-size: 22px; margin-top: 22px; max-width: 820px; }
+  .cover .meta { position: absolute; left: 80px; bottom: 48px; font-size: 15px; color: var(--muted); }
+  .pulse { position: absolute; right: -90px; top: 0; bottom: 0; width: 440px; z-index: 0; }
+  .cover > :not(.pulse) { position: relative; z-index: 1; }
+  .cover .meta { position: absolute; }
+  /* flow */
+  .flow { display: flex; align-items: stretch; gap: 0; }
+  .step { flex: 1; border-radius: 14px; padding: 22px 18px; background: var(--teal-soft); text-align: left; }
+  .step.hl { background: var(--orange-soft); }
+  .step .n { font-size: 13px; font-weight: 800; color: var(--teal-dark); letter-spacing: .08em; margin-bottom: 8px; }
+  .step.hl .n { color: #b85a00; }
+  .step h2 { font-size: 18.5px; }
+  .step p { font-size: 14.5px; line-height: 1.45; }
+  .arrow { width: 34px; display: flex; align-items: center; justify-content: center; color: var(--teal); font-size: 26px; font-weight: 800; }
+  table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  th { text-align: left; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 2px solid var(--line); }
+  td { padding: 13px 14px; border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: top; }
+  td.c { text-align: center; font-weight: 700; }
+  .yes { color: var(--teal-dark); } .no { color: #b0bcc0; } .part { color: var(--orange); }
+  .bar { height: 12px; border-radius: 6px; background: #eef1f2; overflow: hidden; margin-top: 8px; }
+  .bar span { display: block; height: 100%; background: var(--teal); }
+  .bar span.o { background: var(--orange); }
+  .avatar { width: 84px; height: 84px; border-radius: 50%; background: #eef1f2; border: 2px dashed #c6d1d4; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<!-- 1 COVER -->
+<section class="slide cover">
+  <svg class="pulse" viewBox="0 0 520 720" fill="none" aria-hidden="true">
+    <path d="M0 420 H170 L210 300 L250 560 L300 180 L345 470 L380 420 H520" stroke="#009fad" stroke-opacity=".22" stroke-width="18" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>
+  <img class="logo" src="../logo/next2u-saude-logo-horizontal.png" alt="next2u SAÚDE">
+  <h1>Early-warning home monitoring for chronic patients in <em>Brazil's public primary care</em></h1>
+  <p class="lead">A wristband, an Android app and a 158-rule clinical engine that tell the care team who is getting worse, before it becomes a hospitalization.</p>
+  <div class="meta">Seed round · 2026 · next2u.com.br</div>
+</section>
+
+<!-- 2 PROBLEM -->
+<section class="slide">
+  <div class="kicker">Problem</div>
+  <h1>Chronic patients deteriorate at home, <em>between visits</em>, where primary care can't see them</h1>
+  <div class="body">
+    <div class="grid g3">
+      <div class="card teal"><div class="stat">29.7%</div><p><strong>of adults</strong> in Brazilian state capitals report a hypertension diagnosis (2024).</p></div>
+      <div class="card teal"><div class="stat">12.9%</div><p><strong>of adults</strong> report diabetes, more than double the 5.5% of 2006.</p></div>
+      <div class="card orange"><div class="stat o">738k</div><p><strong>deaths from chronic non-communicable diseases</strong> in 2019, 54.7% of all deaths in Brazil.</p></div>
+    </div>
+    <div class="grid g2" style="margin-top:26px">
+      <div><h2>Follow-up is episodic</h2><p>Community health teams see a patient every few weeks. Blood pressure, oxygen saturation and heart rate in between are unknown.</p></div>
+      <div><h2>Decompensation is found late</h2><p>Many hospitalizations of hypertensive, diabetic, kidney, lung and liver patients are classed as sensitive to primary care: avoidable if caught early.</p></div>
+    </div>
+    <div class="src">Sources: Ministério da Saúde, Vigitel 2006–2024 series (capitals + Federal District); Plano de Ações Estratégicas para o Enfrentamento das DCNT 2021–2030 (2019 data). Primary-care-sensitive conditions: Portaria MS nº 221/2008.</div>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>2</span></div>
+</section>
+
+<!-- 3 SOLUTION -->
+<section class="slide">
+  <div class="kicker">Solution</div>
+  <h1>Continuous vital signs, <em>rule-based alerts</em>, one panel per health unit</h1>
+  <div class="body">
+    <div class="grid g3">
+      <div class="card"><span class="tag">Patient</span><h2>Wear and forget</h2><p>A low-cost BLE wristband measures heart rate, SpO2, blood pressure, temperature and sleep. The Android app uploads readings and queues them offline when there is no signal.</p></div>
+      <div class="card"><span class="tag o">Engine</span><h2>158 clinical rules</h2><p>Each reading is checked against 158 base alerts, expanded to 971 patterns by hospitalization risk, active diseases and medication. A score or a drug alone never fires an alert.</p></div>
+      <div class="card"><span class="tag">Care team</span><h2>Who needs attention now</h2><p>The UBS panel ranks patients by alert priority, inside the team's own territory. Every alert is decision support: the clinician decides the conduct.</p></div>
+    </div>
+    <p style="margin-top:30px;font-size:20px"><strong>Outcome we are built for:</strong> fewer avoidable hospitalizations and earlier home visits for the patients who need them.</p>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>3</span></div>
+</section>
+
+<!-- 4 HOW IT WORKS -->
+<section class="slide">
+  <div class="kicker">How it works</div>
+  <h1>One critical path, <em>tested on every commit</em></h1>
+  <div class="body">
+    <div class="flow">
+      <div class="step"><div class="n">01</div><h2>Wristband</h2><p>HBand / Veepoo SDK or any watch with the standard Bluetooth health profile.</p></div>
+      <div class="arrow">›</div>
+      <div class="step"><div class="n">02</div><h2>Companion app</h2><p>Kotlin Android app, pairing, offline outbox, retries.</p></div>
+      <div class="arrow">›</div>
+      <div class="step"><div class="n">03</div><h2>Secure ingest API</h2><p>Scoped API keys, rate limiting, per-patient authorization, idempotent writes.</p></div>
+      <div class="arrow">›</div>
+      <div class="step hl"><div class="n">04</div><h2>Alert matrix</h2><p>158 rules → 971 patterns, weighted by risk, disease and medication.</p></div>
+      <div class="arrow">›</div>
+      <div class="step"><div class="n">05</div><h2>UBS panel</h2><p>Territory-scoped view; separates HTTP, simulated and physical-device data.</p></div>
+    </div>
+    <div class="grid g3" style="margin-top:30px">
+      <div><h2>Interoperable</h2><p>HL7 FHIR R4 export (Patient, Observation, Device, Flag, Bundle).</p></div>
+      <div><h2>Cloud-native</h2><p>Bronze / Silver / Gold lakehouse on Google Cloud: Cloud Run, BigQuery, Cloud Storage.</p></div>
+      <div><h2>Private by design</h2><p>Hashed identifiers, territory-based access, LGPD impact report and incident plan.</p></div>
+    </div>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>4</span></div>
+</section>
+
+<!-- 5 PRODUCT -->
+<section class="slide">
+  <div class="kicker">Product</div>
+  <h1>Clinical protocols for the conditions <em>primary care already follows</em></h1>
+  <div class="body">
+    <div class="grid g2" style="gap:40px">
+      <div>
+        <table>
+          <tr><th>Priority</th><th>Base alerts</th><th>Branches</th><th>Patterns</th></tr>
+          <tr><td>★ Mild</td><td>43</td><td>7</td><td>301</td></tr>
+          <tr><td>★★ Moderate</td><td>70</td><td>7</td><td>490</td></tr>
+          <tr><td>★★★ Severe</td><td>45</td><td>4</td><td>180</td></tr>
+          <tr><td><strong>Total</strong></td><td><strong>158</strong></td><td>—</td><td><strong>971</strong></td></tr>
+        </table>
+        <p class="src" style="font-size:13px">Mild and moderate alerts are promoted only with confirmation, persistence, a second parameter or an additional clinical sign.</p>
+      </div>
+      <div>
+        <h2>Six care pathways</h2>
+        <ul>
+          <li>Hypertension</li>
+          <li>Diabetes</li>
+          <li>Chronic kidney disease</li>
+          <li>Respiratory disease (COPD, asthma)</li>
+          <li>Liver disease</li>
+          <li>High-risk pregnancy</li>
+        </ul>
+        <h2 style="margin-top:18px">Hospitalization risk score</h2>
+        <p>Multimorbidity, heart or liver failure, cancer, polypharmacy, recent admission, cognitive impairment and social isolation set the patient's baseline tier, from standard follow-up to intensive home care.</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>5</span></div>
+</section>
+
+<!-- 6 MARKET -->
+<section class="slide">
+  <div class="kicker">Market and customer</div>
+  <h1>The buyer is the <em>municipal health secretariat</em>; the unit is the UBS</h1>
+  <div class="body">
+    <div class="grid g3">
+      <div class="card teal"><div class="stat">5,570</div><p><strong>municipalities</strong> in Brazil, each responsible for primary care in its territory (IBGE).</p></div>
+      <div class="card teal"><div class="stat">1 in 3</div><p><strong>adults</strong> in the capitals lives with hypertension or diabetes, the core of the UBS chronic-care caseload.</p></div>
+      <div class="card orange"><h2 style="margin-bottom:12px">Bottom-up sizing</h2><p>Monitored patients per municipality × price per patient per month. Our first segment: high-risk tiers (score ≥ 11) that need telemetry.</p><p style="margin-top:10px"><span class="fill">[Fill: price/patient/month and target TAM]</span></p></div>
+    </div>
+    <div class="grid g2" style="margin-top:28px">
+      <div><h2>Why municipalities</h2><p>Primary care is organized by territory and health unit, which maps directly to our access model and alert routing. Avoidable admissions are a cost the municipality and the state pay.</p></div>
+      <div><h2>Expansion</h2><p>The same engine and API serve health plans and hospital-at-home programs once the public-sector pilot produces outcome data.</p></div>
+    </div>
+    <div class="src">"1 in 3" is a conservative reading of Vigitel 2024 (hypertension 29.7%, diabetes 12.9%, with overlap). Municipality count: IBGE.</div>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>6</span></div>
+</section>
+
+<!-- 7 BUSINESS MODEL -->
+<section class="slide">
+  <div class="kicker">Business model</div>
+  <h1>B2G SaaS: <em>per monitored patient, per month</em></h1>
+  <div class="body">
+    <div class="grid g3">
+      <div class="card"><span class="tag">Recurring</span><h2>Platform subscription</h2><p>Per active monitored patient per month: app, ingest, alert engine, panel, support.</p><p style="margin-top:10px"><span class="fill">[Fill: price]</span></p></div>
+      <div class="card"><span class="tag o">One-off</span><h2>Device kit</h2><p>Wristband supplied at cost or through the municipality's own purchase. We stay device-agnostic.</p></div>
+      <div class="card"><span class="tag g">Services</span><h2>Implementation</h2><p>Protocol set-up per pathway, team training and integration with the municipal health record via FHIR.</p></div>
+    </div>
+    <div class="grid g2" style="margin-top:28px">
+      <div><h2>Go-to-market</h2><p>Paid pilot with one municipality → outcome report → public procurement or innovation partnership → neighboring municipalities and regional health consortia.</p></div>
+      <div><h2>Unit economics</h2><p>Serverless API on Cloud Run with per-request pricing; the rule engine runs on CPU.</p><p style="margin-top:8px"><span class="fill">[Fill: cost/patient/month and target margin]</span></p></div>
+    </div>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>7</span></div>
+</section>
+
+<!-- 8 TRACTION -->
+<section class="slide">
+  <div class="kicker">Where we are</div>
+  <h1>Product built and running end to end; <em>physical-device pilot next</em></h1>
+  <div class="body">
+    <div class="grid g2" style="gap:40px">
+      <div>
+        <h2>Done</h2>
+        <ul>
+          <li><strong>Android app v1.5</strong>, installable, with offline outbox</li>
+          <li><strong>Secure ingest API</strong> with scoped keys, rate limit and per-patient lock</li>
+          <li><strong>158-rule alert engine</strong> with decision-support output</li>
+          <li><strong>UBS panel</strong> with territory-scoped access</li>
+          <li><strong>HL7 FHIR R4</strong> export and Medallion lakehouse</li>
+          <li><strong>Automated CI</strong>: critical-path tests on every commit, Linux and Windows, PostgreSQL</li>
+          <li><strong>LGPD file</strong>: impact report, processing record, retention, incident plan</li>
+        </ul>
+      </div>
+      <div>
+        <h2>Next 6 months</h2>
+        <ul>
+          <li>Integrate the HBand / Veepoo SDK on physical wristbands</li>
+          <li>First municipal pilot with real patients and real devices</li>
+          <li>Measure alert precision and time-to-visit against the team's routine</li>
+          <li>Regulatory assessment under ANVISA RDC 657/2022 (software as a medical device)</li>
+        </ul>
+        <div class="card orange" style="margin-top:18px"><p><strong>Stage:</strong> pre-revenue. Simulated-device sessions are not counted as pilot data.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>8</span></div>
+</section>
+
+<!-- 9 AI & EVIDENCE -->
+<section class="slide">
+  <div class="kicker">AI roadmap and evidence discipline</div>
+  <h1>Rules in production today; <em>prediction only after it is proven</em></h1>
+  <div class="body">
+    <div class="grid g2" style="gap:40px">
+      <div>
+        <h2>Research track: deterioration forecasting</h2>
+        <p>A temporal convolutional network (PyTorch) forecasts deterioration at 6, 24 and 72 hours. We keep it out of the product because training and real-world results diverge:</p>
+        <div style="margin-top:18px">
+          <p style="font-size:15px"><strong>F1 on training data</strong> · 0.98</p>
+          <div class="bar"><span style="width:98%"></span></div>
+          <p style="font-size:15px;margin-top:14px"><strong>F1 on real labels</strong> (5 patients, 752 sequences) · 0.64</p>
+          <div class="bar"><span class="o" style="width:64%"></span></div>
+        </div>
+        <p style="margin-top:16px;font-size:16px">We will expose a predictive horizon only after patient-level validation on people outside the training set.</p>
+      </div>
+      <div>
+        <h2>Where NVIDIA accelerates us</h2>
+        <ul>
+          <li><strong>CUDA</strong> for training temporal models on pilot telemetry as it grows</li>
+          <li><strong>RAPIDS cuDF</strong> for lakehouse feature pipelines</li>
+          <li><strong>TensorRT + Triton</strong> for low-latency inference once a model passes validation</li>
+        </ul>
+        <div class="card teal" style="margin-top:18px"><p>The alert matrix stays the source of truth for the pilot. AI adds value when it beats the rules on real patients, not before.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>9</span></div>
+</section>
+
+<!-- 10 COMPETITION -->
+<section class="slide">
+  <div class="kicker">Positioning</div>
+  <h1>Built for <em>public primary care</em>, not adapted to it</h1>
+  <div class="body">
+    <table>
+      <tr><th style="width:34%"></th><th style="text-align:center">Consumer wearable apps</th><th style="text-align:center">Telehealth platforms</th><th style="text-align:center">Hospital RPM suites</th><th style="text-align:center">next2u SAÚDE</th></tr>
+      <tr><td>Continuous home vital signs</td><td class="c yes">●</td><td class="c no">○</td><td class="c yes">●</td><td class="c yes">●</td></tr>
+      <tr><td>Clinical rules by chronic pathway</td><td class="c no">○</td><td class="c part">◐</td><td class="c yes">●</td><td class="c yes">●</td></tr>
+      <tr><td>Territory / UBS access model</td><td class="c no">○</td><td class="c no">○</td><td class="c no">○</td><td class="c yes">●</td></tr>
+      <tr><td>Device-agnostic, low-cost hardware</td><td class="c no">○</td><td class="c part">◐</td><td class="c no">○</td><td class="c yes">●</td></tr>
+      <tr><td>FHIR R4 interoperability</td><td class="c no">○</td><td class="c part">◐</td><td class="c yes">●</td><td class="c yes">●</td></tr>
+      <tr><td>Priced for municipal budgets</td><td class="c part">◐</td><td class="c part">◐</td><td class="c no">○</td><td class="c yes">●</td></tr>
+    </table>
+    <p class="src">● yes · ◐ partial · ○ no. Category-level comparison; individual vendors vary.</p>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>10</span></div>
+</section>
+
+<!-- 11 TRUST -->
+<section class="slide">
+  <div class="kicker">Safety, privacy, regulation</div>
+  <h1>Decision support with <em>guardrails</em></h1>
+  <div class="body">
+    <div class="grid g3">
+      <div class="card"><h2>Clinical safety</h2><p>Every alert is named "Possible…" and carries decision support, never a mandatory conduct. A risk score, disease or drug alone cannot trigger an alert.</p></div>
+      <div class="card"><h2>LGPD</h2><p>Data protection impact report, processing record, retention policy and incident response plan. Identifiers are hashed; access is limited to the patient's territory.</p></div>
+      <div class="card"><h2>Security</h2><p>Scoped API keys, rate limiting, anti-IDOR checks per patient, idempotent ingest, dependency audits in CI.</p></div>
+    </div>
+    <div class="card teal" style="margin-top:26px"><p><strong>Regulatory path:</strong> classification under ANVISA RDC 657/2022 for software as a medical device is part of the pilot workstream. We do not claim certification today.</p></div>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>11</span></div>
+</section>
+
+<!-- 12 TEAM -->
+<section class="slide">
+  <div class="kicker">Team</div>
+  <h1>The people <em>building it</em></h1>
+  <div class="body">
+    <div class="grid g4">
+      <div class="card"><div class="avatar"></div><h2><span class="fill">[Name]</span></h2><p><span class="fill">[Role]</span></p><p style="margin-top:8px;font-size:15px"><span class="fill">[One line of background]</span></p></div>
+      <div class="card"><div class="avatar"></div><h2><span class="fill">[Name]</span></h2><p><span class="fill">[Role]</span></p><p style="margin-top:8px;font-size:15px"><span class="fill">[One line of background]</span></p></div>
+      <div class="card"><div class="avatar"></div><h2><span class="fill">[Name]</span></h2><p><span class="fill">[Role]</span></p><p style="margin-top:8px;font-size:15px"><span class="fill">[One line of background]</span></p></div>
+      <div class="card"><div class="avatar"></div><h2><span class="fill">[Name]</span></h2><p><span class="fill">[Role]</span></p><p style="margin-top:8px;font-size:15px"><span class="fill">[One line of background]</span></p></div>
+    </div>
+    <p style="margin-top:26px"><strong>Clinical advisors:</strong> <span class="fill">[Fill: names and specialties]</span></p>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>12</span></div>
+</section>
+
+<!-- 13 ASK -->
+<section class="slide">
+  <div class="kicker">The ask</div>
+  <h1>Seed round of <em><span class="fill">[US$ amount]</span></em> to prove outcomes in the field</h1>
+  <div class="body">
+    <div class="grid g2" style="gap:40px">
+      <div>
+        <h2>Use of funds</h2>
+        <div style="margin-top:12px">
+          <p style="font-size:16px"><strong>Field pilots</strong>: devices, deployment, municipal support <span class="fill">[%]</span></p><div class="bar"><span style="width:35%"></span></div>
+          <p style="font-size:16px;margin-top:14px"><strong>Clinical validation</strong>: prospective study, patient-level evaluation <span class="fill">[%]</span></p><div class="bar"><span style="width:25%"></span></div>
+          <p style="font-size:16px;margin-top:14px"><strong>Regulatory and privacy</strong>: ANVISA, LGPD, security audit <span class="fill">[%]</span></p><div class="bar"><span style="width:15%"></span></div>
+          <p style="font-size:16px;margin-top:14px"><strong>Team</strong>: engineering, clinical lead, sales to the public sector <span class="fill">[%]</span></p><div class="bar"><span class="o" style="width:25%"></span></div>
+        </div>
+        <p class="src">Bar lengths are illustrative until the allocation is set.</p>
+      </div>
+      <div>
+        <h2>Milestones this round buys</h2>
+        <ul>
+          <li>Physical wristbands live with real patients in the first municipality</li>
+          <li>Outcome report: alert precision, time to home visit, admissions</li>
+          <li>First recurring contract and a second municipality</li>
+          <li>ANVISA classification defined</li>
+          <li>Temporal model validated per patient, or retired</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><img src="../logo/next2u-saude-logo-horizontal.png" alt=""><span>13</span></div>
+</section>
+
+<!-- 14 CONTACT -->
+<section class="slide cover" style="align-items:flex-start">
+  <svg class="pulse" viewBox="0 0 520 720" fill="none" aria-hidden="true">
+    <path d="M0 420 H170 L210 300 L250 560 L300 180 L345 470 L380 420 H520" stroke="#ff8c27" stroke-opacity=".22" stroke-width="18" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>
+  <img class="logo" src="../logo/next2u-saude-logo-horizontal.png" alt="next2u SAÚDE">
+  <h1>See who is getting worse, <em>before the emergency room does</em></h1>
+  <p class="lead" style="margin-top:28px">next2u.com.br · <span class="fill">[contact e-mail]</span></p>
+</section>
+
+</body>
+</html>

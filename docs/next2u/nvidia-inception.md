@@ -56,3 +56,36 @@ Fluxo: pulseira BLE (SDK HBand/Veepoo ou perfil Bluetooth de saúde padrão) -> 
   (ver `AGENTS.md`). O F1 do `alert_matrix_classifier.pkl` vem de dados sintéticos.
 - Não diga que o produto roda em GPU NVIDIA hoje. Só o treino de pesquisa usa CUDA.
 - Sessões `ble_sim` não contam como piloto.
+
+## Capital Connect (`inception-capital-connect`)
+
+Respostas sugeridas para o estágio atual (pré-receita, piloto). Os campos financeiros
+dependem de decisão da empresa; não informe term sheet, investidor líder ou ARR que não existam.
+
+| Campo | Sugestão |
+|-------|----------|
+| Funding Round | Pre-Seed ou Seed |
+| Proposed Raise Amount | Faixa que a empresa definir (o deck tem `[US$ amount]` para preencher) |
+| Board Seat Allocation | Decisão dos fundadores |
+| Term Sheet | No (até existir um) |
+| ARR | $0 / pre-revenue |
+| YoY growth rate | N/A (pré-receita); escolha a opção mais baixa se não houver N/A |
+| Lead investor | No (até existir um) |
+| Proposed funding close date | Data-alvo da empresa |
+
+### Why are you raising capital? (942 caracteres, máx. 1.000)
+
+next2u SAÚDE has built the full product: a wristband-to-dashboard pipeline (Android app, secure ingest API, 158-rule clinical alert engine, territory-scoped panel for primary care units, HL7 FHIR R4 export) with automated tests on every commit. We are pre-revenue. This round turns a working product into field evidence and a first contract. Funds go to: (1) deploying physical wristbands with real patients in a first municipal pilot; (2) a prospective evaluation of alert precision, time to home visit and avoidable hospitalizations; (3) ANVISA classification as software as a medical device, plus LGPD and security audits; (4) a small team with a clinical lead and public-sector sales. GPU capacity lets us retrain our temporal deterioration model on pilot data and validate it per patient; until it beats the rules on real patients, it stays out of the product. The goal is a recurring contract and a second municipality within the round.
+
+### Pitch deck
+
+`docs/next2u/pitch/next2u-saude-pitch-deck.pdf` (14 slides, PDF, < 5 MB), gerado de
+`docs/next2u/pitch/pitch-deck.html` com o Chromium headless:
+
+```bash
+cd docs/next2u/pitch
+chromium --headless --no-pdf-header-footer --print-to-pdf=next2u-saude-pitch-deck.pdf "file://$PWD/pitch-deck.html"
+```
+
+Antes de enviar, preencha os campos em amarelo `[...]`: valor da rodada e alocação, preço
+e custo por paciente, TAM, time, conselheiros clínicos e e-mail de contato.
