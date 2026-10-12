@@ -271,6 +271,18 @@ def rules_catalog() -> List[Dict[str, str]]:
     ]
 
 
+def select_primary(hits: List[AlertHit]) -> AlertHit:
+    """Regra de precedência do alerta principal (R3 Leandro, 12/10/2026).
+
+    1. Maior gravidade-base vence.
+    2. Empate: vence o primeiro hit na ordem do catálogo (n2u_001 → n2u_158).
+    Não há desempate por especificidade. Os 51 casos-base da R3 estão
+    fixados em tests/test_r3_principal.py.
+    """
+    rank = AlertMatrixResult.SEVERITY_RANK
+    return max(hits, key=lambda h: rank.get(h.severity, 0))
+
+
 class AlertMatrixEngine:
     """Avalia um VitalSnapshot contra toda a matriz de cruzamentos."""
 
@@ -320,7 +332,7 @@ class AlertMatrixEngine:
             return empty
 
         rank = AlertMatrixResult.SEVERITY_RANK
-        best = max(hits, key=lambda h: rank.get(h.severity, 0))
+        best = select_primary(hits)
         result = AlertMatrixResult(
             hits=hits,
             max_severity=best.severity,
