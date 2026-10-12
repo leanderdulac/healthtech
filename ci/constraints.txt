@@ -1,0 +1,11 @@
+# Versões fixas da pilha de ML usadas só no CI (pip install ... -c ci/constraints.txt).
+# Compatíveis com Python 3.10 e 3.11 em ubuntu e windows. Não altera requirements.txt
+# nem a imagem Docker de produção. Objetivo: CI reprodutível; a oscilação de
+# test_classifier_train_and_fp_detection vem da ordem de sets (ver PYTHONHASHSEED no ci.yml);
+# no PR #27 severity_f1_macro caiu para 0,43–0,50 em 2 de 4 jobs.
+numpy==2.2.6
+scipy==1.15.3
+scikit-learn==1.5.2
+joblib==1.5.2
+threadpoolctl==3.6.0
+pandas==2.2.3

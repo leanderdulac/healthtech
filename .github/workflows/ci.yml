@@ -34,7 +34,10 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements-dev.txt
+          pip install -r requirements-dev.txt -c ci/constraints.txt
+
+      - name: Show installed versions
+        run: pip freeze
 
       - name: Check secure vendor sync
         run: python scripts/sync_secure_vendor.py --check
@@ -44,6 +47,9 @@ jobs:
           TESTING: "1"
           PYTHONIOENCODING: "utf-8"
           ENVIRONMENT: "development"
+          # O dataset sintético itera sets de doenças/medicamentos; sem semente fixa,
+          # a ordem muda por processo e severity_f1_macro já caiu para ~0,49.
+          PYTHONHASHSEED: "0"
         run: |
           python -m pytest tests/ -q --tb=short
 
@@ -77,7 +83,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements-dev.txt
+          pip install -r requirements-dev.txt -c ci/constraints.txt
 
       - name: Run wearable durable store + idempotency (PostgreSQL)
         env:
