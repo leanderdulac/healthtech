@@ -958,7 +958,7 @@ async def secure_watch_bridge_loop():
                 await manager.broadcast_json({"type": "patient_ingest", "data": frame})
         except Exception as exc:
             logger.warning("Bridge de relógios falhou: %s", exc)
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(float(os.environ.get("SECURE_BRIDGE_POLL_SECONDS", "30")))
 
 
 @app.on_event("startup")
