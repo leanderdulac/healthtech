@@ -11,6 +11,10 @@ next2u-instalar
 **/*.pyc
 data/chroma_db
 data/lakehouse
+data/ops/private
+data/ops/gcp_billing_ledger.json
+data/ops/next2u_pix.json
+dashboard/billing-ledger.json
 data/models/_pre_v1_backup
 data/models/language_v1/train.log
 data/models/temporal_v1_train.log
