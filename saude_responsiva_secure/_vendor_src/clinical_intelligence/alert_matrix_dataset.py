@@ -12,7 +12,10 @@ com a severidade correta.
 
 from __future__ import annotations
 
+import json
 import random
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -33,6 +36,102 @@ from src.clinical_intelligence.next2u_context import (
     RULE_TO_NEXT2U,
     context_features,
 )
+
+_SEVERITY_RANK = {"none": 0, "leve": 1, "moderado": 2, "critico": 3}
+_LABEL_COLUMNS = ("severity", "is_true_alert", "is_false_positive", "rule_id")
+
+
+@lru_cache(maxsize=1)
+def _rule_severity() -> Dict[str, str]:
+    return {rule["rule_id"]: rule["severity"] for rule in ALERT_RULES}
+
+
+@lru_cache(maxsize=1)
+def _r3_principal_by_base() -> Dict[str, str]:
+    """Casos-base da R3: regra amostrada → principal aceito."""
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "tests"
+        / "fixtures"
+        / "r3_principal_gabarito.json"
+    )
+    if not path.is_file():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return {base: spec["principal"] for base, spec in raw.items()}
+
+
+def filter_divergent_and_redundant(df: pd.DataFrame) -> pd.DataFrame:
+    """Tira do treino o que diverge do gabarito R3 ou repete um empate já revisto.
+
+    Empate revisto (a amostra mirou a regra que perde para outra da mesma
+    gravidade) sai. Amostra de um caso-base cujo principal não é o do
+    gabarito sai. A subida de gravidade aceita fica, rotulada com o
+    principal novo. Cruzamento que a planilha não reviu fica, rotulado com
+    o principal que a precedência escolheu. Sinais idênticos com rótulos
+    diferentes saem; a repetição idêntica fica uma vez.
+    """
+    report = {
+        "rows_in": int(len(df)),
+        "dropped_redundant_tie": 0,
+        "dropped_divergent_overlap": 0,
+        "kept_r3_upgrade": 0,
+        "kept_unreviewed_cofire": 0,
+        "dropped_conflicting_label": 0,
+        "dropped_duplicate": 0,
+    }
+    if df.empty:
+        out = df.copy()
+        out.attrs["filter_report"] = {**report, "rows_out": 0}
+        return out
+
+    work = df.copy()
+    if "sampled_rule_id" not in work.columns:
+        work["sampled_rule_id"] = ""
+    severity = _rule_severity()
+    accepted = _r3_principal_by_base()
+    sampled = work["sampled_rule_id"].fillna("").astype(str)
+    primary = work["rule_id"].fillna("").astype(str)
+    mismatch = (sampled != "") & (primary != "") & (sampled != primary)
+    accepted_primary = sampled.map(accepted).fillna("")
+    in_gabarito = sampled.isin(set(accepted))
+    is_accepted = mismatch & in_gabarito & (accepted_primary == primary)
+
+    def _rank(rule_id: str) -> int:
+        return _SEVERITY_RANK.get(severity.get(rule_id, ""), -1)
+
+    base_rank = sampled.map(_rank)
+    primary_rank = primary.map(_rank)
+    redundant = is_accepted & (primary_rank == base_rank)
+    upgrade = is_accepted & (primary_rank > base_rank)
+    divergent = mismatch & in_gabarito & ~is_accepted
+    unreviewed = mismatch & ~in_gabarito
+    report["dropped_redundant_tie"] = int(redundant.sum())
+    report["dropped_divergent_overlap"] = int(divergent.sum())
+    report["kept_r3_upgrade"] = int(upgrade.sum())
+    report["kept_unreviewed_cofire"] = int(unreviewed.sum())
+    work = work.loc[~(redundant | divergent)].copy()
+
+    feature_cols = [col for col in FEATURE_COLUMNS if col in work.columns]
+    if feature_cols:
+        label = work.loc[:, list(_LABEL_COLUMNS)].astype(str).agg("|".join, axis=1)
+        work = work.assign(_label_key=label)
+        nunique = work.groupby(feature_cols, dropna=False)["_label_key"].transform("nunique")
+        conflict = nunique > 1
+        report["dropped_conflicting_label"] = int(conflict.sum())
+        work = work.loc[~conflict].drop(columns="_label_key")
+        before_dup = len(work)
+        work = work.drop_duplicates(feature_cols + list(_LABEL_COLUMNS), keep="first")
+        report["dropped_duplicate"] = int(before_dup - len(work))
+    else:
+        report["dropped_conflicting_label"] = 0
+        report["dropped_duplicate"] = 0
+    report["rows_out"] = int(len(work))
+    report["rows_removed"] = int(report["rows_in"] - report["rows_out"])
+    out = work.reset_index(drop=True)
+    out.attrs["filter_report"] = report
+    return out
+
 
 FEATURE_COLUMNS = [
     "pas",
@@ -1017,7 +1116,12 @@ def generate_dataset(
       - severity: none | leve | moderado | critico
       - is_true_alert: 0/1
       - is_false_positive: 1 se FP (inclui discrepância UI/phantom)
-      - rule_id: regra alvo (se true alert) ou ''
+      - rule_id: alerta principal da matriz (precedência R3) ou ''
+      - sampled_rule_id: regra que o amostrador mirou; vazio fora do laço por regra
+
+    Antes de devolver, descarta o empate revisto na R3, o caso-base cujo
+    principal foge do gabarito, o rótulo conflitante no mesmo sinal e a
+    repetição idêntica. A subida de gravidade aceita permanece.
     """
     r = _rng(seed)
     engine = AlertMatrixEngine()
@@ -1065,6 +1169,7 @@ def generate_dataset(
                     "is_true_alert": 1,
                     "is_false_positive": 0,
                     "rule_id": result.primary_rule_id or rid,
+                    "sampled_rule_id": rid,
                     "alert_name": result.primary_alert_name or "",
                     "sample_type": "true_alert",
                     "next2u_id": result.next2u_id or "",
@@ -1094,6 +1199,7 @@ def generate_dataset(
                 "is_true_alert": int(result.is_true_alert),
                 "is_false_positive": 0,
                 "rule_id": result.primary_rule_id or "",
+                "sampled_rule_id": "",
                 "alert_name": result.primary_alert_name or "",
                 "sample_type": "normal",
                 "next2u_id": result.next2u_id or "",
@@ -1136,6 +1242,7 @@ def generate_dataset(
                     "is_true_alert": 1,
                     "is_false_positive": 0,
                     "rule_id": result.primary_rule_id or "",
+                    "sampled_rule_id": "",
                     "alert_name": result.primary_alert_name or "",
                     "sample_type": "true_alert_from_fp_sampler",
                     "next2u_id": result.next2u_id or "",
@@ -1150,6 +1257,7 @@ def generate_dataset(
                     "is_true_alert": 0,
                     "is_false_positive": 1,
                     "rule_id": "",
+                    "sampled_rule_id": "",
                     "alert_name": "",
                     "sample_type": "false_positive",
                     "next2u_id": "",
@@ -1186,6 +1294,7 @@ def generate_dataset(
                 "is_true_alert": 0,
                 "is_false_positive": 1,
                 "rule_id": "",
+                "sampled_rule_id": "",
                 "alert_name": "",
                 "sample_type": "ui_screenshot_fp",
                 "next2u_id": "",
@@ -1198,4 +1307,6 @@ def generate_dataset(
     for c in FEATURE_COLUMNS:
         if c not in df.columns:
             df[c] = 0.0
-    return df
+    if "sampled_rule_id" not in df.columns:
+        df["sampled_rule_id"] = ""
+    return filter_divergent_and_redundant(df)
