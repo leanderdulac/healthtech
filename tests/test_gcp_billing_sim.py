@@ -175,6 +175,41 @@ def test_oct09_weekly_2000_is_posted():
     assert "09/10 R$ --" in ledger["meta"]["disclaimer"]
 
 
+def test_oct15_weekly_2000_is_split_across_compute_and_training():
+    ledger = build_ledger(as_of=date(2026, 10, 15))
+    credit = next(c for c in ledger["credits"] if c["date"] == "2026-10-15")
+    assert credit["document"] == "PIX-OCULTO"
+    assert credit["source"] == "titular_2026-10-15"
+    assert credit["amount_brl"] == 2000
+    assert credit["allocation"]["training_brl"] == 2000
+    assert credit["allocation"]["cloud_tokens_brl"] == 2000
+    assert credit["allocation"]["gemini_ultra_brl"] == 0
+    assert credit["allocation"]["purpose"] == TRAINING_PURPOSE
+    assert "custos computacionais" in credit["description"]
+    assert "treinamento" in credit["description"]
+    assert ledger["kpis"]["credits_today_brl"] == 2000
+    assert ledger["kpis"]["credits_posted_brl"] == 0
+    assert ledger["kpis"]["credits_prior_brl"] == 23580
+    assert ledger["kpis"]["gemini_ultra_today_brl"] == 0
+    assert ledger["kpis"]["cloud_from_today_credit_brl"] == 2000
+    assert ledger["meta"]["as_of"] == "2026-10-15"
+    assert ledger["kpis"]["spent_last_3_weeks_brl"] == 23580
+    assert 0 < ledger["kpis"]["spent_today_brl"] < 2000
+    assert ledger["kpis"]["balance_brl"] == round(
+        0 - ledger["kpis"]["spent_to_date_brl"], 2
+    )
+    assert ledger["kpis"]["balance_brl"] > 0
+    open_invoice = ledger["invoices"][-1]
+    assert open_invoice["status"] == "open"
+    assert open_invoice["period_start"] == "2026-10-15"
+    assert open_invoice["credit_brl"] == 2000
+    previous = ledger["invoices"][-2]
+    assert previous["status"] == "finalized"
+    assert previous["period_start"] == "2026-10-09"
+    assert previous["period_end"] == "2026-10-14"
+    assert "15/10 R$ --" in ledger["meta"]["disclaimer"]
+
+
 def test_disclaimer_states_ultra_and_training_split():
     ledger = build_ledger(as_of=date(2026, 8, 31))
     text = ledger["meta"]["disclaimer"]

@@ -4,7 +4,7 @@ Faturamento Google Cloud alinhado ao uso real do HealthTech.
 Créditos de nuvem/tokens vêm de PIX da NEXT2U SAUDE LTDA (extrato C6
 25/06–24/08/2026, exportado 24/08 às 12:38), mais o aporte de R$ --
 informado em 24/08, a entrada semanal de R$ -- em 31/08 e os
-complementos de R$ -- em 28/09 e 09/10.
+complementos de R$ -- em 28/09, 09/10 e 15/10.
 
 Os SKUs espelham Cloud Run, Vertex (IF + TCN), BigQuery, GCS, Cloud Build,
 Artifact Registry, Logging, Gemini (tokens de RAG/SLM) e Gemini Ultra.
@@ -24,7 +24,7 @@ TZ = ZoneInfo("America/Sao_Paulo")
 FX_USD_BRL = 5.42
 WEEKLY_CREDIT_BRL = 0.00
 WEEKLY_TRAINING_BRL = 0.00
-AS_OF_DEFAULT = date(2026, 10, 9)
+AS_OF_DEFAULT = date(2026, 10, 15)
 GEMINI_ULTRA_AUG3_BRL = 0.00
 GEMINI_ULTRA_AUG24_BRL = 0.00
 # Compat: SKU Gemini Ultra usa o valor de 03/08 como referência de preço.
@@ -161,6 +161,24 @@ CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
         "description": (
             "PIX Next2U Saúde Ltda — complemento de "
             f"{TRAINING_PURPOSE} (R$ --)."
+        ),
+        "allocation": {
+            "cloud_tokens_brl": 0.00,
+            "training_brl": 0.00,
+            "gemini_ultra_brl": 0.0,
+            "purpose": TRAINING_PURPOSE,
+        },
+    },
+    {
+        "date": "2026-10-15",
+        "amount_brl": 0.00,
+        "payer": "NEXT2U SAUDE LTDA",
+        "status": "posted",
+        "source": "titular_2026-10-15",
+        "document": "PIX-OCULTO",
+        "description": (
+            "PIX Next2U Saúde Ltda — complemento de R$ -- "
+            "distribuído entre custos computacionais e treinamento de modelo."
         ),
         "allocation": {
             "cloud_tokens_brl": 0.00,
@@ -450,7 +468,8 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
                 f"{_fmt_brl(GEMINI_ULTRA_AUG24_BRL)} Gemini Ultra); "
                 f"31/08 R$ -- ({TRAINING_PURPOSE}); "
                 "28/09 R$ -- (complemento de treino); "
-                "09/10 R$ -- (complemento de treino). "
+                "09/10 R$ -- (complemento de treino); "
+                "15/10 R$ -- (complemento de treino, custos computacionais e treinamento). "
                 "Todo PIX no valor macro de R$ -- é treino do modelo e custos correlatos."
             ),
             "as_of": today.isoformat(),
