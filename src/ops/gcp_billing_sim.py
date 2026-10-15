@@ -1,13 +1,8 @@
 """
-Faturamento Google Cloud alinhado ao uso real do HealthTech.
+Faturamento Google Cloud alinhado ao uso do HealthTech.
 
-Créditos de nuvem/tokens vêm de PIX da NEXT2U SAUDE LTDA (extrato C6
-25/06–24/08/2026, exportado 24/08 às 12:38), mais o aporte de R$ --
-informado em 24/08, a entrada semanal de R$ -- em 31/08 e os
-complementos de R$ -- em 28/09, 09/10 e 15/10.
-
-Os SKUs espelham Cloud Run, Vertex (IF + TCN), BigQuery, GCS, Cloud Build,
-Artifact Registry, Logging, Gemini (tokens de RAG/SLM) e Gemini Ultra.
+Os créditos e o ledger ficam só na máquina local, em
+data/ops/private/billing_sim.json. Esse arquivo não é versionado.
 """
 
 from __future__ import annotations
@@ -22,14 +17,25 @@ from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("America/Sao_Paulo")
 FX_USD_BRL = 5.42
-WEEKLY_CREDIT_BRL = 0.00
-WEEKLY_TRAINING_BRL = 0.00
-AS_OF_DEFAULT = date(2026, 10, 15)
-GEMINI_ULTRA_AUG3_BRL = 0.00
-GEMINI_ULTRA_AUG24_BRL = 0.00
-# Compat: SKU Gemini Ultra usa o valor de 03/08 como referência de preço.
-GEMINI_ULTRA_BRL = GEMINI_ULTRA_AUG3_BRL
 TRAINING_PURPOSE = "treino do modelo e custos correlatos"
+
+ROOT = Path(__file__).resolve().parents[2]
+PRIVATE_CONFIG = ROOT / "data" / "ops" / "private" / "billing_sim.json"
+LEDGER_DATA = ROOT / "data" / "ops" / "gcp_billing_ledger.json"
+LEDGER_DASHBOARD = ROOT / "dashboard" / "billing-ledger.json"
+PROJECT_ID = "healthtech-gcp-2026"
+PROJECT_NUMBER = "5794833455"
+PROJECT_NAME = "healthtech-responsive"
+LOCATION = "us-central1"
+
+
+def load_private_config() -> Dict[str, Any]:
+    """Lê o orçamento local. Ausente no clone público."""
+    if not PRIVATE_CONFIG.is_file():
+        raise FileNotFoundError(
+            "O orçamento simulado fica só nesta máquina e não é versionado."
+        )
+    return json.loads(PRIVATE_CONFIG.read_text(encoding="utf-8"))
 
 
 def _fmt_brl(amount: float) -> str:
@@ -37,173 +43,23 @@ def _fmt_brl(amount: float) -> str:
     return f"R$ {formatted}"
 
 
-# PIX NEXT2U SAUDE LTDA. Valor macro de R$ -- = treino do modelo e custos correlatos.
-# R$ -- em 03/08 = R$ -- treino + R$ -- Gemini Ultra.
-# R$ -- em 24/08 = R$ -- treino + R$ -- Gemini Ultra.
-CLOUD_BUDGET_CREDITS: Tuple[Dict[str, Any], ...] = (
-    {
-        "date": "2026-08-03",
-        "amount_brl": 0.00,
-        "payer": "NEXT2U SAUDE LTDA",
-        "status": "posted",
-        "source": "extrato_c6",
-        "document": "PIX-OCULTO",
-        "description": (
-            "PIX Next2U Saúde Ltda — R$ -- "
-            f"({_fmt_brl(WEEKLY_TRAINING_BRL)} {TRAINING_PURPOSE} + "
-            f"{_fmt_brl(GEMINI_ULTRA_AUG3_BRL)} Gemini Ultra)."
-        ),
-        "allocation": {
-            "cloud_tokens_brl": WEEKLY_TRAINING_BRL,
-            "training_brl": WEEKLY_TRAINING_BRL,
-            "gemini_ultra_brl": GEMINI_ULTRA_AUG3_BRL,
-            "purpose": TRAINING_PURPOSE,
-        },
-    },
-    {
-        "date": "2026-08-10",
-        "amount_brl": 0.00,
-        "payer": "NEXT2U SAUDE LTDA",
-        "status": "posted",
-        "source": "extrato_c6",
-        "document": "PIX-OCULTO",
-        "description": (
-            "PIX Next2U Saúde Ltda — complemento de "
-            f"{TRAINING_PURPOSE} (R$ --)."
-        ),
-        "allocation": {
-            "cloud_tokens_brl": 0.00,
-            "training_brl": 0.00,
-            "gemini_ultra_brl": 0.0,
-            "purpose": TRAINING_PURPOSE,
-        },
-    },
-    {
-        "date": "2026-08-17",
-        "amount_brl": 0.00,
-        "payer": "NEXT2U SAUDE LTDA",
-        "status": "posted",
-        "source": "extrato_c6",
-        "document": "PIX-OCULTO",
-        "description": (
-            "PIX Next2U Saúde Ltda — R$ -- "
-            f"({TRAINING_PURPOSE})."
-        ),
-        "allocation": {
-            "cloud_tokens_brl": WEEKLY_TRAINING_BRL,
-            "training_brl": WEEKLY_TRAINING_BRL,
-            "gemini_ultra_brl": 0.0,
-            "purpose": TRAINING_PURPOSE,
-        },
-    },
-    {
-        "date": "2026-08-24",
-        "amount_brl": 0.00,
-        "payer": "NEXT2U SAUDE LTDA",
-        "status": "posted",
-        "source": "titular_2026-08-24",
-        "document": "PIX-OCULTO",
-        "description": (
-            "PIX Next2U Saúde Ltda — R$ -- "
-            f"({_fmt_brl(WEEKLY_TRAINING_BRL)} {TRAINING_PURPOSE} + "
-            f"{_fmt_brl(GEMINI_ULTRA_AUG24_BRL)} Gemini Ultra)."
-        ),
-        "allocation": {
-            "cloud_tokens_brl": WEEKLY_TRAINING_BRL,
-            "training_brl": WEEKLY_TRAINING_BRL,
-            "gemini_ultra_brl": GEMINI_ULTRA_AUG24_BRL,
-            "purpose": TRAINING_PURPOSE,
-        },
-    },
-    {
-        "date": "2026-08-31",
-        "amount_brl": 0.00,
-        "payer": "NEXT2U SAUDE LTDA",
-        "status": "posted",
-        "source": "titular_2026-08-31",
-        "document": "PIX-OCULTO",
-        "description": (
-            "PIX Next2U Saúde Ltda — R$ -- "
-            f"({TRAINING_PURPOSE})."
-        ),
-        "allocation": {
-            "cloud_tokens_brl": WEEKLY_TRAINING_BRL,
-            "training_brl": WEEKLY_TRAINING_BRL,
-            "gemini_ultra_brl": 0.0,
-            "purpose": TRAINING_PURPOSE,
-        },
-    },
-    {
-        "date": "2026-09-28",
-        "amount_brl": 0.00,
-        "payer": "NEXT2U SAUDE LTDA",
-        "status": "posted",
-        "source": "titular_2026-09-28",
-        "document": "PIX-OCULTO",
-        "description": (
-            "PIX Next2U Saúde Ltda — complemento de "
-            f"{TRAINING_PURPOSE} (R$ --)."
-        ),
-        "allocation": {
-            "cloud_tokens_brl": 0.00,
-            "training_brl": 0.00,
-            "gemini_ultra_brl": 0.0,
-            "purpose": TRAINING_PURPOSE,
-        },
-    },
-    {
-        "date": "2026-10-09",
-        "amount_brl": 0.00,
-        "payer": "NEXT2U SAUDE LTDA",
-        "status": "posted",
-        "source": "titular_2026-10-09",
-        "document": "PIX-OCULTO",
-        "description": (
-            "PIX Next2U Saúde Ltda — complemento de "
-            f"{TRAINING_PURPOSE} (R$ --)."
-        ),
-        "allocation": {
-            "cloud_tokens_brl": 0.00,
-            "training_brl": 0.00,
-            "gemini_ultra_brl": 0.0,
-            "purpose": TRAINING_PURPOSE,
-        },
-    },
-    {
-        "date": "2026-10-15",
-        "amount_brl": 0.00,
-        "payer": "NEXT2U SAUDE LTDA",
-        "status": "posted",
-        "source": "titular_2026-10-15",
-        "document": "PIX-OCULTO",
-        "description": (
-            "PIX Next2U Saúde Ltda — complemento de R$ -- "
-            "distribuído entre custos computacionais e treinamento de modelo."
-        ),
-        "allocation": {
-            "cloud_tokens_brl": 0.00,
-            "training_brl": 0.00,
-            "gemini_ultra_brl": 0.0,
-            "purpose": TRAINING_PURPOSE,
-        },
-    },
-)
+def _disclaimer(credits: List[Dict[str, Any]]) -> str:
+    parts = []
+    for credit in credits:
+        day = date.fromisoformat(credit["date"])
+        parts.append(f"{day.strftime('%d/%m')} {_fmt_brl(float(credit['amount_brl']))}")
+    if not parts:
+        return "Sem créditos locais."
+    return "Créditos locais: " + "; ".join(parts) + "."
 
-GEMINI_ULTRA_CHARGES: Tuple[Tuple[date, float], ...] = (
-    (date(2026, 8, 3), GEMINI_ULTRA_AUG3_BRL),
-    (date(2026, 8, 24), GEMINI_ULTRA_AUG24_BRL),
-)
 
-BILLING_ACCOUNT_ID = "CONTA-LOCAL-OCULTAXX"
-BILLING_ACCOUNT_NAME = "conta local"
-PROJECT_ID = "healthtech-gcp-2026"
-PROJECT_NUMBER = "5794833455"
-PROJECT_NAME = "healthtech-responsive"
-LOCATION = "us-central1"
-
-ROOT = Path(__file__).resolve().parents[2]
-LEDGER_DATA = ROOT / "data" / "ops" / "gcp_billing_ledger.json"
-LEDGER_DASHBOARD = ROOT / "dashboard" / "billing-ledger.json"
+def _ultra_charges(credits: List[Dict[str, Any]]) -> List[Tuple[date, float]]:
+    charges: List[Tuple[date, float]] = []
+    for credit in credits:
+        amount = float((credit.get("allocation") or {}).get("gemini_ultra_brl") or 0)
+        if amount > 0:
+            charges.append((date.fromisoformat(credit["date"]), amount))
+    return charges
 
 
 @dataclass(frozen=True)
@@ -239,7 +95,7 @@ SKUS: Dict[str, Sku] = {
         "Gemini Ultra subscription (monthly)",
         "G1U8-ULTRA-001A",
         "month",
-        round(GEMINI_ULTRA_BRL / FX_USD_BRL, 6),
+        0.0,
         "#9334E6",
     ),
 }
@@ -247,7 +103,6 @@ SKUS: Dict[str, Sku] = {
 
 # Picos alinhados ao git log / deploys reais.
 ENGINEERING_EVENTS: Tuple[Tuple[str, str, str, Dict[str, float]], ...] = (
-    ("2026-08-03", "subscription", f"Assinatura Gemini Ultra ({_fmt_brl(GEMINI_ULTRA_AUG3_BRL)} dos R$ --)", {}),
     ("2026-08-03", "platform", "Arquitetura Do Caos à Precisão", {"run_cpu": 1.4, "build": 2.0, "log": 1.3}),
     ("2026-08-04", "platform", "BMO/VMO e signal processing", {"run_cpu": 1.2, "vtx_pred": 1.4, "gem_in": 1.5}),
     ("2026-08-05", "platform", "Cloud Run inicial, LGPD e matriz de alertas", {"build": 8.0, "run_cpu": 2.2, "ar": 1.8, "log": 2.0}),
@@ -261,7 +116,6 @@ ENGINEERING_EVENTS: Tuple[Tuple[str, str, str, Dict[str, float]], ...] = (
     ("2026-08-22", "platform", "Companion VE30 Veepoo SDK", {"run_req": 1.5, "log": 1.2}),
     ("2026-08-24", "platform", "Redeploy Cloud Run (CSP + app.js)", {"build": 5.5, "run_cpu": 1.7, "ar": 1.4, "log": 1.6}),
     ("2026-08-24", "database", "Fluxos HAS/DM/DRC/DPOC/hepatopatia/obstétrico no ingest", {"bq_scan": 2.8, "gem_in": 2.4, "gem_out": 2.1, "run_req": 1.3}),
-    ("2026-08-24", "subscription", f"Assinatura Gemini Ultra ({_fmt_brl(GEMINI_ULTRA_AUG24_BRL)} dos R$ --)", {}),
     ("2026-08-29", "ai_train", "Temporal v1 e Language v1 (BioBERTpt) no RAG", {"vtx_train": 6.0, "gcs": 2.0, "gem_in": 1.8, "build": 2.5}),
 )
 
@@ -339,8 +193,11 @@ def _add_usage(dst: Dict[str, float], src: Dict[str, float]) -> None:
 
 
 def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
-    today = as_of or AS_OF_DEFAULT
-    budget_credits = [dict(c) for c in CLOUD_BUDGET_CREDITS if date.fromisoformat(c["date"]) <= today]
+    cfg = load_private_config()
+    today = as_of or date.fromisoformat(cfg["as_of"])
+    budget_credits = [
+        dict(c) for c in cfg["credits"] if date.fromisoformat(c["date"]) <= today
+    ]
     prior_credits = [c for c in budget_credits if date.fromisoformat(c["date"]) < today]
     today_credits = [c for c in budget_credits if date.fromisoformat(c["date"]) == today]
     period_start = date.fromisoformat(budget_credits[0]["date"]) if budget_credits else today
@@ -412,7 +269,9 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
             d["total_brl"] = round(sum(it["cost_brl"] for it in d["items"]), 2)
 
     ultra_sku = SKUS["gem_ultra"]
-    ultra_by_day = {d.isoformat(): amt for d, amt in GEMINI_ULTRA_CHARGES if d <= today}
+    ultra_by_day = {
+        day.isoformat(): amt for day, amt in _ultra_charges(budget_credits) if day <= today
+    }
     for d in raw_days:
         amt = ultra_by_day.get(d["date"])
         if not amt:
@@ -457,35 +316,21 @@ def build_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
 
     return {
         "meta": {
-            "disclaimer": (
-                "PIX Next2U Saúde: 03/08 R$ -- "
-                f"({_fmt_brl(WEEKLY_TRAINING_BRL)} {TRAINING_PURPOSE} + "
-                f"{_fmt_brl(GEMINI_ULTRA_AUG3_BRL)} Gemini Ultra); "
-                "10/08 R$ -- (complemento de treino); "
-                f"17/08 R$ -- ({TRAINING_PURPOSE}); "
-                "24/08 R$ -- "
-                f"({_fmt_brl(WEEKLY_TRAINING_BRL)} {TRAINING_PURPOSE} + "
-                f"{_fmt_brl(GEMINI_ULTRA_AUG24_BRL)} Gemini Ultra); "
-                f"31/08 R$ -- ({TRAINING_PURPOSE}); "
-                "28/09 R$ -- (complemento de treino); "
-                "09/10 R$ -- (complemento de treino); "
-                "15/10 R$ -- (complemento de treino, custos computacionais e treinamento). "
-                "Todo PIX no valor macro de R$ -- é treino do modelo e custos correlatos."
-            ),
+            "disclaimer": _disclaimer(budget_credits),
             "as_of": today.isoformat(),
             "timezone": "America/Sao_Paulo",
             "currency": "BRL",
             "fx_usd_brl": FX_USD_BRL,
-            "weekly_credit_brl": WEEKLY_CREDIT_BRL,
-            "billing_account_id": BILLING_ACCOUNT_ID,
-            "billing_account_name": BILLING_ACCOUNT_NAME,
+            "weekly_credit_brl": cfg.get("weekly_credit_brl"),
+            "billing_account_id": cfg.get("billing_account_id") or "",
+            "billing_account_name": cfg.get("billing_account_name") or "",
             "project_id": PROJECT_ID,
             "project_number": PROJECT_NUMBER,
             "project_name": PROJECT_NAME,
             "location": LOCATION,
-            "budget_name": "Saúde Responsiva — treino do modelo (R$ --/semana)",
+            "budget_name": cfg.get("budget_name") or "",
             "next_credit_at": None,
-            "bank_statement": "extrato local",
+            "bank_statement": cfg.get("bank_statement") or "",
         },
         "kpis": {
             "credits_posted_brl": posted_total,
@@ -617,6 +462,10 @@ def write_ledger(as_of: Optional[date] = None) -> Dict[str, Any]:
 
 
 def load_ledger() -> Dict[str, Any]:
-    if LEDGER_DASHBOARD.exists():
+    if LEDGER_DASHBOARD.is_file():
         return json.loads(LEDGER_DASHBOARD.read_text(encoding="utf-8"))
-    return write_ledger()
+    if PRIVATE_CONFIG.is_file():
+        return write_ledger()
+    raise FileNotFoundError(
+        "O orçamento simulado fica só nesta máquina e não é versionado."
+    )

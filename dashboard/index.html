@@ -823,16 +823,16 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                         <div class="gcp-banner warn">
                             <span class="material-icons-round">payments</span>
                             <div>
-                                <strong>PIX Next2U Saúde — treino do modelo (valor semanal/semana)</strong>
-                                <div id="gcp-countdown">03/08 R$ -- · 10/08 R$ -- · 17/08 R$ -- · 24/08 R$ -- · 31/08 R$ -- · 28/09 R$ -- · 09/10 R$ -- · 15/10 R$ --</div>
-                                03/08 R$ -- = R$ -- treino + R$ -- Gemini Ultra. 24/08 R$ -- = R$ -- treino + R$ -- Gemini Ultra. Todo PIX de R$ -- (17/08 e 31/08) é treino do modelo e custos correlatos. 10/08, 28/09, 09/10 e 15/10 R$ -- são complemento distribuído entre custos computacionais e treinamento de modelo.
+                                <strong>Orçamento</strong>
+                                <div id="gcp-countdown">—</div>
+                                O detalhe fica só nesta máquina.
                             </div>
                         </div>
                         <div class="gcp-kpis">
                             <div class="gcp-card">
                                 <div class="label">PIX Next2U já compensado</div>
                                 <div class="value" id="gcp-kpi-spent">—</div>
-                                <div class="hint">Treino já queimado + Ultra 03/08 (R$ --) e 24/08 (R$ --)</div>
+                                <div class="hint">Uso já lançado</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Today so far</div>
@@ -842,11 +842,11 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                             <div class="gcp-card">
                                 <div class="label">Available balance</div>
                                 <div class="value pos" id="gcp-kpi-balance">—</div>
-                                <div class="hint">Após PIX 15/10 R$ -- (custos computacionais e treino) − uso de hoje</div>
+                                <div class="hint">Saldo depois do uso de hoje</div>
                             </div>
                             <div class="gcp-card">
                                 <div class="label">Credit today (Next2U)</div>
-                                <div class="value pos" id="gcp-kpi-credit">R$ --</div>
+                                <div class="value pos" id="gcp-kpi-credit">—</div>
                                 <div class="hint">Forecast semana: <span id="gcp-kpi-forecast">—</span></div>
                             </div>
                         </div>
@@ -944,17 +944,17 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
                     <div id="gcp-panel-budgets" class="gcp-panel">
                         <div class="gcp-card" style="margin-bottom:16px">
                             <div class="label">Budget</div>
-                            <div style="font-size:16px;margin:4px 0" id="gcp-budget-name">Saúde Responsiva — treino do modelo (R$ --/semana)</div>
+                            <div style="font-size:16px;margin:4px 0" id="gcp-budget-name">Orçamento</div>
                             <div id="gcp-budget-amount">—</div>
                             <div class="gcp-budget-bar" id="gcp-budget-bar"><span id="gcp-budget-fill"></span></div>
                             <div class="hint" id="gcp-budget-pct">—</div>
-                            <div class="hint">Gemini Ultra: R$ -- em 03/08 + R$ -- em 24/08. Semana de 15/10: R$ -- distribuído entre custos computacionais e treinamento, no mesmo rateio dos SKUs do projeto. Alertas 50/90/100%.</div>
+                            <div class="hint">Alertas em 50/90/100%.</div>
                         </div>
                         <div class="gcp-card">
                             <div class="label">August ceiling (5 Mondays)</div>
                             <div id="gcp-budget-month">—</div>
                             <div class="gcp-budget-bar"><span id="gcp-budget-month-fill"></span></div>
-                            <div class="hint">Teto agosto = -- (treino -- + Ultra 780) + -- + -- + -- (treino -- + Ultra 800) + --</div>
+                            <div class="hint">Teto do período no arquivo local.</div>
                         </div>
                     </div>
                 </div>

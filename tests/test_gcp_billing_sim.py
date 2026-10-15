@@ -1,252 +1,97 @@
-"""Faturamento GCP — PIX Next2U Saúde e SKUs do projeto."""
+"""O ledger simulado usa um arquivo local. O teste não carrega o orçamento real."""
 
 from datetime import date
 
-from src.ops.gcp_billing_sim import (
-    CLOUD_BUDGET_CREDITS,
-    GEMINI_ULTRA_AUG3_BRL,
-    GEMINI_ULTRA_AUG24_BRL,
-    TRAINING_PURPOSE,
-    WEEKLY_TRAINING_BRL,
-    build_ledger,
-    write_ledger,
-)
+import pytest
+
+from src.ops import gcp_billing_sim as sim
 
 
-def test_cloud_budget_matches_c6_pix_and_weekly_credits():
-    amounts = {c["date"]: c["amount_brl"] for c in CLOUD_BUDGET_CREDITS}
-    assert amounts["2026-08-03"] == 0
-    assert amounts["2026-08-10"] == 2000
-    assert amounts["2026-08-17"] == 4000
-    assert amounts["2026-08-24"] == 0
-    assert amounts["2026-08-31"] == 4000
-    assert amounts["2026-09-28"] == 2000
-    assert amounts["2026-10-09"] == 2000
+def _fake_config():
+    purpose = "treino de teste"
+    return {
+        "as_of": "2026-01-08",
+        "weekly_credit_brl": 100.0,
+        "weekly_training_brl": 80.0,
+        "billing_account_id": "TEST-ACCOUNT",
+        "billing_account_name": "Test",
+        "budget_name": "orcamento de teste",
+        "bank_statement": "",
+        "training_purpose": purpose,
+        "credits": [
+            {
+                "date": "2026-01-01",
+                "amount_brl": 100.0,
+                "payer": "TEST",
+                "status": "posted",
+                "source": "test",
+                "document": "DOC-1",
+                "description": "credito de teste",
+                "allocation": {
+                    "cloud_tokens_brl": 80.0,
+                    "training_brl": 80.0,
+                    "gemini_ultra_brl": 20.0,
+                    "purpose": purpose,
+                },
+            },
+            {
+                "date": "2026-01-08",
+                "amount_brl": 50.0,
+                "payer": "TEST",
+                "status": "posted",
+                "source": "test",
+                "document": "DOC-2",
+                "description": "complemento de teste",
+                "allocation": {
+                    "cloud_tokens_brl": 50.0,
+                    "training_brl": 50.0,
+                    "gemini_ultra_brl": 0.0,
+                    "purpose": purpose,
+                },
+            },
+        ],
+    }
 
 
-def test_0_and_0_split_ultra_from_training():
-    by_date = {c["date"]: c for c in CLOUD_BUDGET_CREDITS}
-    aug3 = by_date["2026-08-03"]["allocation"]
-    aug24 = by_date["2026-08-24"]["allocation"]
-    assert aug3["gemini_ultra_brl"] == 780
-    assert aug3["training_brl"] == 4000
-    assert aug3["gemini_ultra_brl"] + aug3["training_brl"] == 0
-    assert aug24["gemini_ultra_brl"] == 800
-    assert aug24["training_brl"] == 4000
-    assert aug24["gemini_ultra_brl"] + aug24["training_brl"] == 0
-    assert GEMINI_ULTRA_AUG3_BRL == 780
-    assert GEMINI_ULTRA_AUG24_BRL == 800
+@pytest.fixture
+def fake_budget(monkeypatch):
+    monkeypatch.setattr(sim, "load_private_config", _fake_config)
 
 
-def test_macro_4000_is_always_model_training():
-    for credit in CLOUD_BUDGET_CREDITS:
-        alloc = credit["allocation"]
-        if credit["amount_brl"] == WEEKLY_TRAINING_BRL or alloc.get("training_brl") == WEEKLY_TRAINING_BRL:
-            assert alloc["purpose"] == TRAINING_PURPOSE
-            assert alloc["training_brl"] == WEEKLY_TRAINING_BRL
+def test_missing_private_config_raises(monkeypatch, tmp_path):
+    monkeypatch.setattr(sim, "PRIVATE_CONFIG", tmp_path / "ausente.json")
+    with pytest.raises(FileNotFoundError):
+        sim.load_private_config()
 
 
-def test_prior_weeks_consume_exact_pix_total():
-    ledger = build_ledger(as_of=date(2026, 8, 24))
-    assert ledger["kpis"]["credits_prior_brl"] == 10780
-    assert ledger["kpis"]["spent_last_3_weeks_brl"] == 10780
-    assert ledger["kpis"]["credits_today_brl"] == 0
-    assert ledger["kpis"]["credits_posted_brl"] == 15580
+def test_allocation_parts_match_the_credit(fake_budget):
+    ledger = sim.build_ledger(as_of=date(2026, 1, 1))
+    credit = ledger["credits"][0]
+    alloc = credit["allocation"]
+    assert alloc["training_brl"] + alloc["gemini_ultra_brl"] == credit["amount_brl"]
+    assert ledger["invoices"][0]["credit_brl"] == 100.0
+    assert ledger["meta"]["billing_account_id"] == "TEST-ACCOUNT"
+    assert "simula" not in str(ledger).lower()
 
 
-def test_today_0_covers_morning_spend():
-    ledger = build_ledger(as_of=date(2026, 8, 24))
-    ultra_total = round(GEMINI_ULTRA_AUG3_BRL + GEMINI_ULTRA_AUG24_BRL, 2)
-    assert ledger["kpis"]["spent_today_brl"] > GEMINI_ULTRA_AUG24_BRL
-    assert ledger["kpis"]["gemini_ultra_brl"] == ultra_total
-    assert ledger["kpis"]["gemini_ultra_today_brl"] == GEMINI_ULTRA_AUG24_BRL
-    assert ledger["kpis"]["cloud_from_today_credit_brl"] == WEEKLY_TRAINING_BRL
-    assert ledger["kpis"]["balance_brl"] == round(
-        15580 - ledger["kpis"]["spent_to_date_brl"], 2
-    )
-    assert ledger["kpis"]["balance_brl"] > 0
-    today_credit = [c for c in ledger["credits"] if c["date"] == "2026-08-24"]
-    assert today_credit[0]["amount_brl"] == 0
-    assert today_credit[0]["allocation"]["gemini_ultra_brl"] == GEMINI_ULTRA_AUG24_BRL
-    assert today_credit[0]["allocation"]["training_brl"] == WEEKLY_TRAINING_BRL
-    today = next(d for d in ledger["daily"] if d["date"] == "2026-08-24")
-    ultra = next(i for i in today["items"] if i["sku_key"] == "gem_ultra")
-    assert ultra["cost_brl"] == GEMINI_ULTRA_AUG24_BRL
-    assert ultra["service"] == "Google One"
-
-
-def test_aug3_0_includes_gemini_ultra():
-    ledger = build_ledger(as_of=date(2026, 8, 24))
-    credit = next(c for c in ledger["credits"] if c["date"] == "2026-08-03")
-    assert credit["allocation"]["gemini_ultra_brl"] == GEMINI_ULTRA_AUG3_BRL
-    assert credit["allocation"]["training_brl"] == WEEKLY_TRAINING_BRL
-    day = next(d for d in ledger["daily"] if d["date"] == "2026-08-03")
-    ultra = next(i for i in day["items"] if i["sku_key"] == "gem_ultra")
-    assert ultra["cost_brl"] == GEMINI_ULTRA_AUG3_BRL
-    google_one = next(s for s in ledger["by_service"] if s["service"] == "Google One")
-    assert google_one["cost_brl"] == round(GEMINI_ULTRA_AUG3_BRL + GEMINI_ULTRA_AUG24_BRL, 2)
-
-
-def test_skus_match_real_project_services():
-    ledger = build_ledger(as_of=date(2026, 8, 24))
-    services = {row["service"] for row in ledger["by_service"]}
-    assert "Vertex AI" in services
-    assert "Cloud Run" in services
-    assert "BigQuery" in services
-    vertex = next(s for s in ledger["by_service"] if s["service"] == "Vertex AI")
-    assert vertex["cost_brl"] > 7000
-
-
-def test_aug31_weekly_4000_is_posted():
-    ledger = build_ledger(as_of=date(2026, 8, 31))
-    credit = next(c for c in ledger["credits"] if c["date"] == "2026-08-31")
-    assert credit["amount_brl"] == 4000
-    assert credit["allocation"]["training_brl"] == 4000
-    assert credit["allocation"]["gemini_ultra_brl"] == 0
-    assert credit["allocation"]["purpose"] == TRAINING_PURPOSE
-    assert TRAINING_PURPOSE in credit["description"]
-    assert ledger["kpis"]["credits_today_brl"] == 4000
-    assert ledger["kpis"]["credits_posted_brl"] == 19580
-    assert ledger["kpis"]["credits_prior_brl"] == 15580
-    assert ledger["kpis"]["gemini_ultra_today_brl"] == 0
-    assert ledger["meta"]["as_of"] == "2026-08-31"
-
-
-def test_sep28_weekly_2000_is_posted_and_spread_across_services():
-    ledger = build_ledger(as_of=date(2026, 9, 28))
-    credit = next(c for c in ledger["credits"] if c["date"] == "2026-09-28")
-    assert credit["amount_brl"] == 2000
-    assert credit["allocation"]["training_brl"] == 2000
-    assert credit["allocation"]["cloud_tokens_brl"] == 2000
-    assert credit["allocation"]["gemini_ultra_brl"] == 0
-    assert credit["allocation"]["purpose"] == TRAINING_PURPOSE
-    assert "complemento" in credit["description"]
-    assert ledger["kpis"]["credits_today_brl"] == 2000
-    assert ledger["kpis"]["credits_posted_brl"] == 21580
-    assert ledger["kpis"]["credits_prior_brl"] == 19580
-    assert ledger["kpis"]["gemini_ultra_today_brl"] == 0
-    assert ledger["kpis"]["cloud_from_today_credit_brl"] == 2000
-    assert ledger["meta"]["as_of"] == "2026-09-28"
-    assert ledger["kpis"]["spent_last_3_weeks_brl"] == 19580
-    assert 0 < ledger["kpis"]["spent_today_brl"] < 2000
-    services = {row["service"] for row in ledger["by_service"]}
-    for name in (
-        "Vertex AI",
-        "Cloud Run",
-        "BigQuery",
-        "Cloud Storage",
-        "Cloud Build",
-        "Artifact Registry",
-        "Cloud Logging",
-        "Google One",
-    ):
-        assert name in services
-    cloud_today = round(ledger["kpis"]["spent_today_brl"] - ledger["kpis"]["gemini_ultra_today_brl"], 2)
-    assert cloud_today == ledger["kpis"]["spent_today_brl"]
-    assert "28/09 R$ --" in ledger["meta"]["disclaimer"]
-
-
-def test_oct09_weekly_2000_is_posted():
-    ledger = build_ledger(as_of=date(2026, 10, 9))
-    credit = next(c for c in ledger["credits"] if c["date"] == "2026-10-09")
-    assert credit["document"] == "PIX-OCULTO"
-    assert credit["amount_brl"] == 2000
-    assert credit["allocation"]["training_brl"] == 2000
-    assert credit["allocation"]["cloud_tokens_brl"] == 2000
-    assert credit["allocation"]["gemini_ultra_brl"] == 0
-    assert credit["allocation"]["purpose"] == TRAINING_PURPOSE
-    assert "complemento" in credit["description"]
-    assert ledger["kpis"]["credits_today_brl"] == 2000
-    assert ledger["kpis"]["credits_posted_brl"] == 23580
-    assert ledger["kpis"]["credits_prior_brl"] == 21580
-    assert ledger["kpis"]["gemini_ultra_today_brl"] == 0
-    assert ledger["kpis"]["cloud_from_today_credit_brl"] == 2000
-    assert ledger["meta"]["as_of"] == "2026-10-09"
-    assert ledger["kpis"]["spent_last_3_weeks_brl"] == 21580
-    assert 0 < ledger["kpis"]["spent_today_brl"] < 2000
-    assert ledger["kpis"]["balance_brl"] == round(
-        23580 - ledger["kpis"]["spent_to_date_brl"], 2
-    )
-    assert ledger["kpis"]["balance_brl"] > 0
-    open_invoice = ledger["invoices"][-1]
-    assert open_invoice["status"] == "open"
-    assert open_invoice["period_start"] == "2026-10-09"
-    assert open_invoice["credit_brl"] == 2000
-    assert "09/10 R$ --" in ledger["meta"]["disclaimer"]
-
-
-def test_oct15_weekly_2000_is_split_across_compute_and_training():
-    ledger = build_ledger(as_of=date(2026, 10, 15))
-    credit = next(c for c in ledger["credits"] if c["date"] == "2026-10-15")
-    assert credit["document"] == "PIX-OCULTO"
-    assert credit["source"] == "titular_2026-10-15"
-    assert credit["amount_brl"] == 2000
-    assert credit["allocation"]["training_brl"] == 2000
-    assert credit["allocation"]["cloud_tokens_brl"] == 2000
-    assert credit["allocation"]["gemini_ultra_brl"] == 0
-    assert credit["allocation"]["purpose"] == TRAINING_PURPOSE
-    assert "custos computacionais" in credit["description"]
-    assert "treinamento" in credit["description"]
-    assert ledger["kpis"]["credits_today_brl"] == 2000
-    assert ledger["kpis"]["credits_posted_brl"] == 0
-    assert ledger["kpis"]["credits_prior_brl"] == 23580
-    assert ledger["kpis"]["gemini_ultra_today_brl"] == 0
-    assert ledger["kpis"]["cloud_from_today_credit_brl"] == 2000
-    assert ledger["meta"]["as_of"] == "2026-10-15"
-    assert ledger["kpis"]["spent_last_3_weeks_brl"] == 23580
-    assert 0 < ledger["kpis"]["spent_today_brl"] < 2000
-    assert ledger["kpis"]["balance_brl"] == round(
-        0 - ledger["kpis"]["spent_to_date_brl"], 2
-    )
-    assert ledger["kpis"]["balance_brl"] > 0
-    open_invoice = ledger["invoices"][-1]
-    assert open_invoice["status"] == "open"
-    assert open_invoice["period_start"] == "2026-10-15"
-    assert open_invoice["credit_brl"] == 2000
-    previous = ledger["invoices"][-2]
-    assert previous["status"] == "finalized"
-    assert previous["period_start"] == "2026-10-09"
-    assert previous["period_end"] == "2026-10-14"
-    assert "15/10 R$ --" in ledger["meta"]["disclaimer"]
-
-
-def test_disclaimer_states_ultra_and_training_split():
-    ledger = build_ledger(as_of=date(2026, 8, 31))
-    text = ledger["meta"]["disclaimer"]
-    assert "R$ -- Gemini Ultra" in text
-    assert "R$ -- Gemini Ultra" in text
-    assert TRAINING_PURPOSE in text
-    assert "valor macro de R$ --" in text
-
-
-def test_other_next2u_pix_not_in_cloud_budget():
-    ledger = build_ledger(as_of=date(2026, 8, 24))
-    amounts = {c["amount_brl"] for c in ledger["credits"]}
-    assert 0 in amounts
-    assert 4000 in amounts
-    assert 0 in amounts
-    assert 0 not in amounts
-    assert 0 not in amounts
-    assert 743 not in amounts
-    assert 180 not in amounts
-    assert 1135 not in amounts
-    assert 300 not in amounts
-    assert "other_next2u_pix" not in ledger
-
-
-def test_write_ledger_roundtrip():
-    ledger = write_ledger(as_of=date(2026, 8, 31))
-    assert ledger["meta"]["project_id"] == "healthtech-gcp-2026"
+def test_open_invoice_uses_the_latest_credit(fake_budget):
+    ledger = sim.build_ledger(as_of=date(2026, 1, 8))
     assert ledger["invoices"][-1]["status"] == "open"
-    assert ledger["invoices"][-1]["credit_brl"] == 4000
-    assert ledger["invoices"][0]["credit_brl"] == 0
+    assert ledger["invoices"][-1]["credit_brl"] == 50.0
+    assert ledger["kpis"]["credits_posted_brl"] == 150.0
+    assert ledger["kpis"]["balance_brl"] == round(
+        150.0 - ledger["kpis"]["spent_to_date_brl"], 2
+    )
 
 
-def test_billing_copy_has_no_simulation_language():
-    ledger = build_ledger(as_of=date(2026, 8, 24))
-    assert "simulation" not in ledger["meta"]
-    blob = str(ledger).lower()
-    assert "simula" not in blob
-    assert "demais pix next2u" not in blob
-    assert "não é fatura google" not in blob
-    assert "nao e fatura google" not in blob
+def test_overview_stays_closed_without_the_local_switch():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from src.ops.billing_routes import register_billing_routes
+
+    app = FastAPI()
+    register_billing_routes(app)
+    response = TestClient(app).get("/api/v1/billing/overview")
+    assert response.status_code == 404
+    assert response.json() == {"available": False}

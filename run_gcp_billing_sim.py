@@ -7,14 +7,15 @@ import argparse
 import json
 from datetime import date
 
-from src.ops.gcp_billing_sim import LEDGER_DASHBOARD, WEEKLY_CREDIT_BRL, write_ledger
+from src.ops.gcp_billing_sim import LEDGER_DASHBOARD, load_private_config, write_ledger
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Ledger de faturamento Google Cloud")
-    parser.add_argument("--as-of", default="2026-10-15", help="Data de corte YYYY-MM-DD")
+    parser.add_argument("--as-of", default="", help="Data de corte YYYY-MM-DD")
     args = parser.parse_args()
-    as_of = date.fromisoformat(args.as_of)
+    cfg = load_private_config()
+    as_of = date.fromisoformat(args.as_of or cfg["as_of"])
     ledger = write_ledger(as_of=as_of)
     k = ledger["kpis"]
     print(json.dumps({
@@ -23,7 +24,7 @@ def main() -> int:
         "spent_last_3_weeks_brl": k["spent_last_3_weeks_brl"],
         "spent_today_brl": k["spent_today_brl"],
         "balance_brl": k["balance_brl"],
-        "weekly_credit_brl": WEEKLY_CREDIT_BRL,
+        "weekly_credit_brl": ledger["meta"].get("weekly_credit_brl"),
         "next_credit_at": ledger["meta"]["next_credit_at"],
         "ledger": str(LEDGER_DASHBOARD),
         "services": ledger["by_service"],

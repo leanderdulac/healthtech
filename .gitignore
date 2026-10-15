@@ -34,6 +34,12 @@ health-aggregator/data/
 
 data/ops/fleet_devices.json
 
+# Orçamento e bilhetagem simulados — só na máquina local
+data/ops/private/
+data/ops/gcp_billing_ledger.json
+data/ops/next2u_pix.json
+dashboard/billing-ledger.json
+
 # Dados regeneráveis em runtime (não versionar)
 data/lakehouse/
 data/bigquery_simulation/

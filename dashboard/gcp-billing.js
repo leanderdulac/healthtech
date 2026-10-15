@@ -357,7 +357,7 @@
         const disc = doc.splitTextToSize(data.meta.disclaimer, pageW - margin * 2);
         doc.text(disc, margin, y);
         y += disc.length * 4 + 6;
-        doc.text("Google Cloud  ·  PIX de R$ -- = treino do modelo e custos correlatos. R$ --/-- incluem Gemini Ultra (R$ --/R$ --).", margin, y);
+        doc.text("Google Cloud", margin, y);
     }
 
     async function downloadInvoicePdf(number) {
