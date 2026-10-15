@@ -11,6 +11,7 @@ next2u-instalar
 **/*.pyc
 data/chroma_db
 data/lakehouse
+data/ops/private
 data/models/_pre_v1_backup
 data/models/language_v1/train.log
 data/models/temporal_v1_train.log
