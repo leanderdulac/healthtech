@@ -13,6 +13,10 @@ server {
         return 302 https://storage.googleapis.com/healthtech-gcp-2026-next2u-app/next2u-saude-1.7.3.apk;
     }
 
+    location = /privacidade {
+        try_files /privacidade/index.html =404;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }
