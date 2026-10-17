@@ -9,6 +9,26 @@ from pydantic import BaseModel, Field, field_validator
 # Fonte única: validador Pydantic e /openapi.json (docs/openapi/hband-wearable.yaml).
 INGEST_SOURCES = ("companion_manual", "ble_sim", "ble_hband", "ble_standard", "http")
 FILTER_TYPES = ("BMO", "Wavelet", "Butterworth", "Raw", "Adaptive")
+# Apelido legível do aparelho que envia (ex.: "iPhone de LFM").
+DEVICE_LABEL_MAX_LENGTH = 64
+
+
+def normalize_device_label(value: Any) -> Optional[str]:
+    """Normaliza ``device_label``: trim, espaços colapsados, sem controle.
+
+    Vazio vira ``None``. Acima de ``DEVICE_LABEL_MAX_LENGTH`` caracteres é
+    **truncado** (não rejeitado): o rótulo é cosmético e não pode derrubar a
+    leitura clínica que vem junto.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("device_label deve ser texto.")
+    cleaned = "".join(ch if ch.isprintable() else " " for ch in value)
+    cleaned = " ".join(cleaned.split())
+    if not cleaned:
+        return None
+    return cleaned[:DEVICE_LABEL_MAX_LENGTH].rstrip()
 
 
 def _string_enum(values: tuple[str, ...]):
@@ -91,6 +111,20 @@ class WearableTelemetryRequest(BaseModel):
         pattern=r"^[A-Za-z0-9_\-]+$",
         description="Tipo da métrica quando a leitura não é um snapshot multi-vital.",
     )
+    device_label: Optional[str] = Field(
+        None,
+        description=(
+            "Apelido legível do aparelho que envia (ex.: \"iPhone de LFM\"). "
+            "Opcional. Espaços nas pontas são removidos; vazio vira null; "
+            f"acima de {DEVICE_LABEL_MAX_LENGTH} caracteres é truncado."
+        ),
+        json_schema_extra={"maxLength": DEVICE_LABEL_MAX_LENGTH, "examples": ["iPhone de LFM"]},
+    )
+
+    @field_validator("device_label", mode="before")
+    @classmethod
+    def validate_device_label(cls, v: Any) -> Optional[str]:
+        return normalize_device_label(v)
 
     @field_validator("ingest_source")
     @classmethod

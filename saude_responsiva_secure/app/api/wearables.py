@@ -127,6 +127,8 @@ def _ingest_one(
             frame["metric_type"] = payload.metric_type
         if payload.ingest_source:
             frame["ingest_source"] = payload.ingest_source
+        if payload.device_label:
+            frame["device_label"] = payload.device_label
         extra = _extra_payload(payload)
         if extra:
             frame["extra"] = extra
@@ -139,6 +141,7 @@ def _ingest_one(
             idempotency_key=idempotency_key,
             measured_at=client_ts,
             metric_type=payload.metric_type or (identity.natural.metric_type if identity.natural else None),
+            device_label=payload.device_label,
         )
         return stored, status, None
     except DurableStoreUnavailable:
