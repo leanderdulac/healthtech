@@ -27,6 +27,8 @@ from app.services.ingest_idempotency import DedupIdentity, NaturalKey, metric_si
 logger = logging.getLogger(__name__)
 
 MIGRATION_NAME = "001_wearable_readings.sql"
+# Aplicadas em ordem por apply_schema(). Só mudanças aditivas e idempotentes.
+MIGRATION_NAMES = ("001_wearable_readings.sql", "002_wearable_device_label.sql")
 
 
 class DurableStoreUnavailable(RuntimeError):
@@ -89,19 +91,19 @@ def _dialect_name(engine: Engine) -> str:
     return (engine.dialect.name or "").lower()
 
 
-def migration_sql_path() -> Path:
+def migration_sql_path(name: str = MIGRATION_NAME) -> Path:
     here = Path(__file__).resolve()
     candidates = [
-        here.parents[2] / "migrations" / MIGRATION_NAME,
-        here.parents[1] / "migrations" / MIGRATION_NAME,
-        Path.cwd() / "migrations" / MIGRATION_NAME,
-        Path.cwd() / "saude_responsiva_secure" / "migrations" / MIGRATION_NAME,
+        here.parents[2] / "migrations" / name,
+        here.parents[1] / "migrations" / name,
+        Path.cwd() / "migrations" / name,
+        Path.cwd() / "saude_responsiva_secure" / "migrations" / name,
     ]
     for path in candidates:
         if path.is_file():
             return path
     raise FileNotFoundError(
-        f"{MIGRATION_NAME} não encontrado. Procurado em: "
+        f"{name} não encontrado. Procurado em: "
         + ", ".join(str(p) for p in candidates)
     )
 
@@ -113,6 +115,7 @@ def _sqlite_ddl() -> List[str]:
             reading_id TEXT PRIMARY KEY,
             patient_id TEXT NOT NULL,
             device_id TEXT NOT NULL,
+            device_label TEXT,
             metric_type TEXT NOT NULL,
             value DOUBLE PRECISION,
             unit TEXT,
@@ -163,8 +166,18 @@ def _sqlite_ddl() -> List[str]:
     ]
 
 
+def _sqlite_add_missing_columns(conn) -> None:
+    """SQLite não tem ADD COLUMN IF NOT EXISTS: checa antes (bancos locais antigos)."""
+    cols = {row[1] for row in conn.execute(text("PRAGMA table_info(wearable_readings)"))}
+    if "device_label" not in cols:
+        conn.execute(text("ALTER TABLE wearable_readings ADD COLUMN device_label TEXT"))
+
+
 def apply_schema(engine: Optional[Engine] = None) -> str:
-    """Aplica ``001_wearable_readings`` (CREATE IF NOT EXISTS). Retorna o dialeto."""
+    """Aplica as migrações (001 cria a tabela, 002 adiciona ``device_label``).
+
+    Tudo idempotente e aditivo. Retorna o dialeto.
+    """
     engine = engine or _require_engine()
     dialect = _dialect_name(engine)
     try:
@@ -172,10 +185,12 @@ def apply_schema(engine: Optional[Engine] = None) -> str:
             if dialect == "sqlite":
                 for stmt in _sqlite_ddl():
                     conn.execute(text(stmt))
+                _sqlite_add_missing_columns(conn)
             else:
-                sql = migration_sql_path().read_text(encoding="utf-8")
-                for chunk in _split_sql(sql):
-                    conn.execute(text(chunk))
+                for name in MIGRATION_NAMES:
+                    sql = migration_sql_path(name).read_text(encoding="utf-8")
+                    for chunk in _split_sql(sql):
+                        conn.execute(text(chunk))
     except DurableStoreUnavailable:
         raise
     except SQLAlchemyError as exc:
@@ -276,7 +291,29 @@ def _row_frame(row: Any) -> Dict[str, Any]:
     extra = _load_json(mapping.get("extra"))
     if extra and "extra" not in out:
         out["extra"] = extra
+    label = _row_device_label(mapping, frame, extra)
+    if label:
+        out["device_label"] = label
     return out
+
+
+def _row_device_label(
+    mapping: Dict[str, Any], frame: Dict[str, Any], extra: Any
+) -> Optional[str]:
+    """Coluna ``device_label``; para linhas antigas, o que ficou no JSON."""
+    from app.models.schemas import normalize_device_label
+
+    candidates = [mapping.get("device_label"), frame.get("device_label")]
+    if isinstance(extra, dict):
+        candidates.append(extra.get("device_label"))
+    for value in candidates:
+        try:
+            label = normalize_device_label(value) if isinstance(value, str) else None
+        except ValueError:
+            label = None
+        if label:
+            return label
+    return None
 
 
 def _value_and_unit(frame: Dict[str, Any], extra: Dict[str, Any], metric_type: str) -> Tuple[Optional[float], Optional[str]]:
@@ -348,7 +385,7 @@ def _select_by_keys(
     if not where:
         return None
     sql = (
-        "SELECT reading_id, patient_id, device_id, metric_type, "
+        "SELECT reading_id, patient_id, device_id, device_label, metric_type, "
         "client_reading_id, extra, frame FROM wearable_readings WHERE "
         + " OR ".join(where)
         + " LIMIT 1"
@@ -416,10 +453,16 @@ def upsert_reading(
     idempotency_key: Optional[str] = None,
     measured_at: Optional[str] = None,
     metric_type: Optional[str] = None,
+    device_label: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], str]:
     """INSERT ... ON CONFLICT DO NOTHING; duplicate devolve o registro original."""
+    from app.models.schemas import normalize_device_label
+
     extra = dict(extra or {})
     stored = dict(frame)
+    label = normalize_device_label(device_label or stored.get("device_label"))
+    if label:
+        stored["device_label"] = label
     stored.setdefault("reading_id", uuid4().hex)
     stored["patient_id"] = patient_id
     _ = dedup_keys  # legado: não parsear strings com ':'
@@ -448,6 +491,7 @@ def upsert_reading(
         "reading_id": stored["reading_id"],
         "patient_id": patient_id,
         "device_id": device_id,
+        "device_label": label,
         "metric_type": metric,
         "value": value,
         "unit": unit,
@@ -471,12 +515,14 @@ def upsert_reading(
         frame_sql = "CAST(:frame AS jsonb)" if dialect == "postgresql" else ":frame"
         insert_sql = f"""
             INSERT INTO wearable_readings (
-                reading_id, patient_id, device_id, metric_type, value, unit,
+                reading_id, patient_id, device_id, device_label, metric_type,
+                value, unit,
                 measured_at, received_at, client_reading_id, idempotency_key,
                 natural_patient_id, natural_device_id, natural_measured_at,
                 natural_metric_type, extra, frame, created_at
             ) VALUES (
-                :reading_id, :patient_id, :device_id, :metric_type, :value, :unit,
+                :reading_id, :patient_id, :device_id, :device_label, :metric_type,
+                :value, :unit,
                 :measured_at, :received_at, :client_reading_id, :idempotency_key,
                 :natural_patient_id, :natural_device_id, :natural_measured_at,
                 :natural_metric_type, {extra_sql}, {frame_sql}, :created_at
@@ -511,7 +557,7 @@ def upsert_reading(
 
 def get_latest(patient_id: str) -> Optional[Dict[str, Any]]:
     sql = """
-        SELECT reading_id, patient_id, device_id, metric_type, client_reading_id, extra, frame
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
         WHERE patient_id = :patient_id
         ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC, created_at DESC
@@ -530,7 +576,7 @@ def get_latest(patient_id: str) -> Optional[Dict[str, Any]]:
 
 def get_history(patient_id: str, limit: int = 20) -> List[Dict[str, Any]]:
     sql = """
-        SELECT reading_id, patient_id, device_id, metric_type, client_reading_id, extra, frame
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
         WHERE patient_id = :patient_id
         ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC, created_at DESC
@@ -553,7 +599,7 @@ def get_history(patient_id: str, limit: int = 20) -> List[Dict[str, Any]]:
 
 def latest_frames_by_device() -> List[Dict[str, Any]]:
     sql = """
-        SELECT reading_id, patient_id, device_id, metric_type, client_reading_id, extra, frame
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
         ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC
     """
@@ -562,11 +608,17 @@ def latest_frames_by_device() -> List[Dict[str, Any]]:
         with engine.connect() as conn:
             rows = conn.execute(text(sql)).fetchall()
         latest: Dict[str, Dict[str, Any]] = {}
+        labels: Dict[str, str] = {}
         for row in rows:
             frame = _row_frame(row)
             device_id = str(frame.get("device_id") or "unknown")
             if device_id not in latest:
                 latest[device_id] = frame
+            # Rótulo mais recente do device, mesmo que a última leitura não traga.
+            if device_id not in labels and frame.get("device_label"):
+                labels[device_id] = str(frame["device_label"])
+        for device_id, label in labels.items():
+            latest[device_id]["device_label"] = label
         return list(latest.values())
     except DurableStoreUnavailable:
         raise
@@ -576,7 +628,7 @@ def latest_frames_by_device() -> List[Dict[str, Any]]:
 
 def iter_patients(limit_per_patient: int = 50) -> Dict[str, List[Dict[str, Any]]]:
     sql = """
-        SELECT reading_id, patient_id, device_id, metric_type, client_reading_id, extra, frame
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
         ORDER BY patient_id ASC, COALESCE(measured_at, received_at) ASC, received_at ASC
     """

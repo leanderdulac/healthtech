@@ -76,6 +76,7 @@ def _compact(summary: Dict[str, Any]) -> Dict[str, Any]:
         "blood_pressure_sys": summary.get("blood_pressure_sys"),
         "blood_pressure_dia": summary.get("blood_pressure_dia"),
         "device_model": summary.get("device_model"),
+        "device_label": summary.get("device_label"),
     }
     if is_synthetic_device(summary) or is_synthetic_device(item):
         item["synthetic"] = True
@@ -198,11 +199,14 @@ def upsert_frame(frame: Dict[str, Any]) -> Dict[str, Any]:
     """Atualiza a frota com um frame de ingestão. Retorna a linha compacta."""
     summary = summarize_frame(frame)
     compact = _compact(summary)
+    compact["device_label"] = frame.get("device_label") or summary.get("device_label")
     compact["latest"] = dict(frame)
     device_id = compact["device_id"]
     with _lock:
         _load_unlocked()
         prev = _devices.get(device_id) or {}
+        if not compact.get("device_label") and prev.get("device_label"):
+            compact["device_label"] = prev["device_label"]
         prev_rx = parse_timestamp(prev.get("received_at") or prev.get("last_seen"))
         new_rx = parse_timestamp(compact.get("received_at") or compact.get("last_seen"))
         if prev_rx and new_rx and new_rx < prev_rx:
