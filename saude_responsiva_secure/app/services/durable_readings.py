@@ -598,7 +598,7 @@ def get_history(patient_id: str, limit: int = 20) -> List[Dict[str, Any]]:
 
 
 def list_frames() -> List[Dict[str, Any]]:
-    """Todos os frames persistidos, mais novos primeiro (frota compacta agrupa)."""
+    """Todos os frames persistidos, mais novos primeiro (uso em testes / fallback)."""
     sql = """
         SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
@@ -615,13 +615,83 @@ def list_frames() -> List[Dict[str, Any]]:
         raise DurableStoreUnavailable(str(exc)) from exc
 
 
+_PG_LATEST_BY_DEVICE = """
+    SELECT DISTINCT ON (device_id)
+        reading_id, patient_id, device_id, device_label, metric_type,
+        client_reading_id, extra, frame
+    FROM wearable_readings
+    ORDER BY device_id, COALESCE(measured_at, received_at) DESC, received_at DESC
+"""
+
+_PG_LATEST_LABEL_BY_DEVICE = """
+    SELECT DISTINCT ON (device_id)
+        device_id, COALESCE(device_label, extra->>'device_label') AS device_label
+    FROM wearable_readings
+    WHERE device_label IS NOT NULL OR extra->>'device_label' IS NOT NULL
+    ORDER BY device_id, COALESCE(measured_at, received_at) DESC, received_at DESC
+"""
+
+
+def _pg_latest_frames_by_device(engine: Engine) -> List[Dict[str, Any]]:
+    """Uma linha por device no próprio Postgres (sem trazer a tabela inteira)."""
+    from app.models.schemas import normalize_device_label
+
+    with engine.connect() as conn:
+        rows = conn.execute(text(_PG_LATEST_BY_DEVICE)).fetchall()
+        label_rows = conn.execute(text(_PG_LATEST_LABEL_BY_DEVICE)).fetchall()
+    frames = [_row_frame(row) for row in rows]
+    labels: Dict[str, str] = {}
+    for row in label_rows:
+        mapping = dict(row._mapping)
+        try:
+            label = normalize_device_label(mapping.get("device_label"))
+        except ValueError:
+            label = None
+        if label:
+            labels[str(mapping.get("device_id"))] = label
+    for frame in frames:
+        label = labels.get(str(frame.get("device_id")))
+        if label:
+            frame["device_label"] = label
+    frames.sort(key=lambda f: str(f.get("timestamp") or ""), reverse=True)
+    return frames
+
+
 def latest_frames_by_device() -> List[Dict[str, Any]]:
-    latest: Dict[str, Dict[str, Any]] = {}
-    for frame in list_frames():
-        device_id = str(frame.get("device_id") or "unknown")
-        if device_id not in latest:
-            latest[device_id] = frame
-    return list(latest.values())
+    """Último frame por device. No Postgres usa DISTINCT ON; nos testes, agrupa em memória."""
+    try:
+        engine = _require_engine()
+        if _dialect_name(engine) == "postgresql":
+            return _pg_latest_frames_by_device(engine)
+    except DurableStoreUnavailable:
+        raise
+    except SQLAlchemyError as exc:
+        raise DurableStoreUnavailable(str(exc)) from exc
+    sql = """
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
+        FROM wearable_readings
+        ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC
+    """
+    try:
+        engine = _require_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql)).fetchall()
+        latest: Dict[str, Dict[str, Any]] = {}
+        labels: Dict[str, str] = {}
+        for row in rows:
+            frame = _row_frame(row)
+            device_id = str(frame.get("device_id") or "unknown")
+            if device_id not in latest:
+                latest[device_id] = frame
+            if device_id not in labels and frame.get("device_label"):
+                labels[device_id] = str(frame["device_label"])
+        for device_id, label in labels.items():
+            latest[device_id]["device_label"] = label
+        return list(latest.values())
+    except DurableStoreUnavailable:
+        raise
+    except SQLAlchemyError as exc:
+        raise DurableStoreUnavailable(str(exc)) from exc
 
 
 def iter_patients(limit_per_patient: int = 50) -> Dict[str, List[Dict[str, Any]]]:
