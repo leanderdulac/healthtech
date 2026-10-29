@@ -124,10 +124,12 @@ def test_patients_list_when_db_configured():
 def test_patients_list_without_database_url():
     with patch(
         "src.ops.patients_routes.list_patients",
-        side_effect=OperationalDbUnavailable("DATABASE_URL não configurada"),
+        side_effect=OperationalDbUnavailable("synthetic-private-db-detail-DO-NOT-EXPOSE"),
     ):
         res = client.get("/api/v1/patients", headers=READ_HEADERS)
     assert res.status_code == 503
+    assert "indisponível" in res.json()["detail"]
+    assert "synthetic-private-db-detail-DO-NOT-EXPOSE" not in res.text
 
 
 def test_patient_by_id_found():

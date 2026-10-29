@@ -754,19 +754,17 @@ def log_backend() -> str:
             "(DATABASE_URL unset; local/tests only — readings are not durable)"
         )
         return "memory"
-    url = database_url()
-    label = redact_database_url(url) or "injected-engine"
     try:
         apply_schema()
         ping()
-        logger.info("Wearable telemetry store: durable (%s)", label)
+        logger.info("Wearable telemetry store: durable")
         return "durable"
-    except DurableStoreUnavailable as exc:
+    except DurableStoreUnavailable:
+        # O texto do driver pode trazer SQL, parâmetros e a URL.
+        # Uma URL com a senha mascarada ainda pode carregar segredo na query.
         logger.error(
-            "Wearable telemetry store: DATABASE_URL is set but unreachable (%s). "
-            "Ingest will return 5xx (no in-memory fallback). error=%s",
-            label,
-            exc,
+            "Wearable telemetry store: DATABASE_URL is set but unreachable. "
+            "Ingest will return 5xx (no in-memory fallback).",
         )
         return "durable-unavailable"
 
