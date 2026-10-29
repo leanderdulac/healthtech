@@ -52,16 +52,19 @@ def test_tcn_runtime_loads_and_predicts():
         "prob_72h",
         "max_probability",
         "horizon_at_risk",
-        "conformal_intervals",
         "alerta",
+        "uso",
+        "conformal_status",
     ):
         assert key in pred
     assert 0.0 <= pred["prob_6h"] <= 1.0
     assert 0.0 <= pred["prob_24h"] <= 1.0
     assert 0.0 <= pred["prob_72h"] <= 1.0
-    assert pred["horizon_at_risk"] in ("6h", "24h", "72h")
-    assert set(pred["conformal_intervals"].keys()) == {"6h", "24h", "72h"}
-    assert isinstance(pred["alerta"], bool)
+    assert pred["alerta"] is False
+    assert pred["uso"] == "laboratorio"
+    assert pred["horizon_at_risk"] is None
+    assert pred["conformal_status"] == "degenerado"
+    assert "conformal_intervals" not in pred
 
 
 def test_extract_sequence_shapes():

@@ -2,8 +2,8 @@
   "status": "deployed",
   "model_type": "anomaly_iforest",
   "model_resource": "projects/5794833455/locations/us-central1/models/5473756460917719040",
-  "endpoint_resource": "projects/5794833455/locations/us-central1/endpoints/3014531579629273088",
-  "VERTEX_ENDPOINT_ID": "projects/5794833455/locations/us-central1/endpoints/3014531579629273088",
+  "endpoint_resource": "projects/5794833455/locations/us-central1/endpoints/6803193562247725056",
+  "VERTEX_ENDPOINT_ID": "projects/5794833455/locations/us-central1/endpoints/6803193562247725056",
   "VERTEX_MODEL_NAME": "projects/5794833455/locations/us-central1/models/5473756460917719040",
   "artifact_uri": "gs://healthtech-gcp-2026-vertex-staging/anomaly_models/20260806_025257",
   "feature_columns": [
@@ -20,43 +20,41 @@
     1.0,
     -1.0
   ],
-  "deployed_at": "2026-08-06T03:16:16.194801+00:00",
+  "deployed_at": "2026-10-29T02:19:03.291986+00:00",
   "tcn_status": "deployed",
   "tcn_model_resource": "projects/5794833455/locations/us-central1/models/4320834956310872064",
-  "tcn_endpoint_resource": "projects/5794833455/locations/us-central1/endpoints/8560714520736038912",
-  "VERTEX_TCN_ENDPOINT_ID": "projects/5794833455/locations/us-central1/endpoints/8560714520736038912",
+  "tcn_endpoint_resource": "projects/5794833455/locations/us-central1/endpoints/1035489814469672960",
+  "VERTEX_TCN_ENDPOINT_ID": "projects/5794833455/locations/us-central1/endpoints/1035489814469672960",
   "VERTEX_TCN_MODEL_NAME": "projects/5794833455/locations/us-central1/models/4320834956310872064",
   "tcn_artifact_uri": "gs://healthtech-gcp-2026-vertex-staging/tcn_models/20260806_040547",
   "tcn_image_uri": "us-central1-docker.pkg.dev/healthtech-gcp-2026/cloud-run-source-deploy/healthtech-tcn-server:latest",
-  "tcn_deployed_at": "2026-08-06T04:29:27.783442+00:00",
+  "tcn_model_version": "2",
+  "tcn_deployed_model_id": "2785408749563543552",
+  "tcn_deployed_at": "2026-10-29T17:18:54Z",
   "tcn_predictions_smoke": [
     {
-      "alerta": true,
+      "alerta": false,
+      "uso": "laboratorio",
+      "conformal_status": "degenerado",
+      "horizon_at_risk": null,
       "prob_6h": 1.0,
-      "horizon_at_risk": "6h",
-      "architecture": "TCN-per-horizon",
-      "conformal_intervals": {
-        "72h": [
-          0.1647,
-          1.0
-        ],
-        "24h": [
-          1.0,
-          1.0
-        ],
-        "6h": [
-          0.0,
-          1.0
-        ]
-      },
-      "prob_72h": 0.9995,
       "prob_24h": 1.0,
+      "prob_72h": 0.9961,
       "max_probability": 1.0,
-      "modo": "Vertex-TCN-per-horizon"
+      "modo": "Vertex-TCN-per-horizon",
+      "architecture": "TCN-per-horizon",
+      "note": "Ruido aleatorio em 2026-10-29T17:19:21Z. Probabilidades continuam saturadas. Sem alerta clinico e sem intervalo conformal."
     }
   ],
-  "updated_at": "2026-08-21T20:20:33.158426+00:00",
+  "updated_at": "2026-10-29T02:19:03.291986+00:00",
   "tcn_predictions_smoke_error": null,
   "alert_matrix_gcs_prefix": "gs://healthtech-gcp-2026-vertex-staging/alert_matrix/20260821_202027",
-  "alert_matrix_uploaded_at": "2026-08-21T20:20:33.158426+00:00"
+  "alert_matrix_uploaded_at": "2026-08-21T20:20:33.158426+00:00",
+  "iforest_machine_type": "n2-standard-2",
+  "iforest_min_replica_count": 1,
+  "iforest_max_replica_count": 1,
+  "tcn_machine_type": "n2-standard-4",
+  "tcn_min_replica_count": 1,
+  "tcn_max_replica_count": 1,
+  "restore_note": "Endpoints recriados em 2026-10-29. N1 recusou quota CustomModelServingCPUs; servindo em N2. Modelos do registry de 2026-08-06. TCN versao 2 no mesmo endpoint desde 17:18Z: sem alerta clinico e sem intervalo conformal degenerado."
 }

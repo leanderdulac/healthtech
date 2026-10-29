@@ -123,16 +123,22 @@ class VertexOnlineDetector:
     @staticmethod
     def _format_tcn_response(prediction: dict, features: dict, instance: dict) -> dict:
         max_prob = float(prediction.get("max_probability", 0))
-        alerta = bool(prediction.get("alerta", max_prob > 0.5))
+        # Sem conformal_status calibrado e sem uso clínico, o endpoint antigo
+        # não vira alerta. Probabilidade alta sozinha não basta.
+        clinical = (
+            prediction.get("conformal_status") == "calibrado"
+            and prediction.get("uso") != "laboratorio"
+            and prediction.get("alerta") is True
+        )
         return {
-            "alerta": alerta,
+            "alerta": clinical,
             "score": max_prob,
             "temporal": prediction,
             "valor_atual": instance.get("bpm") or features.get("bpm"),
             "spo2": instance.get("spo2") or features.get("spo2"),
             "patient_id": features.get("patient_id"),
             "timestamp": features.get("timestamp"),
-            "status": f"ALERTA PREDITIVO ({prediction.get('horizon_at_risk', 'N/A')})" if alerta else "Normal",
+            "status": "Normal",
             "modo": prediction.get("modo", "Vertex-TCN"),
-            "conformal_intervals": prediction.get("conformal_intervals"),
+            "conformal_intervals": prediction.get("conformal_intervals") if clinical else None,
         }
