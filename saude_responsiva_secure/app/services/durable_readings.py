@@ -28,7 +28,11 @@ logger = logging.getLogger(__name__)
 
 MIGRATION_NAME = "001_wearable_readings.sql"
 # Aplicadas em ordem por apply_schema(). Só mudanças aditivas e idempotentes.
-MIGRATION_NAMES = ("001_wearable_readings.sql", "002_wearable_device_label.sql")
+MIGRATION_NAMES = (
+    "001_wearable_readings.sql",
+    "002_wearable_device_label.sql",
+    "003_wearable_event_time_indexes.sql",
+)
 
 
 class DurableStoreUnavailable(RuntimeError):
@@ -174,7 +178,7 @@ def _sqlite_add_missing_columns(conn) -> None:
 
 
 def apply_schema(engine: Optional[Engine] = None) -> str:
-    """Aplica as migrações (001 cria a tabela, 002 adiciona ``device_label``).
+    """Aplica as migrações (001 cria a tabela, 002 o rótulo, 003 os índices).
 
     Tudo idempotente e aditivo. Retorna o dialeto.
     """
@@ -676,7 +680,52 @@ def latest_frames_by_device() -> List[Dict[str, Any]]:
         raise DurableStoreUnavailable(str(exc)) from exc
 
 
+_PG_LATEST_BY_PATIENT = """
+    SELECT w.reading_id, w.patient_id, w.device_id, w.device_label, w.metric_type,
+           w.client_reading_id, w.extra, w.frame, c.sample_count
+    FROM (
+        SELECT patient_id, COUNT(*) AS sample_count
+        FROM wearable_readings
+        GROUP BY patient_id
+    ) c
+    JOIN LATERAL (
+        SELECT reading_id, patient_id, device_id, device_label, metric_type,
+               client_reading_id, extra, frame
+        FROM wearable_readings
+        WHERE patient_id = c.patient_id
+        ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC, created_at DESC
+        LIMIT 1
+    ) w ON true
+"""
+
+
+def _pg_iter_patients(engine: Engine) -> Dict[str, List[Dict[str, Any]]]:
+    """Uma leitura por paciente. O JSON das linhas antigas fica no banco."""
+    with engine.connect() as conn:
+        rows = conn.execute(text(_PG_LATEST_BY_PATIENT)).fetchall()
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for row in rows:
+        mapping = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
+        frame = _row_frame(row)
+        try:
+            frame["sample_count"] = int(mapping.get("sample_count") or 1)
+        except (TypeError, ValueError):
+            frame["sample_count"] = 1
+        pid = str(frame.get("patient_id") or "")
+        if pid:
+            grouped[pid] = [frame]
+    return grouped
+
+
 def iter_patients(limit_per_patient: int = 50) -> Dict[str, List[Dict[str, Any]]]:
+    try:
+        engine = _require_engine()
+        if _dialect_name(engine) == "postgresql":
+            return _pg_iter_patients(engine)
+    except DurableStoreUnavailable:
+        raise
+    except SQLAlchemyError as exc:
+        raise DurableStoreUnavailable(str(exc)) from exc
     sql = """
         SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
