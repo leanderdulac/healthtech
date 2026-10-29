@@ -130,6 +130,51 @@ def test_apply_schema_is_idempotent(durable_engine, backend):
     assert "uq_wearable_readings_client_reading" in names
     assert "uq_wearable_readings_idempotency" in names
     assert "uq_wearable_readings_natural" in names
+    if backend == "postgres":
+        assert "ix_wearable_readings_patient_event" in names
+        assert "ix_wearable_readings_device_event" in names
+
+
+def test_iter_patients_keeps_the_latest_reading_and_the_real_count(durable_engine, backend):
+    older = "2026-09-24T12:00:00.000Z"
+    newer = "2026-09-24T13:00:00.000Z"
+
+    def frame_at(when: str, heart_rate: float):
+        return {
+            "patient_id": "PAT-ITER",
+            "device_id": "HBAND-ITER",
+            "timestamp": when,
+            "ingest_source": "ble_hband",
+            "raw_telemetry": {"heart_rate_bpm": heart_rate, "ingest_source": "ble_hband"},
+            "cleaned_telemetry": {"heart_rate_clean": heart_rate},
+        }
+
+    durable_readings.upsert_reading(
+        "PAT-ITER",
+        frame_at(older, 70.0),
+        client_reading_id="iter-old",
+        measured_at=older,
+        metric_type="heart_rate",
+    )
+    durable_readings.upsert_reading(
+        "PAT-ITER",
+        frame_at(newer, 90.0),
+        client_reading_id="iter-new",
+        measured_at=newer,
+        metric_type="heart_rate",
+    )
+    hist = durable_readings.iter_patients()["PAT-ITER"]
+    assert hist[-1]["raw_telemetry"]["heart_rate_bpm"] == 90.0
+    if backend == "postgres":
+        assert len(hist) == 1
+        assert hist[-1]["sample_count"] == 2
+    else:
+        assert len(hist) == 2
+    from app.services.connection_status import build_connection_status
+
+    payload = build_connection_status({"PAT-ITER": hist})
+    assert payload["sessions"][0]["samples"] == 2
+    assert payload["sessions"][0]["heart_rate_bpm"] == 90.0
 
 
 def test_upsert_duplicate_and_extra_payload(durable_engine):

@@ -19,6 +19,8 @@ import torch
 import torch.nn as nn
 from flask import Flask, jsonify, request
 
+from tcn_decision import decide_tcn
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("tcn-server")
 
@@ -144,20 +146,6 @@ class TCNRuntime:
         self.loaded = True
         logger.info("Loaded %d horizon models from %s", len(self.models), base)
 
-    def _conformal_interval(self, prob: float, horizon_idx: int) -> List[float]:
-        if not self.conformal:
-            margin = 0.15
-            return [round(max(0.0, prob - margin), 4), round(min(1.0, prob + margin), 4)]
-        h_key = HORIZON_NAMES[horizon_idx]
-        # suporte a layouts: {horizons:{event_6h:{q_hat}}} ou {q_hat:{event_6h:}}
-        horizons = self.conformal.get("horizons", {})
-        if h_key in horizons:
-            q_hat = float(horizons[h_key].get("q_hat", 0.15))
-        else:
-            q_map = self.conformal.get("q_hat", {})
-            q_hat = float(q_map.get(h_key, 0.15)) if isinstance(q_map, dict) else float(q_map or 0.15)
-        return [round(max(0.0, prob - q_hat), 4), round(min(1.0, prob + q_hat), 4)]
-
     def predict_one(self, sequence: np.ndarray) -> Dict[str, Any]:
         if sequence.ndim == 2:
             sequence = sequence[np.newaxis, ...]
@@ -168,26 +156,15 @@ class TCNRuntime:
         X_scaled = flat.reshape(n_samples, seq_len, n_features)
 
         probs: List[float] = []
-        intervals: List[List[float]] = []
         with torch.no_grad():
             X_t = torch.tensor(X_scaled, dtype=torch.float32, device=self.device)
-            for h_idx, model in enumerate(self.models):
-                p = float(model(X_t).squeeze(-1).cpu().numpy()[0])
-                probs.append(p)
-                intervals.append(self._conformal_interval(p, h_idx))
+            for model in self.models:
+                probs.append(float(model(X_t).squeeze(-1).cpu().numpy()[0]))
 
-        pred = np.array(probs)
-        return {
-            "prob_6h": round(probs[0], 4),
-            "prob_24h": round(probs[1], 4),
-            "prob_72h": round(probs[2], 4),
-            "max_probability": round(float(pred.max()), 4),
-            "horizon_at_risk": HORIZON_LABELS[int(pred.argmax())],
-            "modo": "Vertex-TCN-per-horizon",
-            "architecture": self.meta.get("architecture", "TCN-per-horizon"),
-            "conformal_intervals": {HORIZON_LABELS[i]: intervals[i] for i in range(3)},
-            "alerta": bool(pred.max() > 0.5),
-        }
+        decision = decide_tcn(probs, self.conformal)
+        decision["modo"] = "Vertex-TCN-per-horizon"
+        decision["architecture"] = self.meta.get("architecture", "TCN-per-horizon")
+        return decision
 
     @staticmethod
     def extract_sequence(inst: Dict) -> Optional[np.ndarray]:

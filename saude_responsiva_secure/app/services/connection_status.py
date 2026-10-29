@@ -159,6 +159,11 @@ def build_connection_status(
         device_id = last.get("device_id") or "unknown"
         hr = _hr_from_frame(last)
         source = ingest_source_from_frame(last)
+        sample_count = last.get("sample_count")
+        try:
+            samples = int(sample_count) if sample_count is not None else len(hist)
+        except (TypeError, ValueError):
+            samples = len(hist)
 
         if age is None:
             link = "unknown"
@@ -180,7 +185,7 @@ def build_connection_status(
                 "mobile_status": link,
                 "device_status": device_link,
                 "heart_rate_bpm": hr,
-                "samples": len(hist),
+                "samples": samples,
                 "spo2_percent": (last.get("raw_telemetry") or {}).get("spo2_percent"),
                 "source": source,
                 "ingest_source": source,

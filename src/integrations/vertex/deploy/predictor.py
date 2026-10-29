@@ -13,6 +13,11 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
+try:
+    from tcn_decision import decide_tcn
+except ImportError:  # importado como pacote src.*
+    from src.integrations.vertex.deploy.tcn_decision import decide_tcn
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -92,38 +97,15 @@ class TCNTemporalPredictor:
         X_scaled = flat.reshape(n_samples, seq_len, n_features)
 
         probs = []
-        intervals = []
-        for h_idx, model in enumerate(self._horizon_models):
+        for model in self._horizon_models:
             with torch.no_grad():
                 X_t = torch.tensor(X_scaled, dtype=torch.float32, device=self._device)
-                p = float(model(X_t).squeeze(-1).cpu().numpy()[0])
-            probs.append(p)
-            intervals.append(self._conformal_interval(p, h_idx))
+                probs.append(float(model(X_t).squeeze(-1).cpu().numpy()[0]))
 
-        pred = np.array(probs)
-        return {
-            "prob_6h": round(probs[0], 4),
-            "prob_24h": round(probs[1], 4),
-            "prob_72h": round(probs[2], 4),
-            "max_probability": round(float(pred.max()), 4),
-            "horizon_at_risk": HORIZON_LABELS[int(pred.argmax())],
-            "modo": "Vertex-TCN-per-horizon",
-            "architecture": self._meta.get("architecture", "TCN-per-horizon"),
-            "conformal_intervals": {
-                HORIZON_LABELS[i]: intervals[i] for i in range(3)
-            },
-            "alerta": bool(pred.max() > 0.5),
-        }
-
-    def _conformal_interval(self, prob: float, horizon_idx: int) -> List[float]:
-        if not self._conformal:
-            margin = 0.15
-            return [round(max(0, prob - margin), 4), round(min(1, prob + margin), 4)]
-
-        h_key = HORIZON_NAMES[horizon_idx]
-        cal = self._conformal.get("horizons", {}).get(h_key, {})
-        q_hat = cal.get("q_hat", 0.15)
-        return [round(max(0.0, prob - q_hat), 4), round(min(1.0, prob + q_hat), 4)]
+        decision = decide_tcn(probs, self._conformal)
+        decision["modo"] = "Vertex-TCN-per-horizon"
+        decision["architecture"] = self._meta.get("architecture", "TCN-per-horizon")
+        return decision
 
     @staticmethod
     def _extract_sequence(inst: Dict) -> Optional[np.ndarray]:

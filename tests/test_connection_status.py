@@ -80,6 +80,16 @@ def test_manual_http_is_via_app_not_ble():
     assert payload["device"]["pairing_ready"] is False
 
 
+def test_sample_count_is_the_stored_total_not_the_loaded_page():
+    frame = _frame("ble_hband", 4)
+    frame["sample_count"] = 80
+    payload = build_connection_status({"PAT-TEST-001": [frame]})
+    assert payload["sessions"][0]["samples"] == 80
+    latest = public_connection_view(payload)["mobile_app"]["latest"]
+    assert "sample_count" not in latest
+    assert "samples" not in latest
+
+
 def test_public_view_omits_patient_id():
     full = build_connection_status({"PAT-SECRET": [_frame("ble_sim", 2)]})
     pub = public_connection_view(full)

@@ -29,13 +29,12 @@ except ImportError:
 router = APIRouter(prefix="/api/v1", tags=["patients"])
 
 
-def _unavailable(exc: OperationalDbUnavailable) -> HTTPException:
+def _unavailable(_exc: OperationalDbUnavailable) -> HTTPException:
     return HTTPException(
         status_code=503,
         detail=(
             "Cadastro operacional indisponível. "
-            "Configure DATABASE_URL no FastAPI (PostgreSQL operacional). "
-            f"({exc})"
+            "Configure DATABASE_URL no FastAPI (PostgreSQL operacional)."
         ),
     )
 

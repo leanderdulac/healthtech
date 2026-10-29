@@ -362,6 +362,15 @@ components:
           description: >
             Tipo da métrica (heart_rate, spo2, vitals, …) para a chave natural.
             Se omitido, o servidor deriva dos campos enviados.
+        device_label:
+          type: string
+          nullable: true
+          maxLength: 64
+          example: iPhone de LFM
+          description: >
+            Apelido legível do aparelho que envia. Opcional. Espaços nas pontas
+            são removidos; vazio vira null; acima de 64 caracteres é truncado
+            (a leitura não é rejeitada). Aparece em GET /api/v1/wearables/devices.
       additionalProperties: true
 
     IngestedTelemetry:

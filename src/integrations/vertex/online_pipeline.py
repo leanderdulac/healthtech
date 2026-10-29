@@ -88,9 +88,6 @@ class VertexOnlinePipeline:
         if temporal:
             result["temporal"] = temporal
             result["score"] = max(result.get("score", 0), temporal.get("max_probability", 0))
-            if temporal.get("max_probability", 0) > 0.5:
-                result["alerta"] = True
-                result["status"] = f"ALERTA PREDITIVO ({temporal['horizon_at_risk']})"
         return result
 
     def _predict_temporal(self, patient_id: str) -> Optional[Dict]:
