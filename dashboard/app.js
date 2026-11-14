@@ -1375,6 +1375,11 @@ console.log(data);`
     const initialTab = urlParams.get("tab");
     if (initialTab) window.switchTab(initialTab);
 
+    const settingsApi = window.HealthtechSettingsPanel;
+    if (settingsApi && typeof settingsApi.bindSettingsPanel === "function") {
+        settingsApi.bindSettingsPanel(document);
+    }
+
     bootstrapDashboard();
 });
 

@@ -12,7 +12,7 @@
     <!-- Icones Material -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
-    <link rel="stylesheet" href="style.css?v=20260929e">
+    <link rel="stylesheet" href="style.css?v=20261114t">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -46,64 +46,15 @@
                     <span class="status-indicator red"></span>
                     <span class="status-text">Desconectado</span>
                 </div>
+                <button type="button" id="btn-open-settings" class="btn btn-secondary btn-settings" aria-haspopup="dialog" aria-controls="settings-panel" aria-expanded="false">
+                    <span class="material-icons-round">settings</span> Configurações
+                </button>
             </div>
         </header>
 
         <!-- VIEW 1: PAINEL PRINCIPAL (DASHBOARD) -->
         <div id="view-dashboard" class="tab-content active">
-            <div class="main-layout">
-                <!-- SIDEBAR CONTROLS -->
-                <aside class="sidebar">
-                    <div class="card card-controls">
-                        <h2><span class="material-icons-round">settings</span> Configurações</h2>
-                        
-                        <div class="control-group">
-                            <label>Simulação de Telemetria</label>
-                            <div class="btn-row">
-                                <button id="btn-start" class="btn btn-primary btn-glow">
-                                    <span class="material-icons-round">play_arrow</span> Iniciar
-                                </button>
-                                <button id="btn-stop" class="btn btn-secondary" disabled>
-                                    <span class="material-icons-round">pause</span> Pausar
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="control-group">
-                            <label for="filter-select">Filtragem Física de Ruído</label>
-                            <select id="filter-select" class="form-select">
-                                <option value="Sem Filtro">Sem Filtragem (Fusional Cru)</option>
-                                <option value="Wavelet">Filtro Wavelet (DWT db4)</option>
-                                <option value="Butterworth">Passa-Baixa Butterworth</option>
-                                <option value="BMO">BMO Adaptativo (Oscilação Média Limitada)</option>
-                            </select>
-                        </div>
-
-                        <div class="control-group">
-                            <label for="kalman-select">Filtro de Kalman (Estados Latentes)</label>
-                            <select id="kalman-select" class="form-select">
-                                <option value="EKF">Kalman Estendido (EKF)</option>
-                                <option value="UKF">Kalman Unscented (UKF)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- PESQUISA RAG / USP -->
-                    <div class="card card-search">
-                        <h2><span class="material-icons-round">search</span> RAG USP Search</h2>
-                        <p class="search-desc">Busque na base de teses de saúde da USP e ontologias clínicas.</p>
-                        <div class="search-box">
-                            <input type="text" id="search-input" placeholder="Ex: arritmia por wearable...">
-                            <button id="btn-search" class="btn btn-search-icon">
-                                <span class="material-icons-round">search</span>
-                            </button>
-                        </div>
-                        <div class="search-results" id="search-results-box">
-                            <div class="no-results">Pronto para buscar...</div>
-                        </div>
-                    </div>
-                </aside>
-
+            <div class="main-layout main-layout-full">
                 <!-- DASHBOARD GRID -->
                 <main class="dashboard-grid">
                     <section class="fleet-panel card" id="fleet-panel">
@@ -780,8 +731,68 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
 
     </div>
 
+    <div id="settings-backdrop" class="settings-backdrop" hidden></div>
+    <aside id="settings-panel" class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-panel-title" hidden>
+        <div class="settings-panel-header">
+            <h2 id="settings-panel-title"><span class="material-icons-round">settings</span> Configurações</h2>
+            <button type="button" id="btn-close-settings" class="btn btn-secondary btn-settings-close" aria-label="Fechar configurações">
+                <span class="material-icons-round">close</span>
+            </button>
+        </div>
+        <div class="settings-panel-body">
+            <div class="card card-controls">
+                <h2><span class="material-icons-round">tune</span> Simulação e filtros</h2>
+
+                <div class="control-group">
+                    <label>Simulação de Telemetria</label>
+                    <div class="btn-row">
+                        <button id="btn-start" class="btn btn-primary btn-glow">
+                            <span class="material-icons-round">play_arrow</span> Iniciar
+                        </button>
+                        <button id="btn-stop" class="btn btn-secondary" disabled>
+                            <span class="material-icons-round">pause</span> Pausar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="filter-select">Filtragem Física de Ruído</label>
+                    <select id="filter-select" class="form-select">
+                        <option value="Sem Filtro">Sem Filtragem (Fusional Cru)</option>
+                        <option value="Wavelet">Filtro Wavelet (DWT db4)</option>
+                        <option value="Butterworth">Passa-Baixa Butterworth</option>
+                        <option value="BMO">BMO Adaptativo (Oscilação Média Limitada)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="kalman-select">Filtro de Kalman (Estados Latentes)</label>
+                    <select id="kalman-select" class="form-select">
+                        <option value="EKF">Kalman Estendido (EKF)</option>
+                        <option value="UKF">Kalman Unscented (UKF)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card card-search">
+                <h2><span class="material-icons-round">search</span> RAG USP Search</h2>
+                <p class="search-desc">Busque na base de teses de saúde da USP e ontologias clínicas.</p>
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Ex: arritmia por wearable...">
+                    <button id="btn-search" class="btn btn-search-icon">
+                        <span class="material-icons-round">search</span>
+                    </button>
+                </div>
+                <div class="search-results" id="search-results-box">
+                    <div class="no-results">Pronto para buscar...</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
     <!-- Script da Aplicação -->
-    <script src="fleet_logic.js?v=20261114s"></script>
-    <script src="app.js?v=20261114s"></script>
+    <script src="fleet_logic.js?v=20261114t"></script>
+    <script src="settings_panel.js?v=20261114t"></script>
+    <script src="app.js?v=20261114t"></script>
 </body>
 </html>
