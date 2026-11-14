@@ -21,6 +21,7 @@ def test_schema_omits_are_not_measurements():
         {"patient_id": "PAT-OMIT-001", "heart_rate": 80}
     )
     assert payload.spo2 is None
+    assert payload.steps is None
     assert payload.hrv_rmssd is None
     assert payload.skin_temp is None
     assert payload.activity_level is None
@@ -192,4 +193,26 @@ def test_fleet_row_keeps_steps_and_blood_pressure():
     assert row["blood_pressure_sys"] == 118
     assert row["blood_pressure_dia"] == 76
     assert row["device_model"] == "Galaxy Watch8 (4WHN)"
+    assert row["received_at"]
+    assert row["last_steps_at"]
+    assert row["last_bp_at"]
+    upsert_frame(
+        {
+            "patient_id": "PAT-HBAND-1975",
+            "device_id": "40:35:E6:40:C5:D8",
+            "timestamp": "2026-09-30T16:45:00+00:00",
+            "received_at": "2026-09-30T16:45:00+00:00",
+            "raw_telemetry": {"heart_rate_bpm": 90, "spo2_percent": 98},
+            "cleaned_telemetry": {"heart_rate_clean": 90},
+        }
+    )
+    later = next(
+        item
+        for item in list_devices(q="40:35:E6:40:C5:D8")["devices"]
+        if item["device_id"] == "40:35:E6:40:C5:D8"
+    )
+    assert later["heart_rate"] == 90
+    assert later["steps"] == 1678
+    assert later["blood_pressure_sys"] == 118
+    assert later["blood_pressure_dia"] == 76
     clear_all()

@@ -23,6 +23,8 @@ _PUBLIC_DEVICE_FIELDS = (
     "blood_pressure_sys",
     "blood_pressure_dia",
     "device_model",
+    "last_steps_at",
+    "last_bp_at",
     "synthetic",
 )
 

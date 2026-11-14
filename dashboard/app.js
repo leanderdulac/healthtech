@@ -565,8 +565,9 @@ document.addEventListener("DOMContentLoaded", () => {
             && fleetLogic.isSyntheticDevice(ing)) {
             return;
         }
-        const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? (ing.raw_telemetry || {}).heart_rate_bpm;
-        const spo2 = (ing.raw_telemetry || {}).spo2_percent;
+        const raw = ing.raw_telemetry || {};
+        const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? raw.heart_rate_bpm;
+        const spo2 = raw.spo2_percent;
         const idx = fleetDevices.findIndex((d) => d.device_id === ing.device_id);
         const existing = idx >= 0 ? fleetDevices[idx] : {};
         const online = typeof fleetLogic.resolveFleetOnline === "function"
@@ -584,10 +585,19 @@ document.addEventListener("DOMContentLoaded", () => {
             online,
             heart_rate: hr,
             spo2,
+            steps: ing.steps ?? raw.steps,
+            blood_pressure_sys: ing.blood_pressure_sys ?? raw.blood_pressure_sys,
+            blood_pressure_dia: ing.blood_pressure_dia ?? raw.blood_pressure_dia,
+            device_model: ing.device_model ?? raw.device_model,
+            last_steps_at: ing.last_steps_at,
+            last_bp_at: ing.last_bp_at,
             latest: ing
         };
-        if (idx >= 0) fleetDevices[idx] = { ...fleetDevices[idx], ...next };
-        else fleetDevices.unshift(next);
+        const merged = typeof fleetLogic.carryLastActivity === "function"
+            ? fleetLogic.carryLastActivity(existing, next)
+            : next;
+        if (idx >= 0) fleetDevices[idx] = { ...fleetDevices[idx], ...merged };
+        else fleetDevices.unshift(merged);
         renderFleetTable();
     }
 
@@ -633,12 +643,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const age = formatAge(d.received_at || d.last_seen);
             const hr = d.heart_rate != null ? Math.round(Number(d.heart_rate)) : "—";
             const spo2 = d.spo2 != null ? Number(d.spo2).toFixed(0) + "%" : "—";
-            const steps = d.steps != null ? Math.round(Number(d.steps)).toLocaleString("pt-BR") : "—";
-            const sys = d.blood_pressure_sys;
-            const dia = d.blood_pressure_dia;
-            const bp = sys != null && dia != null
-                ? `${Math.round(Number(sys))}/${Math.round(Number(dia))}`
-                : "—";
+            const steps = typeof fleetLogic.formatSteps === "function"
+                ? fleetLogic.formatSteps(d.steps)
+                : (d.steps != null ? Math.round(Number(d.steps)).toLocaleString("pt-BR") : "—");
+            const bp = typeof fleetLogic.formatBloodPressure === "function"
+                ? fleetLogic.formatBloodPressure(d.blood_pressure_sys, d.blood_pressure_dia)
+                : (d.blood_pressure_sys != null && d.blood_pressure_dia != null
+                    ? `${Math.round(Number(d.blood_pressure_sys))}/${Math.round(Number(d.blood_pressure_dia))}`
+                    : "—");
             return `<tr data-device="${esc(d.device_id)}" class="${selected}">
                 <td><span class="fleet-dot ${d.online ? "on" : "off"}"></span>${d.online ? "Online" : "Offline"}</td>
                 <td>${esc(d.device_id)}</td>
@@ -670,7 +682,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             const prev = fleetDevices.find((d) => d.device_id === row.device_id) || {};
-            const merged = { ...prev, ...row };
+            const merged = typeof fleetLogic.carryLastActivity === "function"
+                ? fleetLogic.carryLastActivity(prev, { ...prev, ...row })
+                : { ...prev, ...row };
             if (prev.online && typeof fleetLogic.isRecentLiveStamp === "function"
                 && fleetLogic.isRecentLiveStamp(prev.received_at || prev.last_seen)) {
                 merged.online = true;
@@ -1360,6 +1374,11 @@ console.log(data);`
 
     const initialTab = urlParams.get("tab");
     if (initialTab) window.switchTab(initialTab);
+
+    const settingsApi = window.HealthtechSettingsPanel;
+    if (settingsApi && typeof settingsApi.bindSettingsPanel === "function") {
+        settingsApi.bindSettingsPanel(document);
+    }
 
     bootstrapDashboard();
 });

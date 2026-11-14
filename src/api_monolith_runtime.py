@@ -333,6 +333,7 @@ class WearableTelemetryRequest(BaseModel):
     skin_temp: Optional[float] = Field(None, ge=25.0, le=45.0)
     spo2: Optional[float] = Field(None, ge=50.0, le=100.0)
     activity_level: Optional[float] = Field(None, ge=0.0, le=100.0)
+    steps: Optional[int] = Field(None, ge=0)
     ppg_signal: Optional[list[float]] = None
     filter_type: Optional[str] = Field("BMO", max_length=32)
     # Opcionais HBand / matriz de alertas

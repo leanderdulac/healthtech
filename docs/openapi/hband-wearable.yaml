@@ -301,7 +301,7 @@ components:
       description: |
         Subconjunto do schema WearableTelemetryRequest da API.
         Campos HBand extras (BP, respiratory) devem ir em raw ou Bronze via normalizer.
-        Campos extras (steps, calories, …) são aceitos e persistidos em `extra` JSONB.
+        `steps` é campo declarado (>= 0). Outros extras (calories, …) são aceitos e persistidos em `extra` JSONB.
       properties:
         patient_id:
           type: string
@@ -331,6 +331,11 @@ components:
           type: number
           minimum: 0
           maximum: 100
+        steps:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Passos acumulados no dia, quando o relógio enviou.
         ppg_signal:
           type: array
           items:

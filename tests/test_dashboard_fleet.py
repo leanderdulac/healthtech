@@ -168,6 +168,8 @@ def test_fleet_summary_is_public_and_hides_synthetics():
                 "blood_pressure_sys",
                 "blood_pressure_dia",
                 "device_model",
+                "last_steps_at",
+                "last_bp_at",
                 "synthetic",
             }
         )
@@ -326,6 +328,56 @@ def test_ingest_endpoints_still_require_write_scope():
         json={"patient_id": "PAT-KEEP", "readings": [payload]},
     )
     assert batch.status_code == 200
+
+
+def test_settings_panel_js_closes_on_escape_and_backdrop():
+    import shutil
+
+    node = shutil.which("node") or shutil.which("nodejs")
+    assert node, "node is required to verify dashboard/settings_panel.js"
+    script = ROOT / "tests" / "js" / "test_settings_panel.js"
+    result = subprocess.run(
+        [node, str(script)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_painel_principal_moves_sidebar_into_settings_drawer():
+    html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+    css = (ROOT / "dashboard" / "style.css").read_text(encoding="utf-8")
+    app_js = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+    dashboard = html.split('id="view-dashboard"', 1)[1].split('id="view-api-access"', 1)[0]
+    assert 'class="sidebar"' not in dashboard
+    assert 'id="btn-open-settings"' in html
+    assert "Configurações" in html
+    header_session = html.split('class="header-session"', 1)[1].split("</header>", 1)[0]
+    assert 'id="ws-status"' in header_session
+    assert header_session.find('id="ws-status"') < header_session.find('id="btn-open-settings"')
+    panel = html.split('id="settings-panel"', 1)[1]
+    for control_id in (
+        "btn-start",
+        "btn-stop",
+        "filter-select",
+        "kalman-select",
+        "search-input",
+        "btn-search",
+        "search-results-box",
+        "btn-close-settings",
+    ):
+        assert f'id="{control_id}"' in panel
+    assert "RAG USP Search" in panel
+    assert 'id="settings-backdrop"' in html
+    assert 'main-layout-full' in html
+    assert 'id="fleet-panel"' in dashboard
+    assert "grid-template-columns: 320px 1fr" not in css
+    assert ".settings-panel" in css
+    assert "bindSettingsPanel" in app_js
+    assert "settings_panel.js?v=20261114t" in html
+    assert "style.css?v=20261114t" in html
+    assert "app.js?v=20261114t" in html
 
 
 def test_fleet_logic_js_focus_does_not_fake_online():

@@ -551,7 +551,8 @@ def get_history(patient_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         raise DurableStoreUnavailable(str(exc)) from exc
 
 
-def latest_frames_by_device() -> List[Dict[str, Any]]:
+def list_frames() -> List[Dict[str, Any]]:
+    """Todos os frames persistidos, mais novos primeiro (frota compacta agrupa)."""
     sql = """
         SELECT reading_id, patient_id, device_id, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
@@ -561,17 +562,20 @@ def latest_frames_by_device() -> List[Dict[str, Any]]:
         engine = _require_engine()
         with engine.connect() as conn:
             rows = conn.execute(text(sql)).fetchall()
-        latest: Dict[str, Dict[str, Any]] = {}
-        for row in rows:
-            frame = _row_frame(row)
-            device_id = str(frame.get("device_id") or "unknown")
-            if device_id not in latest:
-                latest[device_id] = frame
-        return list(latest.values())
+        return [_row_frame(row) for row in rows]
     except DurableStoreUnavailable:
         raise
     except SQLAlchemyError as exc:
         raise DurableStoreUnavailable(str(exc)) from exc
+
+
+def latest_frames_by_device() -> List[Dict[str, Any]]:
+    latest: Dict[str, Dict[str, Any]] = {}
+    for frame in list_frames():
+        device_id = str(frame.get("device_id") or "unknown")
+        if device_id not in latest:
+            latest[device_id] = frame
+    return list(latest.values())
 
 
 def iter_patients(limit_per_patient: int = 50) -> Dict[str, List[Dict[str, Any]]]:
