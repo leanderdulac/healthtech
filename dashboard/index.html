@@ -12,7 +12,7 @@
     <!-- Icones Material -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons+Round">
     <!-- Folha de Estilos Customizada -->
-    <link rel="stylesheet" href="style.css?v=20261114t">
+    <link rel="stylesheet" href="style.css?v=20261114u">
     <!-- Chart.js para Gráficos Fluidos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -790,9 +790,23 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
         </div>
     </aside>
 
+    <div id="device-details-backdrop" class="settings-backdrop" hidden></div>
+    <aside id="device-details-panel" class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="device-details-panel-title" hidden>
+        <div class="settings-panel-header">
+            <h2 id="device-details-panel-title"><span class="material-icons-round">watch</span> Detalhes do relógio</h2>
+            <button type="button" id="btn-close-device-details" class="btn btn-secondary btn-settings-close" aria-label="Fechar detalhes do relógio">
+                <span class="material-icons-round">close</span>
+            </button>
+        </div>
+        <div class="settings-panel-body" id="device-details-body">
+            <p class="device-details-status">Selecione um relógio na frota.</p>
+        </div>
+    </aside>
+
     <!-- Script da Aplicação -->
-    <script src="fleet_logic.js?v=20261114t"></script>
-    <script src="settings_panel.js?v=20261114t"></script>
-    <script src="app.js?v=20261114t"></script>
+    <script src="fleet_logic.js?v=20261114u"></script>
+    <script src="settings_panel.js?v=20261114u"></script>
+    <script src="device_details.js?v=20261114u"></script>
+    <script src="app.js?v=20261114u"></script>
 </body>
 </html>

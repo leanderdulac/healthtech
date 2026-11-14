@@ -443,8 +443,57 @@ body {
     margin-bottom: 0;
 }
 
-body.settings-open {
+body.settings-open,
+body.device-details-open {
     overflow: hidden;
+}
+
+.device-details-status {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+.device-details-block h3 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.device-details-note {
+    margin: 0 0 12px;
+    font-size: 0.8rem;
+    color: #cbd5e1;
+    line-height: 1.4;
+}
+
+.device-details-dl {
+    display: grid;
+    gap: 8px 0;
+    margin: 0;
+}
+
+.device-details-row {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    gap: 8px 12px;
+    align-items: start;
+}
+
+.device-details-dl dt {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.device-details-dl dd {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 0.9rem;
+    word-break: break-word;
 }
 
 .control-group {

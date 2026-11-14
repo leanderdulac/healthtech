@@ -70,6 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let lastIngestStamp = "";
     let fleetDevices = [];
     let selectedDeviceId = "";
+    let deviceDetailsApi = null;
     let fleetPage = 0;
     const FLEET_PAGE_SIZE = 50;
     const DISPLAY_TZ = "America/Sao_Paulo";
@@ -668,6 +669,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const row = fleetDevices.find((d) => d.device_id === selectedDeviceId);
                 if (row) applyIngestFrame(deviceToIngest(row), { fromLiveIngest: false });
                 renderFleetTable();
+                if (deviceDetailsApi && typeof deviceDetailsApi.show === "function") {
+                    deviceDetailsApi.show(selectedDeviceId);
+                }
             });
         });
     }
@@ -743,6 +747,31 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!window.__fleetClock) {
             window.__fleetClock = setInterval(() => renderFleetTable(), 1000);
         }
+    }
+
+    async function fetchDeviceDetail(deviceId) {
+        const id = String(deviceId || "").trim();
+        if (!id) {
+            return { ok: false, status: 404, hasKey: !!apiKey };
+        }
+        if (!apiKey) {
+            return { ok: false, status: 401, hasKey: false };
+        }
+        const res = await fetch(
+            `${API_URL}/api/v1/ops/devices/${encodeURIComponent(id)}`,
+            {
+                cache: "no-store",
+                headers: {
+                    Accept: "application/json",
+                    "X-API-Key": apiKey
+                }
+            }
+        );
+        if (!res.ok) {
+            return { ok: false, status: res.status, hasKey: true };
+        }
+        const data = await res.json();
+        return { ok: true, ...data, hasKey: true };
     }
 
     async function bootstrapDashboard() {
@@ -1376,8 +1405,30 @@ console.log(data);`
     if (initialTab) window.switchTab(initialTab);
 
     const settingsApi = window.HealthtechSettingsPanel;
+    let settingsPanelApi = null;
     if (settingsApi && typeof settingsApi.bindSettingsPanel === "function") {
-        settingsApi.bindSettingsPanel(document);
+        settingsPanelApi = settingsApi.bindSettingsPanel(document);
+    }
+
+    const detailsModule = window.HealthtechDeviceDetails;
+    if (detailsModule && typeof detailsModule.bindDeviceDetailsPanel === "function") {
+        deviceDetailsApi = detailsModule.bindDeviceDetailsPanel(document, {
+            fetchDetail: fetchDeviceDetail,
+            onOpen() {
+                if (settingsPanelApi && typeof settingsPanelApi.close === "function") {
+                    settingsPanelApi.close();
+                }
+            }
+        });
+    }
+
+    const openSettingsBtn = document.getElementById("btn-open-settings");
+    if (openSettingsBtn) {
+        openSettingsBtn.addEventListener("click", () => {
+            if (deviceDetailsApi && typeof deviceDetailsApi.close === "function") {
+                deviceDetailsApi.close();
+            }
+        });
     }
 
     bootstrapDashboard();
