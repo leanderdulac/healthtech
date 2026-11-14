@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.ops.live_devices import summarize_frame
+from src.ops.live_devices import carry_last_activity, compact_row, summarize_frame
 from src.ops.timestamps import age_seconds, is_online, parse_timestamp
 
 logger = logging.getLogger(__name__)
@@ -61,22 +61,8 @@ def _now() -> datetime:
 
 
 def _compact(summary: Dict[str, Any]) -> Dict[str, Any]:
-    item = {
-        "device_id": summary.get("device_id") or "unknown",
-        "patient_id": summary.get("patient_id"),
-        "last_seen": summary.get("last_seen"),
-        "received_at": summary.get("received_at"),
-        "last_seen_local": summary.get("last_seen_local"),
-        "device_time_local": summary.get("device_time_local"),
-        "online": bool(summary.get("online")),
-        "age_seconds": summary.get("age_seconds"),
-        "heart_rate": summary.get("heart_rate"),
-        "spo2": summary.get("spo2"),
-        "steps": summary.get("steps"),
-        "blood_pressure_sys": summary.get("blood_pressure_sys"),
-        "blood_pressure_dia": summary.get("blood_pressure_dia"),
-        "device_model": summary.get("device_model"),
-    }
+    item = compact_row(summary)
+    item["online"] = bool(item.get("online"))
     if is_synthetic_device(summary) or is_synthetic_device(item):
         item["synthetic"] = True
     return item
@@ -207,6 +193,8 @@ def upsert_frame(frame: Dict[str, Any]) -> Dict[str, Any]:
         new_rx = parse_timestamp(compact.get("received_at") or compact.get("last_seen"))
         if prev_rx and new_rx and new_rx < prev_rx:
             return _compact(_refresh_online(prev))
+        compact = carry_last_activity(prev, compact)
+        compact["latest"] = dict(frame)
         _devices[device_id] = compact
         _evict_unlocked()
         global _dirty
@@ -315,6 +303,8 @@ def merge_remote_rows(rows: List[Dict[str, Any]]) -> None:
             if prev is None or incoming_rx is None or prev_rx is None or incoming_rx >= prev_rx:
                 if prev and prev.get("latest") and not incoming.get("latest"):
                     incoming["latest"] = prev["latest"]
+                if prev:
+                    incoming = carry_last_activity(prev, incoming)
                 _devices[device_id] = incoming
                 changed = True
         if changed:

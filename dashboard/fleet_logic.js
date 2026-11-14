@@ -38,6 +38,69 @@
         return false;
     }
 
+    function asPositive(value) {
+        if (value == null || value === "") return null;
+        const n = Number(value);
+        if (!Number.isFinite(n) || n <= 0) return null;
+        return n;
+    }
+
+    function formatSteps(value) {
+        if (value == null || value === "") return "—";
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 0) return "—";
+        return Math.round(n).toLocaleString("pt-BR");
+    }
+
+    function formatBloodPressure(sys, dia) {
+        const s = asPositive(sys);
+        const d = asPositive(dia);
+        if (s == null || d == null) return "—";
+        return Math.round(s) + "/" + Math.round(d);
+    }
+
+    function activityStamp(row) {
+        if (!row) return null;
+        return row.received_at || row.last_seen || row.timestamp || null;
+    }
+
+    function carryLastActivity(previous, incoming) {
+        const row = Object.assign({}, incoming || {});
+        const prev = previous || {};
+        const incomingSteps = asPositive(row.steps);
+        if (incomingSteps != null) {
+            row.steps = Math.round(incomingSteps);
+            row.last_steps_at = row.last_steps_at || activityStamp(row);
+        } else if (asPositive(prev.steps) != null) {
+            row.steps = prev.steps;
+            row.last_steps_at = prev.last_steps_at || activityStamp(prev);
+        } else {
+            row.steps = null;
+            row.last_steps_at = null;
+        }
+        const incomingSys = asPositive(row.blood_pressure_sys);
+        const incomingDia = asPositive(row.blood_pressure_dia);
+        if (incomingSys != null && incomingDia != null) {
+            row.blood_pressure_sys = incomingSys;
+            row.blood_pressure_dia = incomingDia;
+            row.last_bp_at = row.last_bp_at || activityStamp(row);
+        } else if (asPositive(prev.blood_pressure_sys) != null && asPositive(prev.blood_pressure_dia) != null) {
+            row.blood_pressure_sys = prev.blood_pressure_sys;
+            row.blood_pressure_dia = prev.blood_pressure_dia;
+            row.last_bp_at = prev.last_bp_at || activityStamp(prev);
+        } else {
+            row.blood_pressure_sys = null;
+            row.blood_pressure_dia = null;
+            row.last_bp_at = null;
+        }
+        const model = typeof row.device_model === "string" ? row.device_model.trim() : "";
+        if (!model) {
+            const prevModel = typeof prev.device_model === "string" ? prev.device_model.trim() : "";
+            if (prevModel) row.device_model = prev.device_model;
+        }
+        return row;
+    }
+
     function isSyntheticDevice(row) {
         if (!row || typeof row !== "object") return false;
         const flag = row.synthetic;
@@ -60,6 +123,10 @@
         parseStamp,
         isRecentLiveStamp,
         resolveFleetOnline,
-        isSyntheticDevice
+        isSyntheticDevice,
+        asPositive,
+        formatSteps,
+        formatBloodPressure,
+        carryLastActivity
     };
 }));

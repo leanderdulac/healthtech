@@ -86,6 +86,10 @@ def new_ingest_frames(devices: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "raw_telemetry": {
                     "heart_rate_bpm": row.get("heart_rate"),
                     "spo2_percent": row.get("spo2"),
+                    "steps": row.get("steps"),
+                    "blood_pressure_sys": row.get("blood_pressure_sys"),
+                    "blood_pressure_dia": row.get("blood_pressure_dia"),
+                    "device_model": row.get("device_model"),
                 },
                 "cleaned_telemetry": {"heart_rate_clean": row.get("heart_rate")},
             }

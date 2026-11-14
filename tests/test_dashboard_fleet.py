@@ -168,6 +168,8 @@ def test_fleet_summary_is_public_and_hides_synthetics():
                 "blood_pressure_sys",
                 "blood_pressure_dia",
                 "device_model",
+                "last_steps_at",
+                "last_bp_at",
                 "synthetic",
             }
         )

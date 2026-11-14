@@ -108,6 +108,31 @@ def test_openapi_ingest_source_enum_matches_yaml():
         assert body["schema"]["$ref"].endswith("WearableBatchIngestRequest")
 
 
+def _schema_integer_minimum(node: Any) -> Optional[int]:
+    if not isinstance(node, dict):
+        return None
+    if node.get("type") == "integer" and "minimum" in node:
+        return int(node["minimum"])
+    for key in ("anyOf", "oneOf", "allOf"):
+        for item in node.get(key) or ():
+            found = _schema_integer_minimum(item)
+            if found is not None:
+                return found
+    return None
+
+
+def test_openapi_declares_optional_non_negative_steps():
+    yaml_text = YAML_PATH.read_text(encoding="utf-8")
+    assert "steps:" in yaml_text
+    spec = _openapi_spec()
+    ingest, batch_item = _ingest_and_batch_item_schemas(spec)
+    for schema in (ingest, batch_item):
+        steps = schema["properties"]["steps"]
+        assert _schema_integer_minimum(steps) == 0
+        dump = str(steps)
+        assert "null" in dump.lower() or "anyOf" in steps or steps.get("nullable") is True
+
+
 def test_openapi_filter_type_enum_matches_yaml():
     yaml_text = YAML_PATH.read_text(encoding="utf-8")
     expected = _parse_yaml_flow_enum(yaml_text, "filter_type")

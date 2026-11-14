@@ -22,8 +22,6 @@ from app.services.ingest_idempotency import DedupIdentity
 
 logger = logging.getLogger(__name__)
 
-# Igual a src/ops/timestamps.py: 30 min de medição + 15 min de reconexão + folga.
-ONLINE_WITHIN_SECONDS = 50 * 60.0
 _SYNTHETIC_TOKENS = ("smoke", "probe", "timecheck")
 _MAX_REQUEST_CACHE = 2048
 
@@ -271,7 +269,7 @@ def list_devices(
     if _use_durable():
         from app.services import durable_readings
 
-        frames = durable_readings.latest_frames_by_device()
+        frames = durable_readings.list_frames()
         return _list_devices_from_frames(
             frames,
             q=q,
@@ -296,16 +294,11 @@ def list_devices(
         )
     except Exception:
         pass
-    latest_by_device: Dict[str, Dict[str, Any]] = {}
+    frames: List[Dict[str, Any]] = []
     for hist in _patient_history.values():
-        for frame in hist:
-            device_id = str(frame.get("device_id") or "unknown")
-            ts = str(frame.get("timestamp") or "")
-            prev = latest_by_device.get(device_id)
-            if prev is None or ts >= str(prev.get("timestamp") or ""):
-                latest_by_device[device_id] = frame
+        frames.extend(hist)
     return _list_devices_from_frames(
-        list(latest_by_device.values()),
+        frames,
         q=q,
         online=online,
         limit=limit,
@@ -327,33 +320,12 @@ def _list_devices_from_frames(
     patient_id: Optional[str],
     include_synthetic: bool = False,
 ) -> Dict[str, Any]:
+    from src.ops.live_devices import compact_devices_from_frames
+
     now = datetime.now(timezone.utc)
-    rows: List[Dict[str, Any]] = []
-    for frame in frames:
-        ts = frame.get("timestamp")
-        is_online = False
-        if isinstance(ts, str) and ts:
-            try:
-                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                age = (now - dt).total_seconds()
-                is_online = 0 <= age <= ONLINE_WITHIN_SECONDS
-            except ValueError:
-                is_online = False
-        cleaned = frame.get("cleaned_telemetry") or {}
-        raw = frame.get("raw_telemetry") or {}
-        row = {
-            "device_id": frame.get("device_id") or "unknown",
-            "patient_id": frame.get("patient_id"),
-            "last_seen": ts,
-            "online": is_online,
-            "heart_rate": cleaned.get("heart_rate_clean", raw.get("heart_rate_bpm")),
-            "spo2": raw.get("spo2_percent"),
-        }
-        if include_latest:
-            row["latest"] = frame
-        rows.append(row)
+    rows = compact_devices_from_frames(
+        frames, now=now, include_latest=include_latest
+    )
     wanted_patient = (patient_id or "").strip() or None
     if wanted_patient:
         rows = [row for row in rows if str(row.get("patient_id") or "") == wanted_patient]
