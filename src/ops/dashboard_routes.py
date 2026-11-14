@@ -6,7 +6,10 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Query
 
+from src.ops.timestamps import ONLINE_WITHIN_MS
+
 router = APIRouter(prefix="/api/v1/ops", tags=["ops-dashboard"])
+FLEET_POLL_MS = 30_000
 
 _PUBLIC_DEVICE_FIELDS = (
     "device_id",
@@ -36,7 +39,8 @@ def dashboard_bootstrap() -> Dict[str, Any]:
     """Config pública do painel. Nunca inclui chave de API."""
     return {
         "ok": True,
-        "fleet_poll_ms": 2000,
+        "fleet_poll_ms": FLEET_POLL_MS,
+        "online_within_ms": ONLINE_WITHIN_MS,
         "page_size": 50,
         "max_devices": 500,
         "fleet_summary_path": "/api/v1/ops/fleet-summary",

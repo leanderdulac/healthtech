@@ -183,6 +183,27 @@ body {
     accent-color: #38bdf8;
 }
 
+.fleet-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.fleet-poll-hint {
+    color: #94a3b8;
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.fleet-toolbar .btn,
+.btn-sm {
+    flex: none;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+}
+
 .fleet-table-wrap {
     overflow: auto;
     max-height: 360px;

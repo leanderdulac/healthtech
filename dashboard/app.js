@@ -71,6 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let fleetDevices = [];
     let selectedDeviceId = "";
     let fleetPage = 0;
+    let fleetPollMs = 30000;
     const FLEET_PAGE_SIZE = 50;
     const DISPLAY_TZ = "America/Sao_Paulo";
     const localDateFmt = new Intl.DateTimeFormat("pt-BR", {
@@ -725,22 +726,34 @@ document.addEventListener("DOMContentLoaded", () => {
     function startDevicePoll() {
         if (devicePollTimer) clearInterval(devicePollTimer);
         pollDevices();
-        devicePollTimer = setInterval(pollDevices, 2000);
+        devicePollTimer = setInterval(pollDevices, fleetPollMs);
         if (!window.__fleetClock) {
             window.__fleetClock = setInterval(() => renderFleetTable(), 1000);
         }
+    }
+
+    function applyFleetBootstrap(cfg) {
+        if (!cfg || typeof cfg !== "object") return;
+        if (Object.prototype.hasOwnProperty.call(cfg, "api_key")) {
+            delete cfg.api_key;
+        }
+        if (typeof cfg.fleet_poll_ms === "number" && cfg.fleet_poll_ms >= 5000) {
+            fleetPollMs = cfg.fleet_poll_ms;
+        }
+        const hint = document.getElementById("fleet-poll-hint");
+        if (hint) {
+            const seconds = Math.round(fleetPollMs / 1000);
+            hint.textContent = `Atualiza a cada ${seconds}s`;
+        }
+        const display = document.getElementById("api-key-display");
+        if (display && apiKey) display.value = apiKey;
     }
 
     async function bootstrapDashboard() {
         try {
             const res = await fetch(`${API_URL}/api/v1/ops/dashboard-bootstrap`, { cache: "no-store" });
             if (res.ok) {
-                const cfg = await res.json();
-                if (cfg && Object.prototype.hasOwnProperty.call(cfg, "api_key")) {
-                    delete cfg.api_key;
-                }
-                const display = document.getElementById("api-key-display");
-                if (display && apiKey) display.value = apiKey;
+                applyFleetBootstrap(await res.json());
             }
         } catch (err) {
             /* segue sem chave: a frota pública não precisa dela */
@@ -1001,6 +1014,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         fleetSynthetic.addEventListener("change", () => {
             fleetPage = 0;
+            pollDevices();
+        });
+    }
+    const btnRefreshFleet = document.getElementById("btn-refresh-fleet");
+    if (btnRefreshFleet) {
+        btnRefreshFleet.addEventListener("click", () => {
             pollDevices();
         });
     }

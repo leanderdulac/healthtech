@@ -128,6 +128,12 @@
                                 <input type="checkbox" id="fleet-include-synthetic">
                                 Mostrar dispositivos de teste
                             </label>
+                            <div class="fleet-toolbar-actions">
+                                <span class="fleet-poll-hint" id="fleet-poll-hint">Atualiza a cada 30s</span>
+                                <button type="button" id="btn-refresh-fleet" class="btn btn-secondary btn-sm">
+                                    <span class="material-icons-round">refresh</span> Atualizar
+                                </button>
+                            </div>
                         </div>
                         <div class="fleet-table-wrap">
                             <table class="fleet-table">
@@ -781,7 +787,7 @@ curl -X POST "http://localhost:8000/api/v1/wearables/ingest" \
     </div>
 
     <!-- Script da Aplicação -->
-    <script src="fleet_logic.js?v=20260929b"></script>
-    <script src="app.js?v=20260930b"></script>
+    <script src="fleet_logic.js?v=20261114a"></script>
+    <script src="app.js?v=20261114a"></script>
 </body>
 </html>

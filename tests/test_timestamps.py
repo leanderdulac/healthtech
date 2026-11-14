@@ -3,7 +3,15 @@
 from datetime import datetime, timezone
 
 from src.ops.live_devices import summarize_frame
-from src.ops.timestamps import local_display, parse_timestamp, stamp_ingest, utc_iso
+from src.ops.timestamps import (
+    ONLINE_WITHIN_MS,
+    ONLINE_WITHIN_SECONDS,
+    is_online,
+    local_display,
+    parse_timestamp,
+    stamp_ingest,
+    utc_iso,
+)
 
 
 def test_utc_instant_displays_brasilia():
@@ -44,3 +52,15 @@ def test_summarize_uses_received_at_for_online_status():
     )
     assert row["online"] is True
     assert row["last_seen_local"] == "24/08/2026 18:15:50"
+
+
+def test_is_online_two_hour_window_covers_ios_background_gap():
+    now = datetime(2026, 8, 24, 21, 16, 0, tzinfo=timezone.utc)
+    assert ONLINE_WITHIN_SECONDS == 2 * 60 * 60
+    assert ONLINE_WITHIN_MS == 2 * 60 * 60 * 1000
+    fifty_min = datetime(2026, 8, 24, 20, 26, 0, tzinfo=timezone.utc)
+    assert is_online(fifty_min, now=now) is True
+    two_hours = datetime(2026, 8, 24, 19, 16, 0, tzinfo=timezone.utc)
+    assert is_online(two_hours, now=now) is True
+    over = datetime(2026, 8, 24, 19, 15, 59, tzinfo=timezone.utc)
+    assert is_online(over, now=now) is False
