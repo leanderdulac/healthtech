@@ -48,6 +48,8 @@ VENDOR_PACKAGES: dict[str, tuple[str, ...]] = {
         "patients_routes.py",
         "live_devices.py",
         "device_registry.py",
+        "device_detail.py",
+        "device_detail_routes.py",
     ),
 }
 
@@ -61,7 +63,7 @@ VENDOR_ROOT_INIT = '''"""Subset de src.* embutido na imagem secure.
 Gerado por scripts/sync_secure_vendor.py — não edite à mão.
 
 Pacotes: clinical_intelligence (alertas) e ops (timestamps, patients,
-operational_patients, device_registry, live_devices).
+operational_patients, device_registry, live_devices, device_detail).
 Fonte da verdade: src/clinical_intelligence/ e src/ops/
 """
 '''
@@ -71,7 +73,8 @@ VENDOR_PKG_INIT = {
 ''',
     "ops": '''"""Subset de src.ops embutido na imagem secure.
 
-timestamps, operational_patients, patients_routes, live_devices, device_registry.
+timestamps, operational_patients, patients_routes, live_devices, device_registry,
+device_detail, device_detail_routes.
 Não inclui live_watch_bridge.
 """
 ''',

@@ -19,7 +19,7 @@ from typing import Dict, Any, Optional, List
 
 import numpy as np
 import pandas as pd
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
@@ -69,7 +69,7 @@ app.add_middleware(
     allow_origins=get_cors_origins(),
     allow_credentials=cors_allow_credentials(),
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["*", "X-API-Key", "X-Request-ID"],
+    allow_headers=["*", "X-API-Key", "X-Request-ID", "Idempotency-Key", "X-App-Version"],
 )
 
 # Montar diretório de frontend estático
@@ -296,6 +296,7 @@ def search_literature(search: SearchQuery):
 def ingest_wearable_reading(
     req: WearableTelemetryRequest,
     _api_key: str = Depends(require_scope("wearables:write")),
+    x_app_version: Optional[str] = Header(default=None, alias="X-App-Version"),
 ):
     """
     Endpoint principal para recepção de telemetria contínua de smartwatches VE30.
@@ -505,6 +506,14 @@ def ingest_wearable_reading(
         },
         "clinical_alerts": clinical_alerts,
     }
+    try:
+        from src.ops.device_detail import attach_app_version
+
+        extra = attach_app_version(response_payload, response_payload.get("extra"), x_app_version)
+        if extra:
+            response_payload["extra"] = extra
+    except Exception:
+        pass
 
     # Armazenar no buffer histórico do paciente
     if req.patient_id not in patient_telemetry_history:
@@ -527,6 +536,7 @@ def ingest_wearable_reading(
 def ingest_wearable_batch(
     req: WearableBatchIngestRequest,
     _api_key: str = Depends(require_scope("wearables:write")),
+    x_app_version: Optional[str] = Header(default=None, alias="X-App-Version"),
 ):
     """
     Ingestão em lote de registros históricos descarregados da memória do VE30 (OriginData3).
@@ -554,7 +564,7 @@ def ingest_wearable_batch(
                 hrv_rmssd=float(item["hrv"]) if item.get("hrv") is not None else None,
                 steps=int(item["step_count"]) if item.get("step_count") is not None else None
             )
-            result = ingest_wearable_reading(single_req)
+            result = ingest_wearable_reading(single_req, x_app_version=x_app_version)
             results.append(result)
             processed_count += 1
 
@@ -570,10 +580,12 @@ def ingest_wearable_batch(
 
 
 from src.ops.dashboard_routes import router as dashboard_ops_router
+from src.ops.device_detail_routes import router as device_detail_router
 from src.ops.patients_routes import router as patients_router
 
 app.include_router(patients_router)
 app.include_router(dashboard_ops_router)
+app.include_router(device_detail_router)
 
 
 @app.get("/api/v1/wearables/devices")

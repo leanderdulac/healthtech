@@ -30,6 +30,9 @@ COMPACT_FIELDS = (
     "device_model",
     "last_steps_at",
     "last_bp_at",
+    "ingest_source",
+    "device_label",
+    "app_version",
 )
 
 
@@ -88,6 +91,29 @@ def _device_model(value: Any) -> Optional[str]:
     return stripped[:80] if stripped else None
 
 
+def _optional_text(value: Any, max_len: int) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped[:max_len] if stripped else None
+
+
+def _keep_text(
+    row: Dict[str, Any],
+    prev: Mapping[str, Any],
+    key: str,
+    *,
+    max_len: int,
+) -> None:
+    current = _optional_text(row.get(key), max_len)
+    if current:
+        row[key] = current
+        return
+    previous = _optional_text(prev.get(key), max_len)
+    if previous:
+        row[key] = previous
+
+
 def compact_row(summary: Mapping[str, Any]) -> Dict[str, Any]:
     """Linha compacta da frota — sem `latest`."""
     item = {key: summary.get(key) for key in COMPACT_FIELDS}
@@ -102,6 +128,7 @@ def summarize_frame(frame: Mapping[str, Any], now: Optional[datetime] = None) ->
     sample = parse_timestamp(frame.get("timestamp")) or received
     live_ref = received or sample
     stamp = utc_iso(received) if received else frame.get("received_at")
+    extra = frame.get("extra") if isinstance(frame.get("extra"), dict) else {}
     steps = raw.get("steps")
     sys_val = raw.get("blood_pressure_sys")
     dia_val = raw.get("blood_pressure_dia")
@@ -120,9 +147,21 @@ def summarize_frame(frame: Mapping[str, Any], now: Optional[datetime] = None) ->
         "steps": steps,
         "blood_pressure_sys": sys_val,
         "blood_pressure_dia": dia_val,
-        "device_model": _device_model(raw.get("device_model")),
+        "device_model": _device_model(raw.get("device_model") or frame.get("device_model")),
         "last_steps_at": stamp if valid_steps(steps) is not None else None,
         "last_bp_at": stamp if valid_sys is not None and valid_dia is not None else None,
+        "ingest_source": _optional_text(
+            frame.get("ingest_source") or extra.get("ingest_source") or raw.get("ingest_source"),
+            32,
+        ),
+        "device_label": _optional_text(
+            frame.get("device_label") or extra.get("device_label"),
+            80,
+        ),
+        "app_version": _optional_text(
+            frame.get("app_version") or extra.get("app_version"),
+            64,
+        ),
         "latest": dict(frame),
     }
 
@@ -173,6 +212,10 @@ def carry_last_activity(
         prev_model = _device_model(prev.get("device_model"))
         if prev_model is not None:
             row["device_model"] = prev_model
+
+    _keep_text(row, prev, "ingest_source", max_len=32)
+    _keep_text(row, prev, "device_label", max_len=80)
+    _keep_text(row, prev, "app_version", max_len=64)
 
     return row
 

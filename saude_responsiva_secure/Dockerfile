@@ -30,7 +30,7 @@ COPY --chown=appuser:appuser migrations/ /app/migrations/
 COPY --chown=appuser:appuser requirements.txt /app/
 # Subset gerado por scripts/sync_secure_vendor.py (não o monorepo inteiro):
 #   clinical_intelligence — matriz de alertas no ingest
-#   ops — timestamps, patients_routes, operational_patients, live_devices, device_registry
+#   ops — timestamps, patients_routes, operational_patients, live_devices, device_registry, device_detail
 # Fonte local: _vendor_src/ (evita sombrear monorepo `src/` no PYTHONPATH do host)
 COPY --chown=appuser:appuser _vendor_src/ /app/src/
 
@@ -41,7 +41,7 @@ RUN mkdir -p /app/data/ops && chown -R appuser:appuser /app/data
 USER appuser
 
 # Falha o build se o vendor não incluir o src.ops usado em ingest + /patients.
-RUN python -c "from src.ops.timestamps import stamp_ingest; from src.ops.patients_routes import router; assert stamp_ingest and router.routes"
+RUN python -c "from src.ops.timestamps import stamp_ingest; from src.ops.patients_routes import router; from src.ops.device_detail_routes import router as detail; assert stamp_ingest and router.routes and detail.routes"
 
 EXPOSE 8080
 

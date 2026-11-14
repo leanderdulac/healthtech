@@ -100,7 +100,7 @@ def _create_secure_app() -> FastAPI:
         allow_origins=origins or ["http://localhost:8080"],
         allow_credentials=bool(origins) and origins != ["*"],
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["*", "X-API-Key", "X-Request-ID", "Idempotency-Key"],
+        allow_headers=["*", "X-API-Key", "X-Request-ID", "Idempotency-Key", "X-App-Version"],
     )
 
     @application.exception_handler(StarletteHTTPException)
@@ -168,10 +168,12 @@ def _create_secure_app() -> FastAPI:
     application.include_router(lgpd.router)
     try:
         from src.ops.patients_routes import router as patients_router
+        from src.ops.device_detail_routes import router as device_detail_router
 
         application.include_router(patients_router)
+        application.include_router(device_detail_router)
     except ImportError:
-        logger.warning("Rotas /api/v1/patients não carregadas (src.ops indisponível).")
+        logger.warning("Rotas /api/v1/patients e /ops/devices não carregadas (src.ops indisponível).")
 
     return application
 

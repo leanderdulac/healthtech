@@ -99,6 +99,7 @@ def _ingest_one(
     *,
     patient_id: str,
     idempotency_key: Optional[str],
+    app_version: Optional[str] = None,
 ) -> Tuple[Optional[Dict[str, Any]], str, Optional[str]]:
     """Processa uma leitura. Retorna (frame, status, error)."""
     client_ts = payload.timestamp
@@ -128,6 +129,12 @@ def _ingest_one(
         if payload.ingest_source:
             frame["ingest_source"] = payload.ingest_source
         extra = _extra_payload(payload)
+        try:
+            from src.ops.device_detail import attach_app_version
+
+            extra = attach_app_version(frame, extra, app_version)
+        except Exception:
+            pass
         if extra:
             frame["extra"] = extra
         stored, status = telemetry_store.upsert_reading(
@@ -154,6 +161,7 @@ def ingest_wearable_reading(
     settings: Settings = Depends(get_settings),
     _api_key: str = Depends(require_scope("wearables:write")),
     idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    x_app_version: Optional[str] = Header(default=None, alias="X-App-Version"),
 ):
     """
     Recebe telemetria de wearable (PPG / HR / SpO2).
@@ -180,6 +188,7 @@ def ingest_wearable_reading(
             payload,
             patient_id=payload.patient_id,
             idempotency_key=header_key,
+            app_version=x_app_version,
         )
     except DurableStoreUnavailable as exc:
         _raise_store_unavailable(exc)
@@ -200,6 +209,7 @@ def batch_ingest_wearables(
     request: Request,
     _api_key: str = Depends(require_scope("wearables:write")),
     idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
+    x_app_version: Optional[str] = Header(default=None, alias="X-App-Version"),
 ):
     """Ingestão em lote (sincronização periódica). Requer wearables:write.
 
@@ -230,6 +240,7 @@ def batch_ingest_wearables(
                 reading,
                 patient_id=batch.patient_id,
                 idempotency_key=None,
+                app_version=x_app_version,
             )
         except DurableStoreUnavailable as exc:
             _raise_store_unavailable(exc)

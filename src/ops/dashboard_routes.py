@@ -42,7 +42,8 @@ def dashboard_bootstrap() -> Dict[str, Any]:
         "page_size": 50,
         "max_devices": 500,
         "fleet_summary_path": "/api/v1/ops/fleet-summary",
-        "auth_required_for": ["websocket", "ingest", "patient_history"],
+        "device_details_path": "/api/v1/ops/devices/{device_id}",
+        "auth_required_for": ["websocket", "ingest", "patient_history", "device_details"],
     }
 
 
@@ -60,7 +61,8 @@ def fleet_summary(
     """Resumo somente-leitura da frota para o dashboard público.
 
     Expõe no máximo os campos compactos já mostrados na tabela (sem `latest`,
-    sem histórico, sem chave). Devices sintéticos ficam de fora por padrão.
+    sem histórico, sem chave, sem município/UBS). Devices sintéticos ficam
+    de fora por padrão.
     """
     from src.ops.dashboard_fleet import present_fleet
 

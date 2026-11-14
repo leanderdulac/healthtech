@@ -16,7 +16,7 @@ from typing import Dict, Any, Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -80,7 +80,7 @@ app.add_middleware(
     allow_origins=_cors_origins or ["https://healthtech-responsive-5794833455.us-central1.run.app"],
     allow_credentials=cors_allow_credentials(),
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["*", "X-API-Key", "X-Request-ID"],
+    allow_headers=["*", "X-API-Key", "X-Request-ID", "Idempotency-Key", "X-App-Version"],
 )
 
 
@@ -180,10 +180,12 @@ class SearchQuery(BaseModel):
 
 
 from src.ops.dashboard_routes import router as dashboard_ops_router
+from src.ops.device_detail_routes import router as device_detail_router
 from src.ops.patients_routes import router as patients_router
 
 app.include_router(patients_router)
 app.include_router(dashboard_ops_router)
+app.include_router(device_detail_router)
 
 
 @app.get("/api/health")
@@ -368,6 +370,7 @@ def get_patient_engine(patient_id: str, use_ukf: bool = False) -> PhantomDataEng
 def ingest_wearable_reading(
     req: WearableTelemetryRequest,
     _api_key: str = Depends(require_scope("wearables:write")),
+    x_app_version: Optional[str] = Header(default=None, alias="X-App-Version"),
 ):
     """
     Endpoint principal para recepção de telemetria enviada por wearables no pulso dos pacientes
@@ -561,6 +564,14 @@ def ingest_wearable_reading(
         ],
         "clinical_codes": report['clinical_codes']
     }
+    try:
+        from src.ops.device_detail import attach_app_version
+
+        extra = attach_app_version(processed_frame, processed_frame.get("extra"), x_app_version)
+        if extra:
+            processed_frame["extra"] = extra
+    except Exception:
+        pass
 
     if req.patient_id not in patient_history:
         patient_history[req.patient_id] = []
@@ -607,6 +618,7 @@ def ingest_wearable_reading(
 def batch_ingest_wearables(
     batch: WearableBatchIngestRequest,
     _api_key: str = Depends(require_scope("wearables:write")),
+    x_app_version: Optional[str] = Header(default=None, alias="X-App-Version"),
 ):
     """
     Ingestão em lote para sincronização periódica de leituras acumuladas por wearables no pulso. Requer escopo 'wearables:write'.
@@ -614,7 +626,7 @@ def batch_ingest_wearables(
     results = []
     for reading in batch.readings:
         reading.patient_id = batch.patient_id
-        res = ingest_wearable_reading(reading, _api_key=_api_key)
+        res = ingest_wearable_reading(reading, _api_key=_api_key, x_app_version=x_app_version)
         results.append(res)
     return {
         "status": "success",

@@ -123,6 +123,8 @@ def test_dashboard_bootstrap_omits_key_even_if_env_set(monkeypatch):
         if value:
             assert value not in res.text
     assert body["fleet_summary_path"] == "/api/v1/ops/fleet-summary"
+    assert body["device_details_path"] == "/api/v1/ops/devices/{device_id}"
+    assert "device_details" in body["auth_required_for"]
 
 
 def test_fleet_summary_is_public_and_hides_synthetics():
@@ -375,9 +377,12 @@ def test_painel_principal_moves_sidebar_into_settings_drawer():
     assert "grid-template-columns: 320px 1fr" not in css
     assert ".settings-panel" in css
     assert "bindSettingsPanel" in app_js
-    assert "settings_panel.js?v=20261114t" in html
-    assert "style.css?v=20261114t" in html
-    assert "app.js?v=20261114t" in html
+    assert "settings_panel.js?v=20261114u" in html
+    assert "style.css?v=20261114u" in html
+    assert "app.js?v=20261114u" in html
+    assert "device_details.js?v=20261114u" in html
+    assert 'id="device-details-panel"' in html
+    assert "Detalhes do relógio" in html
 
 
 def test_fleet_logic_js_focus_does_not_fake_online():

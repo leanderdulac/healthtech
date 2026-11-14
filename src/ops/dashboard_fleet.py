@@ -39,6 +39,9 @@ def _normalize(row: Dict[str, Any], now: datetime) -> Optional[Dict[str, Any]]:
         "device_model": row.get("device_model"),
         "last_steps_at": row.get("last_steps_at"),
         "last_bp_at": row.get("last_bp_at"),
+        "ingest_source": row.get("ingest_source"),
+        "device_label": row.get("device_label"),
+        "app_version": row.get("app_version"),
     }
     if is_synthetic_device(row) or is_synthetic_device(item):
         item["synthetic"] = True

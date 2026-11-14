@@ -28,7 +28,7 @@ HBand ou simulador BLE
 | Companion | `companion-android/app` + `companion-android/client` |
 | Dashboard conexões | `dashboard/index.html` + `dashboard/app.js` |
 | Testes | `pytest -m critical` e, para o store durável, `WEARABLE_TEST_DB=postgres` + `WEARABLE_TEST_DB=sqlite` (psycopg2; não só SQLite) |
-| Vendor da imagem secure | `python scripts/sync_secure_vendor.py` (`clinical_intelligence` + `ops`: timestamps, patients_routes, operational_patients, live_devices, device_registry) |
+| Vendor da imagem secure | `python scripts/sync_secure_vendor.py` (`clinical_intelligence` + `ops`: timestamps, patients_routes, operational_patients, live_devices, device_registry, device_detail) |
 
 ## Laboratório (não bloqueia o produto)
 

@@ -26,6 +26,8 @@ tags:
     description: Endpoints usados pelo app HBand
   - name: envelopes
     description: Formatos de mensagem do companion (documentação de schema)
+  - name: ops-dashboard
+    description: Painel ops (frota pública compacta + detalhe autenticado)
 
 paths:
   /api/v1/wearables/ingest:
@@ -50,6 +52,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XAppVersion'
       requestBody:
         required: true
         content:
@@ -118,6 +121,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/XAppVersion'
       requestBody:
         required: true
         content:
@@ -239,6 +243,42 @@ paths:
         "200":
           description: Lista de frames
 
+  /api/v1/ops/devices/{device_id}:
+    get:
+      tags: [ops-dashboard]
+      summary: Detalhe autenticado de um relógio da frota
+      description: |
+        Mesma authz de `GET /api/v1/wearables/devices` e `GET /api/v1/patients/{id}`
+        (`wearables:read` + autorização por paciente).
+
+        `region` traz só `municipality_id` e `ubs_id` do cadastro
+        (`source: cadastro`). Não é GPS nem localização aproximada.
+        Sem catálogo de nomes: o painel mostra o ID ou «não informado».
+        `GET /api/v1/ops/fleet-summary` continua público e **não** inclui região.
+        `app_version` só aparece se o ingest persistiu o header `X-App-Version`.
+      operationId: opsDeviceDetail
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Detalhe do relógio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpsDeviceDetail'
+        "401":
+          description: API key ausente ou inválida
+        "403":
+          description: Escopo insuficiente ou paciente fora da autorização
+        "404":
+          description: Relógio não encontrado
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -261,6 +301,16 @@ components:
         Identificador estável da operação HTTP. No ingest unitário também
         serve de chave da leitura quando `client_reading_id` está ausente.
         No batch, cacheia o envelope do lote. Não gere um UUID novo a cada retry.
+    XAppVersion:
+      name: X-App-Version
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 64
+      description: |
+        Versão do app companion já enviada no ingest. Persistida em
+        `extra`/`frame` quando presente. Não exige payload novo no app.
 
   schemas:
     HBandDeviceInfo:
@@ -674,3 +724,73 @@ components:
         SleepData.sleepLine:
           type: string
           example: MetricType.SLEEP_STAGE
+
+    OpsDeviceDetail:
+      type: object
+      description: |
+        Detalhe autenticado. `region.source` é sempre `cadastro`.
+        Sem GPS, sem nome de município/UBS.
+      required: [ok, device_id, region]
+      properties:
+        ok:
+          type: boolean
+        device_id:
+          type: string
+        device_label:
+          type: string
+          nullable: true
+        device_model:
+          type: string
+          nullable: true
+        patient_id:
+          type: string
+          nullable: true
+        ingest_source:
+          type: string
+          nullable: true
+        last_seen:
+          type: string
+          nullable: true
+        last_seen_local:
+          type: string
+          nullable: true
+        received_at:
+          type: string
+          nullable: true
+        online:
+          type: boolean
+        app_version:
+          type: string
+          nullable: true
+          description: Só se o ingest persistiu X-App-Version
+        vitals:
+          type: object
+          properties:
+            heart_rate:
+              type: number
+              nullable: true
+            spo2:
+              type: number
+              nullable: true
+            steps:
+              type: number
+              nullable: true
+            blood_pressure_sys:
+              type: number
+              nullable: true
+            blood_pressure_dia:
+              type: number
+              nullable: true
+        region:
+          type: object
+          required: [source]
+          properties:
+            municipality_id:
+              type: string
+              nullable: true
+            ubs_id:
+              type: string
+              nullable: true
+            source:
+              type: string
+              enum: [cadastro]
