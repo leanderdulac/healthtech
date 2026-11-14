@@ -22,8 +22,6 @@ from app.services.ingest_idempotency import DedupIdentity
 
 logger = logging.getLogger(__name__)
 
-# Igual a src/ops/timestamps.py: 30 min de medição + 15 min de reconexão + folga.
-ONLINE_WITHIN_SECONDS = 50 * 60.0
 _SYNTHETIC_TOKENS = ("smoke", "probe", "timecheck")
 _MAX_REQUEST_CACHE = 2048
 
@@ -327,27 +325,19 @@ def _list_devices_from_frames(
     patient_id: Optional[str],
     include_synthetic: bool = False,
 ) -> Dict[str, Any]:
+    from src.ops.timestamps import is_online as stamp_is_online
+
     now = datetime.now(timezone.utc)
     rows: List[Dict[str, Any]] = []
     for frame in frames:
         ts = frame.get("timestamp")
-        is_online = False
-        if isinstance(ts, str) and ts:
-            try:
-                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                age = (now - dt).total_seconds()
-                is_online = 0 <= age <= ONLINE_WITHIN_SECONDS
-            except ValueError:
-                is_online = False
         cleaned = frame.get("cleaned_telemetry") or {}
         raw = frame.get("raw_telemetry") or {}
         row = {
             "device_id": frame.get("device_id") or "unknown",
             "patient_id": frame.get("patient_id"),
             "last_seen": ts,
-            "online": is_online,
+            "online": stamp_is_online(ts, now=now),
             "heart_rate": cleaned.get("heart_rate_clean", raw.get("heart_rate_bpm")),
             "spo2": raw.get("spo2_percent"),
         }

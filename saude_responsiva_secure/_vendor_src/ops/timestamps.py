@@ -7,9 +7,11 @@ from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
 DISPLAY_TZ = ZoneInfo("America/Sao_Paulo")
-# Uma rodada a cada 30 min, mais a reconexão lenta de 15 min e uma folga curta.
-# Duas horas sem pacote continuam offline.
-ONLINE_WITHIN_SECONDS = 50 * 60.0
+# Janela única de Online da frota (servidor + painel).
+# Companions iOS só enviam no background a cada 15+ min, e o SO atrasa ainda mais.
+# Leitura com até 2 h = Online; depois disso, Offline.
+ONLINE_WITHIN_SECONDS = 2 * 60 * 60.0
+ONLINE_WITHIN_MS = int(ONLINE_WITHIN_SECONDS * 1000)
 
 
 def now_utc() -> datetime:

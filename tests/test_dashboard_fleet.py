@@ -11,8 +11,9 @@ from fastapi.testclient import TestClient
 
 from src.api_server import app
 from src.ops.device_registry import clear_all, is_synthetic_device, list_devices, upsert_frame
+from src.ops.dashboard_routes import FLEET_POLL_MS
 from src.ops.fleet_online import resolve_fleet_online
-from src.ops.timestamps import ONLINE_WITHIN_SECONDS
+from src.ops.timestamps import ONLINE_WITHIN_MS, ONLINE_WITHIN_SECONDS
 
 client = TestClient(app)
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,13 +35,16 @@ def teardown_function() -> None:
     clear_all()
 
 
-def test_online_window_covers_the_half_hour_cycle_and_not_a_two_hour_gap():
-    assert ONLINE_WITHIN_SECONDS == 50 * 60
+def test_online_window_is_two_hours_to_cover_ios_background_delay():
+    assert ONLINE_WITHIN_SECONDS == 2 * 60 * 60
+    assert ONLINE_WITHIN_MS == int(ONLINE_WITHIN_SECONDS * 1000)
     now = datetime.now(timezone.utc)
-    within_cycle = {"received_at": (now - timedelta(minutes=30)).isoformat()}
-    assert resolve_fleet_online(None, within_cycle, True, now=now) is True
-    two_hours = {"received_at": (now - timedelta(hours=2)).isoformat(), "online": True}
-    assert resolve_fleet_online(None, two_hours, True, now=now) is False
+    fifty_min = {"received_at": (now - timedelta(minutes=50)).isoformat()}
+    assert resolve_fleet_online(None, fifty_min, True, now=now) is True
+    two_hours = {"received_at": (now - timedelta(hours=2)).isoformat()}
+    assert resolve_fleet_online(None, two_hours, True, now=now) is True
+    over = {"received_at": (now - timedelta(hours=2, seconds=1)).isoformat(), "online": True}
+    assert resolve_fleet_online(None, over, True, now=now) is False
 
 
 def test_resolve_fleet_online_focus_does_not_fake_status():
@@ -123,6 +127,8 @@ def test_dashboard_bootstrap_omits_key_even_if_env_set(monkeypatch):
         if value:
             assert value not in res.text
     assert body["fleet_summary_path"] == "/api/v1/ops/fleet-summary"
+    assert body["fleet_poll_ms"] == FLEET_POLL_MS == 30_000
+    assert body["online_within_ms"] == ONLINE_WITHIN_MS
 
 
 def test_fleet_summary_is_public_and_hides_synthetics():
@@ -341,3 +347,26 @@ def test_fleet_logic_js_focus_does_not_fake_online():
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_js_online_window_matches_python():
+    import operator
+    import re
+    from functools import reduce
+
+    js = (ROOT / "dashboard" / "fleet_logic.js").read_text(encoding="utf-8")
+    match = re.search(r"const ONLINE_WITHIN_MS = ([^;]+);", js)
+    assert match, "fleet_logic.js must define ONLINE_WITHIN_MS"
+    parts = [int(part.strip()) for part in match.group(1).split("*")]
+    js_ms = reduce(operator.mul, parts, 1)
+    assert js_ms == ONLINE_WITHIN_MS == 2 * 60 * 60 * 1000
+
+
+def test_fleet_list_polls_every_thirty_seconds_and_keeps_manual_refresh():
+    app_js = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+    html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+    assert "setInterval(pollDevices, 2000)" not in app_js
+    assert "setInterval(pollDevices, fleetPollMs)" in app_js
+    assert "let fleetPollMs = 30000" in app_js
+    assert 'id="btn-refresh-fleet"' in html
+    assert FLEET_POLL_MS == 30_000

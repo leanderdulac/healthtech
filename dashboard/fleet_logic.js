@@ -9,8 +9,10 @@
     }
     root.HealthtechFleetLogic = api;
 }(typeof globalThis !== "undefined" ? globalThis : this, function () {
-    // 30 min de medição + 15 min de reconexão lenta + folga. 2 h sem pacote fica offline.
-    const ONLINE_WITHIN_MS = 50 * 60 * 1000;
+    // Deve coincidir com src/ops/timestamps.py ONLINE_WITHIN_SECONDS.
+    // Companions iOS enviam no background a cada 15+ min e o SO atrasa ainda mais;
+    // 2 h evita falso Offline em quem está usando o relógio.
+    const ONLINE_WITHIN_MS = 2 * 60 * 60 * 1000;
     const SYNTHETIC_TOKENS = ["smoke", "probe", "timecheck"];
 
     function parseStamp(value) {
