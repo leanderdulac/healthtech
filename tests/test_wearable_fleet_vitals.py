@@ -134,9 +134,34 @@ def test_later_hr_only_frame_keeps_last_valid_steps_and_bp():
     assert str(row["last_bp_at"]).startswith("2026-09-30T16:40:32")
 
 
+def test_later_hr_only_frame_keeps_last_valid_spo2():
+    rows = compact_devices_from_frames(
+        [
+            _frame(
+                timestamp="2026-09-30T16:40:32+00:00",
+                spo2=97,
+                heart_rate=86,
+            ),
+            _frame(
+                timestamp="2026-09-30T16:45:00+00:00",
+                heart_rate=90,
+                spo2=None,
+                steps=None,
+                sys=None,
+                dia=None,
+            ),
+        ]
+    )
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["heart_rate"] == 90
+    assert row["spo2"] == 97
+    assert str(row["last_spo2_at"]).startswith("2026-09-30T16:40:32")
+
+
 def test_carry_does_not_invent_steps_or_bp():
     incoming = summarize_frame(
-        _frame(timestamp="2026-09-30T16:45:00+00:00", heart_rate=72),
+        _frame(timestamp="2026-09-30T16:45:00+00:00", heart_rate=72, spo2=None),
         now=datetime(2026, 9, 30, 16, 46, tzinfo=timezone.utc),
     )
     row = carry_last_activity(None, incoming)
@@ -145,6 +170,8 @@ def test_carry_does_not_invent_steps_or_bp():
     assert row["blood_pressure_dia"] is None
     assert row["last_steps_at"] is None
     assert row["last_bp_at"] is None
+    assert row["spo2"] is None
+    assert row["last_spo2_at"] is None
 
 
 def test_zero_or_partial_bp_is_not_treated_as_valid():
@@ -174,6 +201,7 @@ def test_device_registry_keeps_last_valid_across_upserts():
         _frame(
             timestamp="2026-09-30T16:45:00+00:00",
             heart_rate=111,
+            spo2=None,
             steps=None,
             sys=None,
             dia=None,
@@ -182,6 +210,7 @@ def test_device_registry_keeps_last_valid_across_upserts():
     )
     row = list_devices(q="40:35:E6:40:C5:D8")["devices"][0]
     assert row["heart_rate"] == 111
+    assert row["spo2"] == 97
     assert row["steps"] == 1678
     assert row["blood_pressure_sys"] == 118
     assert row["blood_pressure_dia"] == 76
@@ -264,5 +293,6 @@ def test_dashboard_js_uses_pt_br_formatters():
     assert "fleetLogic.formatSteps" in app_js
     assert "fleetLogic.formatBloodPressure" in app_js
     assert "fleetLogic.carryLastActivity" in app_js
+    assert "devicePollInFlight" in app_js
     assert ">Passos</th>" in html
     assert ">Pressão</th>" in html

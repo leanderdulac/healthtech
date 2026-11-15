@@ -140,6 +140,7 @@ def upsert_reading(
     idempotency_key: Optional[str] = None,
     measured_at: Optional[str] = None,
     metric_type: Optional[str] = None,
+    device_label: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], str]:
     """Persiste a leitura se nenhuma das chaves ainda existir.
 
@@ -159,6 +160,7 @@ def upsert_reading(
             idempotency_key=idempotency_key,
             measured_at=measured_at,
             metric_type=metric_type,
+            device_label=device_label,
         )
         if status == "accepted":
             _register_device(stored)
@@ -172,6 +174,8 @@ def upsert_reading(
                 return dict(existing), "duplicate"
         stored = dict(frame)
         stored.setdefault("reading_id", uuid4().hex)
+        if device_label and not stored.get("device_label"):
+            stored["device_label"] = device_label
         if patient_id not in _patient_history:
             _patient_history[patient_id] = []
         _patient_history[patient_id].append(stored)
@@ -269,8 +273,8 @@ def list_devices(
     if _use_durable():
         from app.services import durable_readings
 
-        frames = durable_readings.list_frames()
-        return _list_devices_from_frames(
+        frames = durable_readings.latest_frames_by_device()
+        payload = _list_devices_from_frames(
             frames,
             q=q,
             online=online,
@@ -280,6 +284,15 @@ def list_devices(
             patient_id=patient_id,
             include_synthetic=include_synthetic,
         )
+        last = durable_readings.list_device_last_vitals()
+        if last:
+            from src.ops.live_devices import carry_last_activity
+
+            payload["devices"] = [
+                carry_last_activity(last.get(str(row.get("device_id") or "")), row)
+                for row in payload.get("devices") or []
+            ]
+        return payload
     try:
         from src.ops.device_registry import list_devices as fleet_list
 
@@ -294,9 +307,23 @@ def list_devices(
         )
     except Exception:
         pass
-    frames: List[Dict[str, Any]] = []
+    latest_by_device: Dict[str, Dict[str, Any]] = {}
+    label_by_device: Dict[str, Tuple[str, str]] = {}
     for hist in _patient_history.values():
-        frames.extend(hist)
+        for frame in hist:
+            device_id = str(frame.get("device_id") or "unknown")
+            ts = str(frame.get("timestamp") or "")
+            prev = latest_by_device.get(device_id)
+            if prev is None or ts >= str(prev.get("timestamp") or ""):
+                latest_by_device[device_id] = frame
+            label = frame.get("device_label")
+            if label and ts >= label_by_device.get(device_id, ("", ""))[0]:
+                label_by_device[device_id] = (ts, str(label))
+    for device_id, (_ts, label) in label_by_device.items():
+        frame = latest_by_device.get(device_id)
+        if frame is not None and not frame.get("device_label"):
+            latest_by_device[device_id] = {**frame, "device_label": label}
+    frames = list(latest_by_device.values())
     return _list_devices_from_frames(
         frames,
         q=q,
@@ -344,6 +371,7 @@ def _list_devices_from_frames(
             for row in rows
             if needle in str(row.get("device_id") or "").lower()
             or needle in str(row.get("patient_id") or "").lower()
+            or needle in str(row.get("device_label") or "").lower()
         ]
     total = len(rows)
     online_count = sum(1 for row in rows if row.get("online"))

@@ -25,6 +25,7 @@ _PUBLIC_DEVICE_FIELDS = (
     "device_model",
     "last_steps_at",
     "last_bp_at",
+    "last_spo2_at",
     "synthetic",
 )
 

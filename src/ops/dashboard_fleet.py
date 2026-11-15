@@ -39,6 +39,7 @@ def _normalize(row: Dict[str, Any], now: datetime) -> Optional[Dict[str, Any]]:
         "device_model": row.get("device_model"),
         "last_steps_at": row.get("last_steps_at"),
         "last_bp_at": row.get("last_bp_at"),
+        "last_spo2_at": row.get("last_spo2_at"),
         "ingest_source": row.get("ingest_source"),
         "device_label": row.get("device_label"),
         "app_version": row.get("app_version"),

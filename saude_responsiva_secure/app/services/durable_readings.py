@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -27,6 +28,12 @@ from app.services.ingest_idempotency import DedupIdentity, NaturalKey, metric_si
 logger = logging.getLogger(__name__)
 
 MIGRATION_NAME = "001_wearable_readings.sql"
+# Aplicadas em ordem por apply_schema(). Só mudanças aditivas e idempotentes.
+MIGRATION_NAMES = (
+    "001_wearable_readings.sql",
+    "002_wearable_device_label.sql",
+    "003_wearable_device_last_vitals.sql",
+)
 
 
 class DurableStoreUnavailable(RuntimeError):
@@ -89,19 +96,19 @@ def _dialect_name(engine: Engine) -> str:
     return (engine.dialect.name or "").lower()
 
 
-def migration_sql_path() -> Path:
+def migration_sql_path(name: str = MIGRATION_NAME) -> Path:
     here = Path(__file__).resolve()
     candidates = [
-        here.parents[2] / "migrations" / MIGRATION_NAME,
-        here.parents[1] / "migrations" / MIGRATION_NAME,
-        Path.cwd() / "migrations" / MIGRATION_NAME,
-        Path.cwd() / "saude_responsiva_secure" / "migrations" / MIGRATION_NAME,
+        here.parents[2] / "migrations" / name,
+        here.parents[1] / "migrations" / name,
+        Path.cwd() / "migrations" / name,
+        Path.cwd() / "saude_responsiva_secure" / "migrations" / name,
     ]
     for path in candidates:
         if path.is_file():
             return path
     raise FileNotFoundError(
-        f"{MIGRATION_NAME} não encontrado. Procurado em: "
+        f"{name} não encontrado. Procurado em: "
         + ", ".join(str(p) for p in candidates)
     )
 
@@ -113,6 +120,7 @@ def _sqlite_ddl() -> List[str]:
             reading_id TEXT PRIMARY KEY,
             patient_id TEXT NOT NULL,
             device_id TEXT NOT NULL,
+            device_label TEXT,
             metric_type TEXT NOT NULL,
             value DOUBLE PRECISION,
             unit TEXT,
@@ -160,11 +168,34 @@ def _sqlite_ddl() -> List[str]:
         CREATE INDEX IF NOT EXISTS ix_wearable_readings_device_time
             ON wearable_readings (device_id, received_at DESC)
         """,
+        """
+        CREATE TABLE IF NOT EXISTS wearable_device_last_vitals (
+            device_id TEXT PRIMARY KEY,
+            spo2 DOUBLE PRECISION,
+            last_spo2_at DATETIME,
+            steps DOUBLE PRECISION,
+            last_steps_at DATETIME,
+            blood_pressure_sys DOUBLE PRECISION,
+            blood_pressure_dia DOUBLE PRECISION,
+            last_bp_at DATETIME,
+            updated_at DATETIME NOT NULL
+        )
+        """,
     ]
 
 
+def _sqlite_add_missing_columns(conn) -> None:
+    """SQLite não tem ADD COLUMN IF NOT EXISTS: checa antes (bancos locais antigos)."""
+    cols = {row[1] for row in conn.execute(text("PRAGMA table_info(wearable_readings)"))}
+    if "device_label" not in cols:
+        conn.execute(text("ALTER TABLE wearable_readings ADD COLUMN device_label TEXT"))
+
+
 def apply_schema(engine: Optional[Engine] = None) -> str:
-    """Aplica ``001_wearable_readings`` (CREATE IF NOT EXISTS). Retorna o dialeto."""
+    """Aplica as migrações (001 tabela, 002 device_label, 003 last vitals).
+
+    Tudo idempotente e aditivo. Retorna o dialeto.
+    """
     engine = engine or _require_engine()
     dialect = _dialect_name(engine)
     try:
@@ -172,10 +203,12 @@ def apply_schema(engine: Optional[Engine] = None) -> str:
             if dialect == "sqlite":
                 for stmt in _sqlite_ddl():
                     conn.execute(text(stmt))
+                _sqlite_add_missing_columns(conn)
             else:
-                sql = migration_sql_path().read_text(encoding="utf-8")
-                for chunk in _split_sql(sql):
-                    conn.execute(text(chunk))
+                for name in MIGRATION_NAMES:
+                    sql = migration_sql_path(name).read_text(encoding="utf-8")
+                    for chunk in _split_sql(sql):
+                        conn.execute(text(chunk))
     except DurableStoreUnavailable:
         raise
     except SQLAlchemyError as exc:
@@ -276,7 +309,29 @@ def _row_frame(row: Any) -> Dict[str, Any]:
     extra = _load_json(mapping.get("extra"))
     if extra and "extra" not in out:
         out["extra"] = extra
+    label = _row_device_label(mapping, frame, extra)
+    if label:
+        out["device_label"] = label
     return out
+
+
+def _row_device_label(
+    mapping: Dict[str, Any], frame: Dict[str, Any], extra: Any
+) -> Optional[str]:
+    """Coluna ``device_label``; para linhas antigas, o que ficou no JSON."""
+    from app.models.schemas import normalize_device_label
+
+    candidates = [mapping.get("device_label"), frame.get("device_label")]
+    if isinstance(extra, dict):
+        candidates.append(extra.get("device_label"))
+    for value in candidates:
+        try:
+            label = normalize_device_label(value) if isinstance(value, str) else None
+        except ValueError:
+            label = None
+        if label:
+            return label
+    return None
 
 
 def _value_and_unit(frame: Dict[str, Any], extra: Dict[str, Any], metric_type: str) -> Tuple[Optional[float], Optional[str]]:
@@ -348,7 +403,7 @@ def _select_by_keys(
     if not where:
         return None
     sql = (
-        "SELECT reading_id, patient_id, device_id, metric_type, "
+        "SELECT reading_id, patient_id, device_id, device_label, metric_type, "
         "client_reading_id, extra, frame FROM wearable_readings WHERE "
         + " OR ".join(where)
         + " LIMIT 1"
@@ -416,10 +471,16 @@ def upsert_reading(
     idempotency_key: Optional[str] = None,
     measured_at: Optional[str] = None,
     metric_type: Optional[str] = None,
+    device_label: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], str]:
     """INSERT ... ON CONFLICT DO NOTHING; duplicate devolve o registro original."""
+    from app.models.schemas import normalize_device_label
+
     extra = dict(extra or {})
     stored = dict(frame)
+    label = normalize_device_label(device_label or stored.get("device_label"))
+    if label:
+        stored["device_label"] = label
     stored.setdefault("reading_id", uuid4().hex)
     stored["patient_id"] = patient_id
     _ = dedup_keys  # legado: não parsear strings com ':'
@@ -448,6 +509,7 @@ def upsert_reading(
         "reading_id": stored["reading_id"],
         "patient_id": patient_id,
         "device_id": device_id,
+        "device_label": label,
         "metric_type": metric,
         "value": value,
         "unit": unit,
@@ -471,12 +533,14 @@ def upsert_reading(
         frame_sql = "CAST(:frame AS jsonb)" if dialect == "postgresql" else ":frame"
         insert_sql = f"""
             INSERT INTO wearable_readings (
-                reading_id, patient_id, device_id, metric_type, value, unit,
+                reading_id, patient_id, device_id, device_label, metric_type,
+                value, unit,
                 measured_at, received_at, client_reading_id, idempotency_key,
                 natural_patient_id, natural_device_id, natural_measured_at,
                 natural_metric_type, extra, frame, created_at
             ) VALUES (
-                :reading_id, :patient_id, :device_id, :metric_type, :value, :unit,
+                :reading_id, :patient_id, :device_id, :device_label, :metric_type,
+                :value, :unit,
                 :measured_at, :received_at, :client_reading_id, :idempotency_key,
                 :natural_patient_id, :natural_device_id, :natural_measured_at,
                 :natural_metric_type, {extra_sql}, {frame_sql}, :created_at
@@ -502,6 +566,7 @@ def upsert_reading(
                         "INSERT em conflito sem linha existente (schema incompleto?)"
                     )
                 return existing, "duplicate"
+            _upsert_device_last_vitals(conn, device_id, stored, dialect)
         return stored, "accepted"
     except DurableStoreUnavailable:
         raise
@@ -511,7 +576,7 @@ def upsert_reading(
 
 def get_latest(patient_id: str) -> Optional[Dict[str, Any]]:
     sql = """
-        SELECT reading_id, patient_id, device_id, metric_type, client_reading_id, extra, frame
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
         WHERE patient_id = :patient_id
         ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC, created_at DESC
@@ -530,7 +595,7 @@ def get_latest(patient_id: str) -> Optional[Dict[str, Any]]:
 
 def get_history(patient_id: str, limit: int = 20) -> List[Dict[str, Any]]:
     sql = """
-        SELECT reading_id, patient_id, device_id, metric_type, client_reading_id, extra, frame
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
         WHERE patient_id = :patient_id
         ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC, created_at DESC
@@ -551,10 +616,227 @@ def get_history(patient_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         raise DurableStoreUnavailable(str(exc)) from exc
 
 
-def list_frames() -> List[Dict[str, Any]]:
-    """Todos os frames persistidos, mais novos primeiro (frota compacta agrupa)."""
+
+def _frame_last_vitals(frame: Dict[str, Any]) -> Dict[str, Any]:
+    """Extrai SpO₂/passos/pressão válidos de um frame, sem inventar valor."""
+    from src.ops.live_devices import valid_blood_pressure, valid_spo2, valid_steps
+
+    raw = frame.get("raw_telemetry") if isinstance(frame.get("raw_telemetry"), dict) else {}
+    stamp = frame.get("received_at") or frame.get("timestamp")
+    spo2 = valid_spo2((raw or {}).get("spo2_percent", (raw or {}).get("spo2")))
+    steps = valid_steps((raw or {}).get("steps"))
+    sys_val, dia_val = valid_blood_pressure(
+        (raw or {}).get("blood_pressure_sys"), (raw or {}).get("blood_pressure_dia")
+    )
+    return {
+        "spo2": spo2,
+        "last_spo2_at": stamp if spo2 is not None else None,
+        "steps": steps,
+        "last_steps_at": stamp if steps is not None else None,
+        "blood_pressure_sys": sys_val,
+        "blood_pressure_dia": dia_val,
+        "last_bp_at": stamp if sys_val is not None and dia_val is not None else None,
+    }
+
+
+def _upsert_device_last_vitals(
+    conn, device_id: str, frame: Dict[str, Any], dialect: str
+) -> None:
+    vitals = _frame_last_vitals(frame)
+    if not device_id:
+        return
+    if all(
+        vitals[key] is None
+        for key in ("spo2", "steps", "blood_pressure_sys", "blood_pressure_dia")
+    ):
+        # Mesmo sem vitais novos, garante a linha para merges posteriores.
+        pass
+    now = datetime.now(timezone.utc)
+    params = {"device_id": device_id, "updated_at": now, **vitals}
     sql = """
-        SELECT reading_id, patient_id, device_id, metric_type, client_reading_id, extra, frame
+        INSERT INTO wearable_device_last_vitals (
+            device_id, spo2, last_spo2_at, steps, last_steps_at,
+            blood_pressure_sys, blood_pressure_dia, last_bp_at, updated_at
+        ) VALUES (
+            :device_id, :spo2, :last_spo2_at, :steps, :last_steps_at,
+            :blood_pressure_sys, :blood_pressure_dia, :last_bp_at, :updated_at
+        )
+        ON CONFLICT (device_id) DO UPDATE SET
+            spo2 = COALESCE(EXCLUDED.spo2, wearable_device_last_vitals.spo2),
+            last_spo2_at = CASE
+                WHEN EXCLUDED.spo2 IS NOT NULL THEN EXCLUDED.last_spo2_at
+                ELSE wearable_device_last_vitals.last_spo2_at
+            END,
+            steps = COALESCE(EXCLUDED.steps, wearable_device_last_vitals.steps),
+            last_steps_at = CASE
+                WHEN EXCLUDED.steps IS NOT NULL THEN EXCLUDED.last_steps_at
+                ELSE wearable_device_last_vitals.last_steps_at
+            END,
+            blood_pressure_sys = COALESCE(
+                EXCLUDED.blood_pressure_sys, wearable_device_last_vitals.blood_pressure_sys
+            ),
+            blood_pressure_dia = COALESCE(
+                EXCLUDED.blood_pressure_dia, wearable_device_last_vitals.blood_pressure_dia
+            ),
+            last_bp_at = CASE
+                WHEN EXCLUDED.blood_pressure_sys IS NOT NULL
+                 AND EXCLUDED.blood_pressure_dia IS NOT NULL
+                THEN EXCLUDED.last_bp_at
+                ELSE wearable_device_last_vitals.last_bp_at
+            END,
+            updated_at = EXCLUDED.updated_at
+    """
+    _ = dialect
+    conn.execute(text(sql), params)
+
+
+def list_device_last_vitals() -> Dict[str, Dict[str, Any]]:
+    """Snapshot compacto (uma linha por device) para merge na frota."""
+    sql = """
+        SELECT device_id, spo2, last_spo2_at, steps, last_steps_at,
+               blood_pressure_sys, blood_pressure_dia, last_bp_at
+        FROM wearable_device_last_vitals
+    """
+    try:
+        engine = _require_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql)).fetchall()
+    except DurableStoreUnavailable:
+        raise
+    except SQLAlchemyError as exc:
+        raise DurableStoreUnavailable(str(exc)) from exc
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        mapping = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
+        device_id = str(mapping.get("device_id") or "")
+        if not device_id:
+            continue
+        out[device_id] = {
+            "device_id": device_id,
+            "spo2": mapping.get("spo2"),
+            "last_spo2_at": mapping.get("last_spo2_at"),
+            "steps": mapping.get("steps"),
+            "last_steps_at": mapping.get("last_steps_at"),
+            "blood_pressure_sys": mapping.get("blood_pressure_sys"),
+            "blood_pressure_dia": mapping.get("blood_pressure_dia"),
+            "last_bp_at": mapping.get("last_bp_at"),
+        }
+    return out
+
+
+_backfill_lock = threading.Lock()
+_backfill_done = False
+
+
+
+def _latest_valid_vital_frame(conn, device_id: str, raw_key: str) -> Optional[Dict[str, Any]]:
+    """Último frame do device com um vital no JSON (lookup pontual, não a tabela inteira)."""
+    allowed = {"spo2_percent", "steps", "blood_pressure_sys", "blood_pressure_dia"}
+    if raw_key not in allowed:
+        return None
+    dialect = _dialect_name(_require_engine())
+    if dialect == "sqlite":
+        path = "$.raw_telemetry." + raw_key
+        sql = text(
+            f"""
+            SELECT reading_id, patient_id, device_id, device_label, metric_type,
+                   client_reading_id, extra, frame, received_at, measured_at
+            FROM wearable_readings
+            WHERE device_id = :device_id
+              AND NULLIF(TRIM(json_extract(frame, '{path}')), '') IS NOT NULL
+            ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC
+            LIMIT 1
+            """
+        )
+        row = conn.execute(sql, {"device_id": device_id}).fetchone()
+    else:
+        sql = text(
+            """
+            SELECT reading_id, patient_id, device_id, device_label, metric_type,
+                   client_reading_id, extra, frame, received_at, measured_at
+            FROM wearable_readings
+            WHERE device_id = :device_id
+              AND NULLIF(TRIM(frame->'raw_telemetry'->>:raw_key), '') IS NOT NULL
+            ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC
+            LIMIT 1
+            """
+        )
+        row = conn.execute(sql, {"device_id": device_id, "raw_key": raw_key}).fetchone()
+    return _row_frame(row) if row else None
+
+
+def backfill_device_last_vitals(*, force: bool = False) -> int:
+    """Preenche o snapshot a partir do histórico. Uma vez (ou force=True).
+
+    Usa as leituras já persistidas, em memória no dialeto de teste e via
+    varredura única no Postgres. Não entra no caminho de GET /devices.
+    """
+    global _backfill_done
+    with _backfill_lock:
+        if _backfill_done and not force:
+            return 0
+        try:
+            engine = _require_engine()
+            apply_schema(engine)
+            with engine.connect() as conn:
+                if not force:
+                    existing = conn.execute(
+                        text("SELECT COUNT(*) FROM wearable_device_last_vitals")
+                    ).scalar()
+                    if int(existing or 0) > 0:
+                        _backfill_done = True
+                        return 0
+            latest = latest_frames_by_device()
+        except DurableStoreUnavailable as exc:
+            logger.warning("Backfill de last vitals adiado: %s", exc)
+            return 0
+        except SQLAlchemyError as exc:
+            logger.warning("Backfill de last vitals adiado: %s", exc)
+            return 0
+        count = 0
+        try:
+            dialect = _dialect_name(engine)
+            with engine.begin() as conn:
+                for frame in latest:
+                    device_id = str(frame.get("device_id") or "")
+                    if not device_id:
+                        continue
+                    # Completa vitais ausentes no último frame com um lookup pontual.
+                    filled = dict(frame)
+                    raw = dict(filled.get("raw_telemetry") or {})
+                    vitals = _frame_last_vitals(filled)
+                    if vitals.get("spo2") is None:
+                        prev = _latest_valid_vital_frame(conn, device_id, "spo2_percent")
+                        if prev:
+                            raw["spo2_percent"] = (prev.get("raw_telemetry") or {}).get("spo2_percent")
+                            filled["raw_telemetry"] = raw
+                    if vitals.get("steps") is None:
+                        prev = _latest_valid_vital_frame(conn, device_id, "steps")
+                        if prev:
+                            raw["steps"] = (prev.get("raw_telemetry") or {}).get("steps")
+                            filled["raw_telemetry"] = raw
+                    if vitals.get("blood_pressure_sys") is None:
+                        prev = _latest_valid_vital_frame(conn, device_id, "blood_pressure_sys")
+                        if prev:
+                            prev_raw = prev.get("raw_telemetry") or {}
+                            raw["blood_pressure_sys"] = prev_raw.get("blood_pressure_sys")
+                            raw["blood_pressure_dia"] = prev_raw.get("blood_pressure_dia")
+                            filled["raw_telemetry"] = raw
+                    _upsert_device_last_vitals(conn, device_id, filled, dialect)
+                    count += 1
+        except SQLAlchemyError as exc:
+            logger.warning("Backfill de last vitals falhou: %s", exc)
+            return 0
+        _backfill_done = True
+        if count:
+            logger.info("Backfill de last vitals: %s frames processados", count)
+        return count
+
+
+def list_frames() -> List[Dict[str, Any]]:
+    """Todos os frames persistidos, mais novos primeiro (uso em testes / fallback)."""
+    sql = """
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
         ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC
     """
@@ -569,18 +851,88 @@ def list_frames() -> List[Dict[str, Any]]:
         raise DurableStoreUnavailable(str(exc)) from exc
 
 
+_PG_LATEST_BY_DEVICE = """
+    SELECT DISTINCT ON (device_id)
+        reading_id, patient_id, device_id, device_label, metric_type,
+        client_reading_id, extra, frame
+    FROM wearable_readings
+    ORDER BY device_id, COALESCE(measured_at, received_at) DESC, received_at DESC
+"""
+
+_PG_LATEST_LABEL_BY_DEVICE = """
+    SELECT DISTINCT ON (device_id)
+        device_id, COALESCE(device_label, extra->>'device_label') AS device_label
+    FROM wearable_readings
+    WHERE device_label IS NOT NULL OR extra->>'device_label' IS NOT NULL
+    ORDER BY device_id, COALESCE(measured_at, received_at) DESC, received_at DESC
+"""
+
+
+def _pg_latest_frames_by_device(engine: Engine) -> List[Dict[str, Any]]:
+    """Uma linha por device no próprio Postgres (sem trazer a tabela inteira)."""
+    from app.models.schemas import normalize_device_label
+
+    with engine.connect() as conn:
+        rows = conn.execute(text(_PG_LATEST_BY_DEVICE)).fetchall()
+        label_rows = conn.execute(text(_PG_LATEST_LABEL_BY_DEVICE)).fetchall()
+    frames = [_row_frame(row) for row in rows]
+    labels: Dict[str, str] = {}
+    for row in label_rows:
+        mapping = dict(row._mapping)
+        try:
+            label = normalize_device_label(mapping.get("device_label"))
+        except ValueError:
+            label = None
+        if label:
+            labels[str(mapping.get("device_id"))] = label
+    for frame in frames:
+        label = labels.get(str(frame.get("device_id")))
+        if label:
+            frame["device_label"] = label
+    frames.sort(key=lambda f: str(f.get("timestamp") or ""), reverse=True)
+    return frames
+
+
 def latest_frames_by_device() -> List[Dict[str, Any]]:
-    latest: Dict[str, Dict[str, Any]] = {}
-    for frame in list_frames():
-        device_id = str(frame.get("device_id") or "unknown")
-        if device_id not in latest:
-            latest[device_id] = frame
-    return list(latest.values())
+    """Último frame por device. No Postgres usa DISTINCT ON; nos testes, agrupa em memória."""
+    try:
+        engine = _require_engine()
+        if _dialect_name(engine) == "postgresql":
+            return _pg_latest_frames_by_device(engine)
+    except DurableStoreUnavailable:
+        raise
+    except SQLAlchemyError as exc:
+        raise DurableStoreUnavailable(str(exc)) from exc
+    sql = """
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
+        FROM wearable_readings
+        ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC
+    """
+    try:
+        engine = _require_engine()
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql)).fetchall()
+        latest: Dict[str, Dict[str, Any]] = {}
+        labels: Dict[str, str] = {}
+        for row in rows:
+            frame = _row_frame(row)
+            device_id = str(frame.get("device_id") or "unknown")
+            if device_id not in latest:
+                latest[device_id] = frame
+            if device_id not in labels and frame.get("device_label"):
+                labels[device_id] = str(frame["device_label"])
+        for device_id, label in labels.items():
+            latest[device_id]["device_label"] = label
+        return list(latest.values())
+    except DurableStoreUnavailable:
+        raise
+    except SQLAlchemyError as exc:
+        raise DurableStoreUnavailable(str(exc)) from exc
 
 
 def iter_patients(limit_per_patient: int = 50) -> Dict[str, List[Dict[str, Any]]]:
     sql = """
-        SELECT reading_id, patient_id, device_id, metric_type, client_reading_id, extra, frame
+        SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
         ORDER BY patient_id ASC, COALESCE(measured_at, received_at) ASC, received_at ASC
     """
@@ -646,6 +998,7 @@ def clear_all() -> None:
     engine = _require_engine()
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM wearable_readings"))
+        conn.execute(text("DELETE FROM wearable_device_last_vitals"))
 
 
 def log_backend() -> str:
@@ -662,6 +1015,11 @@ def log_backend() -> str:
         apply_schema()
         ping()
         logger.info("Wearable telemetry store: durable (%s)", label)
+        threading.Thread(
+            target=backfill_device_last_vitals,
+            name="last-vitals-backfill",
+            daemon=True,
+        ).start()
         return "durable"
     except DurableStoreUnavailable as exc:
         logger.error(

@@ -64,6 +64,12 @@
         return row.received_at || row.last_seen || row.timestamp || null;
     }
 
+    function validSpo2(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n < 50 || n > 100) return null;
+        return n;
+    }
+
     function carryLastActivity(previous, incoming) {
         const row = Object.assign({}, incoming || {});
         const prev = previous || {};
@@ -92,6 +98,17 @@
             row.blood_pressure_sys = null;
             row.blood_pressure_dia = null;
             row.last_bp_at = null;
+        }
+        const incomingSpo2 = validSpo2(row.spo2);
+        if (incomingSpo2 != null) {
+            row.spo2 = incomingSpo2;
+            row.last_spo2_at = row.last_spo2_at || activityStamp(row);
+        } else if (validSpo2(prev.spo2) != null) {
+            row.spo2 = prev.spo2;
+            row.last_spo2_at = prev.last_spo2_at || activityStamp(prev);
+        } else {
+            row.spo2 = null;
+            row.last_spo2_at = null;
         }
         const model = typeof row.device_model === "string" ? row.device_model.trim() : "";
         if (!model) {

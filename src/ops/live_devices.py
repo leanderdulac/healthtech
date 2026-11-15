@@ -30,6 +30,7 @@ COMPACT_FIELDS = (
     "device_model",
     "last_steps_at",
     "last_bp_at",
+    "last_spo2_at",
     "ingest_source",
     "device_label",
     "app_version",
@@ -78,6 +79,19 @@ def valid_blood_pressure(
     if sys_val is None or dia_val is None:
         return None, None
     return sys_val, dia_val
+
+
+def valid_spo2(value: Any) -> Optional[float]:
+    """SpO₂ aceito pela API (50–100). Zero, lixo e fora da faixa não entram."""
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not (50.0 <= number <= 100.0):
+        return None
+    return number
 
 
 def _activity_stamp(row: Mapping[str, Any]) -> Optional[str]:
@@ -143,13 +157,14 @@ def summarize_frame(frame: Mapping[str, Any], now: Optional[datetime] = None) ->
         "online": is_online(live_ref, now=now) if live_ref else False,
         "age_seconds": age_seconds(live_ref, now=now),
         "heart_rate": _heart_rate(frame),
-        "spo2": raw.get("spo2_percent"),
+        "spo2": valid_spo2(raw.get("spo2_percent")),
         "steps": steps,
         "blood_pressure_sys": sys_val,
         "blood_pressure_dia": dia_val,
         "device_model": _device_model(raw.get("device_model") or frame.get("device_model")),
         "last_steps_at": stamp if valid_steps(steps) is not None else None,
         "last_bp_at": stamp if valid_sys is not None and valid_dia is not None else None,
+        "last_spo2_at": stamp if valid_spo2(raw.get("spo2_percent")) is not None else None,
         "ingest_source": _optional_text(
             frame.get("ingest_source") or extra.get("ingest_source") or raw.get("ingest_source"),
             32,
@@ -170,7 +185,7 @@ def carry_last_activity(
     previous: Optional[Mapping[str, Any]],
     incoming: Mapping[str, Any],
 ) -> Dict[str, Any]:
-    """Mantém o último BP/passos válidos (>0) quando o frame novo só traz FC.
+    """Mantém o último BP/passos/SpO₂ válidos quando o frame novo só traz FC.
 
     Não inventa valor: se nunca houve medição, o campo fica ausente/None.
     """
@@ -207,6 +222,17 @@ def carry_last_activity(
             row["blood_pressure_sys"] = None
             row["blood_pressure_dia"] = None
             row["last_bp_at"] = None
+
+    incoming_spo2 = valid_spo2(row.get("spo2"))
+    if incoming_spo2 is not None:
+        row["spo2"] = incoming_spo2
+        row["last_spo2_at"] = row.get("last_spo2_at") or _activity_stamp(row)
+    elif valid_spo2(prev.get("spo2")) is not None:
+        row["spo2"] = prev.get("spo2")
+        row["last_spo2_at"] = prev.get("last_spo2_at") or _activity_stamp(prev)
+    else:
+        row["spo2"] = None
+        row["last_spo2_at"] = None
 
     if _device_model(row.get("device_model")) is None:
         prev_model = _device_model(prev.get("device_model"))

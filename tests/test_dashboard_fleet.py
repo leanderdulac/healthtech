@@ -172,6 +172,7 @@ def test_fleet_summary_is_public_and_hides_synthetics():
                 "device_model",
                 "last_steps_at",
                 "last_bp_at",
+                "last_spo2_at",
                 "synthetic",
             }
         )
