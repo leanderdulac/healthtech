@@ -288,9 +288,13 @@ def test_dashboard_device_details_drawer_markup():
     details_js = (ROOT / "dashboard" / "device_details.js").read_text(encoding="utf-8")
     assert 'id="device-details-panel"' in html
     assert "Detalhes do relógio" in html
-    assert "device_details.js?v=20261114u" in html
+    assert "device_details.js?v=20261114v" in html
     assert "bindDeviceDetailsPanel" in app_js
     assert "fetchDeviceDetail" in app_js
+    assert "onRequestApiAccess" in app_js
+    assert 'switchTab("api-access")' in app_js
+    assert "renderAuthPrompt" in details_js
+    assert "rejectedKey" in details_js
     assert "body.device-details-open" in css
     assert "municipality_id" in details_js
     assert "municipality_name" not in details_js

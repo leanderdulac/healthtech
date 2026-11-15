@@ -11,12 +11,15 @@
     const CLOSE_ANIMATION_MS = 250;
     const CADASTRO_NOTE = "Região do cadastro do paciente, não é localização em tempo real.";
     const MESSAGES = {
-        missingKey: "Informe a chave de API em Acesso à API para ver os detalhes do relógio.",
+        missingKey: "Para ver os detalhes do relógio, abra Acesso à API e informe a chave de leitura já usada no painel.",
+        rejectedKey: "A chave salva foi recusada. Atualize-a em Acesso à API para ver os detalhes do relógio.",
         forbidden: "Sem permissão para ver os detalhes deste relógio.",
         notFound: "Relógio não encontrado.",
         unavailable: "Não foi possível carregar os detalhes do relógio.",
-        loading: "Carregando detalhes…"
+        loading: "Carregando detalhes…",
+        openApiAccess: "Abrir Acesso à API"
     };
+    const OPEN_API_ACCESS_ACTION = "open-api-access";
 
     function shouldCloseOnKey(event) {
         if (!event) return false;
@@ -42,10 +45,26 @@
     }
 
     function unauthorizedMessage(status, hasKey) {
-        if (!hasKey || status === 401) return MESSAGES.missingKey;
+        if (!hasKey) return MESSAGES.missingKey;
+        if (status === 401) return MESSAGES.rejectedKey;
         if (status === 403) return MESSAGES.forbidden;
         if (status === 404) return MESSAGES.notFound;
         return MESSAGES.unavailable;
+    }
+
+    function needsApiAccessAction(status, hasKey) {
+        return !hasKey || status === 401;
+    }
+
+    function renderAuthPrompt(message) {
+        const text = escapeHtml(message || MESSAGES.missingKey);
+        const label = escapeHtml(MESSAGES.openApiAccess);
+        return `<div class="device-details-auth-prompt">`
+            + `<p class="device-details-status">${text}</p>`
+            + `<button type="button" class="btn btn-primary" data-device-details-action="${OPEN_API_ACCESS_ACTION}">`
+            + label
+            + `</button>`
+            + `</div>`;
     }
 
     function presentDeviceDetails(payload) {
@@ -254,7 +273,14 @@
             Promise.resolve(fetcher(id)).then((result) => {
                 if (controller.currentDeviceId() !== id) return;
                 if (!result || result.ok === false) {
-                    renderStatus(unauthorizedMessage(result && result.status, result && result.hasKey));
+                    const status = result && result.status;
+                    const hasKey = !!(result && result.hasKey);
+                    const message = unauthorizedMessage(status, hasKey);
+                    if (needsApiAccessAction(status, hasKey)) {
+                        setBodyHtml(body, renderAuthPrompt(message));
+                    } else {
+                        renderStatus(message);
+                    }
                     return;
                 }
                 setBodyHtml(body, renderPresented(presentDeviceDetails(result)));
@@ -281,6 +307,20 @@
             }
         }
 
+        if (body) {
+            body.addEventListener("click", function (event) {
+                const target = event && event.target;
+                const btn = target && target.closest
+                    ? target.closest('[data-device-details-action="' + OPEN_API_ACCESS_ACTION + '"]')
+                    : null;
+                if (!btn) return;
+                if (event && typeof event.preventDefault === "function") event.preventDefault();
+                if (typeof opts.onRequestApiAccess === "function") {
+                    opts.onRequestApiAccess(controller.currentDeviceId());
+                }
+            });
+        }
+
         if (closeBtn) closeBtn.addEventListener("click", onCloseClick);
         if (backdrop) backdrop.addEventListener("click", onBackdropClick);
         const keyTarget = elements.document;
@@ -289,7 +329,13 @@
         }
 
         applyOpenState(elements, false);
-        return { open, close, show, isOpen: controller.isOpen };
+        return {
+            open,
+            close,
+            show,
+            isOpen: controller.isOpen,
+            currentDeviceId: controller.currentDeviceId
+        };
     }
 
     return {
@@ -300,9 +346,12 @@
         shouldCloseOnBackdropClick,
         displayValue,
         unauthorizedMessage,
+        needsApiAccessAction,
+        renderAuthPrompt,
         presentDeviceDetails,
         renderPresented,
         createDetailsController,
-        bindDeviceDetailsPanel
+        bindDeviceDetailsPanel,
+        OPEN_API_ACCESS_ACTION
     };
 }));
