@@ -457,6 +457,34 @@ body.device-details-open {
 .device-details-auth-prompt .device-details-status {
     margin: 0;
 }
+.device-details-key-form {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+}
+.device-details-key-form label {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    font-weight: 500;
+}
+.device-details-key-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+.device-details-key-row input {
+    flex: 1 1 14rem;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.8);
+    color: #f8fafc;
+    font-size: 0.9rem;
+}
 
 .device-details-status {
     margin: 0;

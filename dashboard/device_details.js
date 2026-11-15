@@ -11,15 +11,20 @@
     const CLOSE_ANIMATION_MS = 250;
     const CADASTRO_NOTE = "Região do cadastro do paciente, não é localização em tempo real.";
     const MESSAGES = {
-        missingKey: "Para ver os detalhes do relógio, abra Acesso à API e informe a chave de leitura já usada no painel.",
-        rejectedKey: "A chave salva foi recusada. Atualize-a em Acesso à API para ver os detalhes do relógio.",
+        missingKey: "Informe a chave de leitura já usada no painel para ver os detalhes do relógio. Ela fica salva só neste navegador.",
+        rejectedKey: "A chave salva foi recusada. Informe uma chave válida para ver os detalhes do relógio.",
         forbidden: "Sem permissão para ver os detalhes deste relógio.",
         notFound: "Relógio não encontrado.",
         unavailable: "Não foi possível carregar os detalhes do relógio.",
         loading: "Carregando detalhes…",
-        openApiAccess: "Abrir Acesso à API"
+        openApiAccess: "Abrir Acesso à API",
+        keyLabel: "Chave de leitura",
+        keyPlaceholder: "Cole a chave de leitura",
+        saveKey: "Guardar e ver detalhes",
+        missingKeyInput: "Cole a chave de leitura para continuar."
     };
     const OPEN_API_ACCESS_ACTION = "open-api-access";
+    const SAVE_API_KEY_ACTION = "save-api-key";
 
     function shouldCloseOnKey(event) {
         if (!event) return false;
@@ -58,12 +63,18 @@
 
     function renderAuthPrompt(message) {
         const text = escapeHtml(message || MESSAGES.missingKey);
-        const label = escapeHtml(MESSAGES.openApiAccess);
+        const keyLabel = escapeHtml(MESSAGES.keyLabel);
+        const placeholder = escapeHtml(MESSAGES.keyPlaceholder);
+        const saveLabel = escapeHtml(MESSAGES.saveKey);
         return `<div class="device-details-auth-prompt">`
             + `<p class="device-details-status">${text}</p>`
-            + `<button type="button" class="btn btn-primary" data-device-details-action="${OPEN_API_ACCESS_ACTION}">`
-            + label
-            + `</button>`
+            + `<form class="device-details-key-form" data-device-details-action="${SAVE_API_KEY_ACTION}">`
+            + `<label for="device-details-api-key">${keyLabel}</label>`
+            + `<div class="device-details-key-row">`
+            + `<input type="password" id="device-details-api-key" name="api_key" autocomplete="off" placeholder="${placeholder}">`
+            + `<button type="submit" class="btn btn-primary">${saveLabel}</button>`
+            + `</div>`
+            + `</form>`
             + `</div>`;
     }
 
@@ -319,6 +330,29 @@
                     opts.onRequestApiAccess(controller.currentDeviceId());
                 }
             });
+            body.addEventListener("submit", function (event) {
+                const form = event && event.target;
+                const action = form && form.getAttribute
+                    ? form.getAttribute("data-device-details-action")
+                    : "";
+                if (action !== SAVE_API_KEY_ACTION) return;
+                if (event && typeof event.preventDefault === "function") event.preventDefault();
+                const input = form.querySelector
+                    ? form.querySelector("#device-details-api-key")
+                    : null;
+                const value = input && input.value ? String(input.value).trim() : "";
+                if (!value) {
+                    setBodyHtml(body, renderAuthPrompt(MESSAGES.missingKeyInput));
+                    const again = body.querySelector
+                        ? body.querySelector("#device-details-api-key")
+                        : null;
+                    if (again && typeof again.focus === "function") again.focus();
+                    return;
+                }
+                if (typeof opts.onSaveApiKey === "function") {
+                    opts.onSaveApiKey(value);
+                }
+            });
         }
 
         if (closeBtn) closeBtn.addEventListener("click", onCloseClick);
@@ -352,6 +386,7 @@
         renderPresented,
         createDetailsController,
         bindDeviceDetailsPanel,
-        OPEN_API_ACCESS_ACTION
+        OPEN_API_ACCESS_ACTION,
+        SAVE_API_KEY_ACTION
     };
 }));

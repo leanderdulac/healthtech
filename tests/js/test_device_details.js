@@ -25,10 +25,15 @@ assert.strictEqual(details.needsApiAccessAction(401, true), true);
 assert.strictEqual(details.needsApiAccessAction(403, true), false);
 
 const prompt = details.renderAuthPrompt(details.MESSAGES.missingKey);
-assert.ok(prompt.indexOf("Acesso à API") >= 0);
-assert.ok(prompt.indexOf('data-device-details-action="' + details.OPEN_API_ACCESS_ACTION + '"') >= 0);
+assert.ok(prompt.indexOf("chave de leitura") >= 0);
+assert.ok(prompt.indexOf('data-device-details-action="' + details.SAVE_API_KEY_ACTION + '"') >= 0);
+assert.ok(prompt.indexOf('id="device-details-api-key"') >= 0);
+assert.ok(prompt.indexOf('type="password"') >= 0);
 assert.ok(prompt.indexOf("<script") < 0);
-assert.ok(prompt.indexOf(details.MESSAGES.openApiAccess) >= 0);
+assert.ok(prompt.indexOf(details.MESSAGES.saveKey) >= 0);
+assert.ok(prompt.indexOf(details.MESSAGES.openApiAccess) < 0);
+assert.ok(prompt.indexOf('data-device-details-action="' + details.OPEN_API_ACCESS_ACTION + '"') < 0);
+assert.strictEqual(details.SAVE_API_KEY_ACTION, "save-api-key");
 
 const presented = details.presentDeviceDetails({
     device_id: "VE30-AA:BB:CC:DD:EE:FF",

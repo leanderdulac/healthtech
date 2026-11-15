@@ -1446,6 +1446,11 @@ console.log(data);`
                         input.scrollIntoView({ block: "center" });
                     }
                 }
+            },
+            onSaveApiKey(nextKey) {
+                persistOperatorKey(nextKey);
+                const input = document.getElementById("api-key-display");
+                if (input) input.value = nextKey || "";
             }
         });
     }
