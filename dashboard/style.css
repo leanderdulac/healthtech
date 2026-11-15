@@ -448,6 +448,16 @@ body.device-details-open {
     overflow: hidden;
 }
 
+.device-details-auth-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+.device-details-auth-prompt .device-details-status {
+    margin: 0;
+}
+
 .device-details-status {
     margin: 0;
     color: #94a3b8;

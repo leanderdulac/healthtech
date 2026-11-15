@@ -1057,6 +1057,17 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.removeItem("api_key");
         }
         connectWebSocket();
+        if (
+            deviceDetailsApi
+            && typeof deviceDetailsApi.isOpen === "function"
+            && deviceDetailsApi.isOpen()
+            && typeof deviceDetailsApi.show === "function"
+        ) {
+            const openId = typeof deviceDetailsApi.currentDeviceId === "function"
+                ? deviceDetailsApi.currentDeviceId()
+                : "";
+            if (openId) deviceDetailsApi.show(openId);
+        }
     }
 
     const btnSaveKey = document.getElementById("btn-save-key");
@@ -1417,6 +1428,18 @@ console.log(data);`
             onOpen() {
                 if (settingsPanelApi && typeof settingsPanelApi.close === "function") {
                     settingsPanelApi.close();
+                }
+            },
+            onRequestApiAccess() {
+                if (typeof window.switchTab === "function") {
+                    window.switchTab("api-access");
+                }
+                const input = document.getElementById("api-key-display");
+                if (input) {
+                    if (typeof input.focus === "function") input.focus();
+                    if (typeof input.scrollIntoView === "function") {
+                        input.scrollIntoView({ block: "center" });
+                    }
                 }
             }
         });
