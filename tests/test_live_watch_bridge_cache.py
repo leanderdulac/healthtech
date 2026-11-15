@@ -6,7 +6,16 @@ import json
 import threading
 import time
 
+import pytest
+
 from src.ops import live_watch_bridge as br
+
+
+@pytest.fixture(autouse=True)
+def _reset_bridge():
+    br.reset_bridge_state()
+    yield
+    br.reset_bridge_state()
 
 
 class _Resp:

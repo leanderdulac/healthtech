@@ -127,8 +127,14 @@ def test_device_registry_handles_hundreds_of_watches():
 
 
 def test_live_watch_bridge_module_imports():
-    from src.ops.live_watch_bridge import cached_devices, new_ingest_frames, poll_once
+    from src.ops.live_watch_bridge import (
+        cached_devices,
+        new_ingest_frames,
+        poll_once,
+        reset_bridge_state,
+    )
 
+    reset_bridge_state()
     assert cached_devices() == []
     assert new_ingest_frames([]) == []
     devices, frames = poll_once()
