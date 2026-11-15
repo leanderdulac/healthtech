@@ -45,5 +45,20 @@ assert.strictEqual(kept.last_bp_at, "t1");
 const empty = logic.carryLastActivity(null, { heart_rate: 72 });
 assert.strictEqual(empty.steps, null);
 assert.strictEqual(empty.blood_pressure_sys, null);
+assert.strictEqual(empty.spo2, null);
+
+const keptSpo2 = logic.carryLastActivity(
+    { spo2: 97, last_spo2_at: "t-spo2", steps: 10 },
+    { heart_rate: 88, spo2: null, steps: 12 }
+);
+assert.strictEqual(keptSpo2.spo2, 97);
+assert.strictEqual(keptSpo2.last_spo2_at, "t-spo2");
+assert.strictEqual(keptSpo2.steps, 12);
+
+const ignoredOutOfRange = logic.carryLastActivity(
+    { spo2: 97 },
+    { heart_rate: 80, spo2: 0 }
+);
+assert.strictEqual(ignoredOutOfRange.spo2, 97);
 
 console.log("ok fleet_logic.js");

@@ -720,7 +720,10 @@ document.addEventListener("DOMContentLoaded", () => {
         setVitalsStale(true, "");
     }
 
+    let devicePollInFlight = false;
     async function pollDevices() {
+        if (devicePollInFlight) return;
+        devicePollInFlight = true;
         const qs = new URLSearchParams({ limit: "500" });
         if (includeSyntheticFleet()) qs.set("include_synthetic", "true");
         try {
@@ -737,6 +740,8 @@ document.addEventListener("DOMContentLoaded", () => {
             updateFleetPill(devices.some((row) => row && row.online) ? "live" : "stale");
         } catch (err) {
             updateFleetPill("down");
+        } finally {
+            devicePollInFlight = false;
         }
     }
 

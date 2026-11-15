@@ -5,20 +5,42 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
+import time
 import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Evita estouro de GET /devices quando o painel e a ponte pedem a frota ao mesmo tempo.
+CACHE_TTL_SECONDS = 2.0
+
 _state: Dict[str, Any] = {
     "cache": [],
     "last_seen": {},
+    "cached_at": 0.0,
+    "cache_valid": False,
+    "inflight": None,
 }
+_lock = threading.Lock()
 
 
 def cached_devices() -> List[Dict[str, Any]]:
     return list(_state["cache"])
+
+
+def reset_bridge_state() -> None:
+    """Utilitário de teste — zera cache e voo único."""
+    with _lock:
+        inflight = _state.get("inflight")
+        _state["cache"] = []
+        _state["last_seen"] = {}
+        _state["cached_at"] = 0.0
+        _state["cache_valid"] = False
+        _state["inflight"] = None
+        if inflight is not None:
+            inflight.set()
 
 
 def _bridge_config() -> Tuple[str, str]:
@@ -41,6 +63,25 @@ def fetch_secure_fleet(timeout: float = 8.0) -> Optional[List[Dict[str, Any]]]:
     base, key = _bridge_config()
     if not base or not key:
         return None
+    with _lock:
+        now = time.monotonic()
+        if _state.get("cache_valid") and (now - float(_state.get("cached_at") or 0)) < CACHE_TTL_SECONDS:
+            return list(_state["cache"])
+        inflight = _state.get("inflight")
+        if inflight is not None:
+            waiter = inflight
+            owner = False
+        else:
+            waiter = threading.Event()
+            _state["inflight"] = waiter
+            owner = True
+    if not owner:
+        waiter.wait(timeout=max(0.1, float(timeout) + 1.0))
+        with _lock:
+            if _state.get("cache_valid"):
+                return list(_state["cache"])
+            cached = list(_state["cache"])
+            return cached if cached else None
     req = urllib.request.Request(
         f"{base}/api/v1/wearables/devices?limit=500&include_synthetic=true",
         headers={"X-API-Key": key, "Accept": "application/json"},
@@ -49,16 +90,26 @@ def fetch_secure_fleet(timeout: float = 8.0) -> Optional[List[Dict[str, Any]]]:
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
+        devices = payload.get("devices") if isinstance(payload, dict) else None
+        if not isinstance(devices, list):
+            with _lock:
+                cached = list(_state["cache"])
+                return cached if cached else None
+        with _lock:
+            _state["cache"] = devices
+            _state["cached_at"] = time.monotonic()
+            _state["cache_valid"] = True
+        return devices
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
         logger.warning("Falha ao listar relógios na API segura: %s", exc)
-        cached = list(_state["cache"])
-        return cached if cached else None
-    devices = payload.get("devices") if isinstance(payload, dict) else None
-    if not isinstance(devices, list):
-        cached = list(_state["cache"])
-        return cached if cached else None
-    _state["cache"] = devices
-    return devices
+        with _lock:
+            cached = list(_state["cache"])
+            return cached if cached else None
+    finally:
+        with _lock:
+            if _state.get("inflight") is waiter:
+                _state["inflight"] = None
+            waiter.set()
 
 
 def fetch_secure_devices(timeout: float = 8.0) -> List[Dict[str, Any]]:

@@ -273,8 +273,8 @@ def list_devices(
     if _use_durable():
         from app.services import durable_readings
 
-        frames = durable_readings.list_frames()
-        return _list_devices_from_frames(
+        frames = durable_readings.latest_frames_by_device()
+        payload = _list_devices_from_frames(
             frames,
             q=q,
             online=online,
@@ -284,6 +284,15 @@ def list_devices(
             patient_id=patient_id,
             include_synthetic=include_synthetic,
         )
+        last = durable_readings.list_device_last_vitals()
+        if last:
+            from src.ops.live_devices import carry_last_activity
+
+            payload["devices"] = [
+                carry_last_activity(last.get(str(row.get("device_id") or "")), row)
+                for row in payload.get("devices") or []
+            ]
+        return payload
     try:
         from src.ops.device_registry import list_devices as fleet_list
 
