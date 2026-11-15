@@ -378,10 +378,10 @@ def test_painel_principal_moves_sidebar_into_settings_drawer():
     assert "grid-template-columns: 320px 1fr" not in css
     assert ".settings-panel" in css
     assert "bindSettingsPanel" in app_js
-    assert "settings_panel.js?v=20261114v" in html
-    assert "style.css?v=20261114v" in html
-    assert "app.js?v=20261114v" in html
-    assert "device_details.js?v=20261114v" in html
+    assert "settings_panel.js?v=20261115v" in html
+    assert "style.css?v=20261115v" in html
+    assert "app.js?v=20261115v" in html
+    assert "device_details.js?v=20261115v" in html
     assert 'id="device-details-panel"' in html
     assert "Detalhes do relógio" in html
 
