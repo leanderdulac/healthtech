@@ -30,7 +30,7 @@ os.environ["AUTH_DISABLED"] = "false"
 os.environ["APP_MODE"] = "secure"
 os.environ.setdefault("SECRET_SALT", "test-salt-not-for-production-use-32c")
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 
 get_settings.cache_clear()
 
@@ -199,6 +199,68 @@ def test_idor_patient_authorization_blocked(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.delenv("ALLOWED_PATIENT_IDS", raising=False)
     get_settings.cache_clear()
+
+
+def test_get_allowed_patients_wildcard_is_not_empty():
+    """`*` / ALL não pode colapsar para set() — senão produção trata como unset."""
+    for raw in ("*", "ALL", "all", " * ", "*,PAT-X"):
+        assert Settings(allowed_patient_ids=raw).get_allowed_patients() == {"*"}
+    assert Settings(allowed_patient_ids="").get_allowed_patients() == set()
+    assert Settings(allowed_patient_ids="  ").get_allowed_patients() == set()
+    assert Settings(allowed_patient_ids="PAT-A, PAT-B").get_allowed_patients() == {
+        "PAT-A",
+        "PAT-B",
+    }
+
+
+def _prod_settings(**kwargs) -> Settings:
+    return Settings(
+        environment="production",
+        auth_disabled=False,
+        read_api_key="ht_read_real_configured_secret_value",
+        ingest_api_key="ht_ingest_real_configured_secret_value",
+        admin_api_key="ht_admin_real_configured_secret_value_32",
+        **kwargs,
+    )
+
+
+def test_idor_wildcard_allows_read_key_in_production():
+    from app.security.auth import check_patient_authorization
+
+    settings = _prod_settings(allowed_patient_ids="*")
+    assert settings.get_allowed_patients() == {"*"}
+    assert (
+        check_patient_authorization(
+            "ht_read_real_configured_secret_value", "PAT-DETAIL-1", settings
+        )
+        is True
+    )
+    settings_all = _prod_settings(allowed_patient_ids="ALL")
+    assert (
+        check_patient_authorization(
+            "ht_read_real_configured_secret_value", "PAT-DETAIL-2", settings_all
+        )
+        is True
+    )
+
+
+def test_idor_unset_denies_read_key_in_production():
+    from app.security.auth import check_patient_authorization
+
+    settings = _prod_settings(allowed_patient_ids="")
+    assert settings.get_allowed_patients() == set()
+    assert (
+        check_patient_authorization(
+            "ht_read_real_configured_secret_value", "PAT-ANY", settings
+        )
+        is False
+    )
+    assert (
+        check_patient_authorization(
+            "ht_admin_real_configured_secret_value_32", "PAT-ANY", settings
+        )
+        is True
+    )
 
 
 def test_pydantic_input_validation_and_sanitization():

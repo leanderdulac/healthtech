@@ -311,3 +311,53 @@ def test_device_details_js_suite():
     script = ROOT / "tests" / "js" / "test_device_details.js"
     result = subprocess.run([node, str(script)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _prod_env(monkeypatch, allowed: str | None) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("READ_API_KEY", READ_HEADERS["X-API-Key"])
+    monkeypatch.setenv("INGEST_API_KEY", INGEST_HEADERS["X-API-Key"])
+    monkeypatch.setenv("ADMIN_API_KEY", "ht_admin_test_key_32chars_long_token_x")
+    monkeypatch.delenv("API_KEY", raising=False)
+    if allowed is None:
+        monkeypatch.delenv("ALLOWED_PATIENT_IDS", raising=False)
+    else:
+        monkeypatch.setenv("ALLOWED_PATIENT_IDS", allowed)
+
+
+def _get_detail(headers: dict):
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        return client.get(f"/api/v1/ops/devices/{DEVICE_ID}", headers=headers)
+    finally:
+        get_settings.cache_clear()
+
+
+def test_device_detail_production_wildcard_allows_read_key(monkeypatch):
+    """ALLOWED_PATIENT_IDS=* em produção libera o detalhe para a chave de leitura."""
+    _upsert_watch()
+    for raw in ("*", "ALL", "all"):
+        _prod_env(monkeypatch, raw)
+        res = _get_detail(READ_HEADERS)
+        assert res.status_code == 200, (raw, res.text)
+        assert res.json()["device_id"] == DEVICE_ID
+
+
+def test_device_detail_production_wildcard_still_requires_read_scope(monkeypatch):
+    """Wildcard não dá escopo: a chave de ingestão continua 403 no detalhe."""
+    _upsert_watch()
+    _prod_env(monkeypatch, "*")
+    res = _get_detail(INGEST_HEADERS)
+    assert res.status_code == 403
+    assert "wearables:read" in res.json()["detail"]
+
+
+def test_device_detail_production_unset_allowlist_denies_read_key(monkeypatch):
+    """Allow-list ausente/vazia em produção continua fail-closed."""
+    _upsert_watch()
+    for raw in (None, "", "  "):
+        _prod_env(monkeypatch, raw)
+        res = _get_detail(READ_HEADERS)
+        assert res.status_code == 403, (raw, res.text)
