@@ -6,8 +6,7 @@ Registra todas as requisições à API em formato estruturado (JSON), capturando
 - Request ID único (UUID4)
 - API Key ID mascarada (nunca grava a chave em texto claro)
 - IP de origem e User-Agent
-- Método HTTP e Path
-- ID do Paciente (se aplicável)
+- Método HTTP e Path, com o identificador depois de /patient/ redigido
 - Código de status HTTP e tempo de resposta (ms)
 """
 
@@ -17,7 +16,6 @@ import json
 import logging
 import time
 import uuid
-from typing import Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -26,6 +24,18 @@ from src.security.auth import mask_api_key
 
 audit_logger = logging.getLogger("healthtech.audit")
 audit_logger.setLevel(logging.INFO)
+
+
+def redact_subject_path(path: str) -> str:
+    marker = "/patient/"
+    if marker not in path:
+        return path
+    head, _, tail = path.partition(marker)
+    _subject, sep, rest = tail.partition("/")
+    redacted = head + marker + "redigido"
+    if sep:
+        redacted += sep + rest
+    return redacted
 
 
 class AuditLoggingMiddleware(BaseHTTPMiddleware):
@@ -43,17 +53,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
         duration_ms = round((time.time() - start_time) * 1000, 2)
         response.headers["X-Request-ID"] = request_id
 
-        # Extrair patient_id se presente na URL
-        path = request.url.path
-        patient_id: Optional[str] = None
-        if "/patient/" in path:
-            parts = path.split("/")
-            try:
-                idx = parts.index("patient")
-                if idx + 1 < len(parts):
-                    patient_id = parts[idx + 1]
-            except ValueError:
-                pass
+        path = redact_subject_path(request.url.path)
 
         log_record = {
             "event": "api_access_audit",
@@ -63,7 +63,6 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
             "masked_api_key": masked_key,
             "method": request.method,
             "path": path,
-            "patient_id": patient_id,
             "status_code": response.status_code,
             "duration_ms": duration_ms,
             "user_agent": request.headers.get("user-agent", "unknown"),

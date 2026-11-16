@@ -32,7 +32,7 @@ Fonte de verdade de rede: **módulo `:client`**. O app depende dele — não cop
 cp local.properties.example local.properties
 # Studio preenche sdk.dir
 # HEALTHTECH_BASE_URL=http://10.0.2.2:8080
-# cole a chave (wearables:write) em HEALTHTECH_INGEST_API_KEY — nunca commitar
+# A API key não vai no APK. Cole na tela do app; ela fica cifrada no aparelho.
 ```
 
 4. Rode a configuração **app** (▶️)

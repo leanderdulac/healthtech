@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request, Security
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
 
 from app.config import Settings, get_settings
 from app.security.auth import api_key_header, get_key_scopes
 from app.services import telemetry_store
 from app.services.connection_status import build_connection_status, public_connection_view
+from app.services.durable_readings import DurableStoreUnavailable
 
 router = APIRouter(prefix="/api/v1/connections", tags=["connections"])
 
@@ -29,8 +30,15 @@ def get_connection_status(
     - Com wearables:read: inclui sessões por paciente.
     """
     _ = request
+    try:
+        history = telemetry_store.iter_patients()
+    except DurableStoreUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Armazenamento durável de telemetria indisponível. ({exc})",
+        ) from exc
     full = build_connection_status(
-        telemetry_store.iter_patients(),
+        history,
         online_threshold_sec=online_threshold_sec,
         stale_threshold_sec=stale_threshold_sec,
     )
@@ -49,8 +57,15 @@ def get_connection_status_public(
 ):
     """Alias explícito da visão pública (sem autenticação)."""
     _ = request
+    try:
+        history = telemetry_store.iter_patients()
+    except DurableStoreUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Armazenamento durável de telemetria indisponível. ({exc})",
+        ) from exc
     full = build_connection_status(
-        telemetry_store.iter_patients(),
+        history,
         online_threshold_sec=online_threshold_sec,
         stale_threshold_sec=stale_threshold_sec,
     )

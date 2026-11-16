@@ -16,7 +16,7 @@ from typing import Dict, Any, Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -26,7 +26,7 @@ from pydantic import BaseModel
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from pydantic import BaseModel, Field, field_validator
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.requests import Request
 
 from src.security.auth import (
@@ -80,7 +80,7 @@ app.add_middleware(
     allow_origins=_cors_origins or ["https://healthtech-responsive-5794833455.us-central1.run.app"],
     allow_credentials=cors_allow_credentials(),
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["*", "X-API-Key", "X-Request-ID"],
+    allow_headers=["*", "X-API-Key", "X-Request-ID", "Idempotency-Key", "X-App-Version"],
 )
 
 
@@ -104,6 +104,13 @@ app.mount("/dashboard", StaticFiles(directory="dashboard"), name="dashboard")
 def read_root():
     """Redireciona a raiz para o dashboard estático."""
     return RedirectResponse(url="/dashboard/index.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Ícone da aba: logo Next2U Saúde."""
+    icon = os.path.join(os.path.dirname(__file__), "..", "dashboard", "favicon.ico")
+    return FileResponse(icon, media_type="image/x-icon")
 
 
 # Carregar configurações do GCP
@@ -172,9 +179,13 @@ class SearchQuery(BaseModel):
     n_results: int = 3
 
 
+from src.ops.dashboard_routes import router as dashboard_ops_router
+from src.ops.device_detail_routes import router as device_detail_router
 from src.ops.patients_routes import router as patients_router
 
 app.include_router(patients_router)
+app.include_router(dashboard_ops_router)
+app.include_router(device_detail_router)
 
 
 @app.get("/api/health")
@@ -320,10 +331,11 @@ class WearableTelemetryRequest(BaseModel):
     device_id: Optional[str] = Field("wrist_wearable", max_length=64)
     timestamp: Optional[str] = Field(None, max_length=64)
     heart_rate: float = Field(..., ge=20.0, le=250.0)
-    hrv_rmssd: Optional[float] = Field(40.0, ge=0.0, le=300.0)
-    skin_temp: Optional[float] = Field(33.0, ge=25.0, le=45.0)
-    spo2: Optional[float] = Field(98.0, ge=50.0, le=100.0)
-    activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
+    hrv_rmssd: Optional[float] = Field(None, ge=0.0, le=300.0)
+    skin_temp: Optional[float] = Field(None, ge=25.0, le=45.0)
+    spo2: Optional[float] = Field(None, ge=50.0, le=100.0)
+    activity_level: Optional[float] = Field(None, ge=0.0, le=100.0)
+    steps: Optional[int] = Field(None, ge=0)
     ppg_signal: Optional[list[float]] = None
     filter_type: Optional[str] = Field("BMO", max_length=32)
     # Opcionais HBand / matriz de alertas
@@ -333,6 +345,7 @@ class WearableTelemetryRequest(BaseModel):
     body_temp_c: Optional[float] = Field(None, ge=30.0, le=45.0)
     steps_drop_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
     sleep_worsen_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
+    wear_status: Optional[bool] = None
 
     @field_validator("filter_type")
     @classmethod
@@ -357,6 +370,7 @@ def get_patient_engine(patient_id: str, use_ukf: bool = False) -> PhantomDataEng
 def ingest_wearable_reading(
     req: WearableTelemetryRequest,
     _api_key: str = Depends(require_scope("wearables:write")),
+    x_app_version: Optional[str] = Header(default=None, alias="X-App-Version"),
 ):
     """
     Endpoint principal para recepção de telemetria enviada por wearables no pulso dos pacientes
@@ -368,37 +382,40 @@ def ingest_wearable_reading(
     if req.heart_rate <= 0 or req.heart_rate > 300:
         raise HTTPException(status_code=400, detail="Frequência cardíaca fora dos limites fisiológicos válidos (1-300 BPM).")
 
-    # 1. Denoising do Sinal Heart Rate / PPG se fornecido
-    bpm_clean = req.heart_rate
+    # 1. A FC medida não é a média da onda PPG. A onda segue só para o perfil BMO.
+    from src.clinical_intelligence.alert_ingest import resolve_heart_rate
+
+    bpm_clean, hr_note = resolve_heart_rate(req.heart_rate, req.ppg_signal)
     bmo_metrics = {}
     if req.ppg_signal and len(req.ppg_signal) >= 4:
         analyzer = BMOAnalyzer()
         bmo_metrics = analyzer.multiscale_bmo_profile(np.array(req.ppg_signal))
-        if req.filter_type == "BMO":
-            denoiser = BMODenoiser(window_size=8, alpha=0.5)
-            filtered_ppg = denoiser.denoise(np.array(req.ppg_signal))
-            bpm_clean = float(np.mean(filtered_ppg)) if np.mean(filtered_ppg) > 30 else req.heart_rate
 
-    # 2. Inferência de Dados Fantasmas via Filtro de Kalman por Paciente
+    # 2. Inferência de Dados Fantasmas. Prior ausente fica no filtro.
     engine = get_patient_engine(req.patient_id, use_ukf=sim_config.use_ukf)
     wearable_data = {
-        'heart_rate': bpm_clean,
-        'hrv_rmssd': req.hrv_rmssd or 40.0,
-        'skin_temp': req.skin_temp or 33.0,
-        'activity_level': req.activity_level or 0.0
+        "heart_rate": bpm_clean if bpm_clean is not None else req.heart_rate,
     }
+    if req.hrv_rmssd is not None:
+        wearable_data["hrv_rmssd"] = req.hrv_rmssd
+    if req.skin_temp is not None:
+        wearable_data["skin_temp"] = req.skin_temp
+    if req.activity_level is not None:
+        wearable_data["activity_level"] = req.activity_level
     phantom_res = engine.process_reading(wearable_data)
     states = phantom_res['states']
 
     # 3. Detecção de Anomalias Fisiológicas
     anomaly_res = {"alerta": False, "score": 0.0, "modo": "Deteção Local"}
-    if vertex_detector:
+    if vertex_detector and bpm_clean is not None:
         try:
             anomaly_res = vertex_detector.processar_nova_leitura(bpm_clean)
         except Exception as e:
             logger.error(f"Erro no Vertex AI: {e}")
     else:
-        is_anomalia = bpm_clean > 100 or bpm_clean < 40 or (req.spo2 is not None and req.spo2 < 92)
+        is_anomalia = (
+            bpm_clean is not None and (bpm_clean > 100 or bpm_clean < 40)
+        ) or (req.spo2 is not None and req.spo2 < 92)
         anomaly_res = {
             "alerta": bool(is_anomalia),
             "score": 0.95 if is_anomalia else 0.05,
@@ -407,7 +424,7 @@ def ingest_wearable_reading(
 
     # 4. Diagnóstico Ontológico e Rede Bayesiana
     current_phantom = {k: v['estimate'] for k, v in states.items()}
-    hrv_metrics = {'rmssd': req.hrv_rmssd or 40.0}
+    hrv_metrics = {"rmssd": req.hrv_rmssd} if req.hrv_rmssd is not None else None
     
     hypotheses = bayes_net.generate_diagnostic_hypotheses(
         phantom_data=current_phantom,
@@ -434,9 +451,12 @@ def ingest_wearable_reading(
             "estimate": float(details["estimate"]),
             "ci_lower": float(details["ci_lower"]),
             "ci_upper": float(details["ci_upper"]),
-            "reliable": details["reliable"],
+            "reliable": False,
+            "filter_reliable": bool(details.get("reliable", False)),
+            "method": "ukf",
         }
         for name, details in states.items()
+        if isinstance(details, dict) and "estimate" in details
     }
     # Extensões HBand / campos opcionais da matriz de alertas
     extra = getattr(req, "model_extra", None) or {}
@@ -457,25 +477,40 @@ def ingest_wearable_reading(
     try:
         from src.clinical_intelligence.alert_ingest import (
             assess_ingest_alerts,
+            attach_previous_reading,
             merge_anomaly_with_alerts,
         )
 
+        _extra = getattr(req, "model_extra", None) or {}
+        _source = getattr(req, "ingest_source", None) or _extra.get("ingest_source") or "companion_manual"
+        prior = patient_history.get(req.patient_id) or []
+        raw_for_alerts = {
+            "heart_rate_bpm": req.heart_rate,
+            "spo2_percent": req.spo2,
+            "skin_temp_celsius": req.skin_temp,
+            "blood_pressure_sys": req.blood_pressure_sys,
+            "blood_pressure_dia": req.blood_pressure_dia,
+            "glucose_mgdl": req.glucose_mgdl,
+            "ingest_source": _source,
+            "timestamp": ts,
+        }
+        if req.activity_level is not None:
+            raw_for_alerts["activity_level"] = req.activity_level
+        if req.wear_status is not None:
+            raw_for_alerts["wear_status"] = req.wear_status
+        raw_for_alerts = attach_previous_reading(
+            raw_for_alerts, prior[-1] if prior else None
+        )
         clinical_alerts = assess_ingest_alerts(
-            heart_rate=bpm_clean,
+            heart_rate=req.heart_rate,
             spo2=req.spo2,
             skin_temp=req.body_temp_c if req.body_temp_c is not None else req.skin_temp,
             hrv_rmssd=req.hrv_rmssd,
             activity_level=req.activity_level,
             phantom=phantom_for_alerts,
             hband_ext=hband_ext,
-            raw_telemetry={
-                "heart_rate_bpm": req.heart_rate,
-                "spo2_percent": req.spo2,
-                "skin_temp_celsius": req.skin_temp,
-                "blood_pressure_sys": req.blood_pressure_sys,
-                "blood_pressure_dia": req.blood_pressure_dia,
-                "glucose_mgdl": req.glucose_mgdl,
-            },
+            raw_telemetry=raw_for_alerts,
+            rules_only=True,
         )
         anomaly_res = merge_anomaly_with_alerts(anomaly_res, clinical_alerts)
     except Exception as alert_err:
@@ -503,7 +538,10 @@ def ingest_wearable_reading(
             "activity_level": req.activity_level
         },
         "cleaned_telemetry": {
-            "heart_rate_clean": round(bpm_clean, 2),
+            "heart_rate_clean": None if bpm_clean is None else round(bpm_clean, 2),
+            "heart_rate_source": hr_note["heart_rate_source"],
+            "ppg_role": hr_note["ppg_role"],
+            "ppg_samples": hr_note["ppg_samples"],
             "filter_applied": req.filter_type,
             "bmo_metrics": bmo_metrics
         },
@@ -526,6 +564,14 @@ def ingest_wearable_reading(
         ],
         "clinical_codes": report['clinical_codes']
     }
+    try:
+        from src.ops.device_detail import attach_app_version
+
+        extra = attach_app_version(processed_frame, processed_frame.get("extra"), x_app_version)
+        if extra:
+            processed_frame["extra"] = extra
+    except Exception:
+        pass
 
     if req.patient_id not in patient_history:
         patient_history[req.patient_id] = []
@@ -572,6 +618,7 @@ def ingest_wearable_reading(
 def batch_ingest_wearables(
     batch: WearableBatchIngestRequest,
     _api_key: str = Depends(require_scope("wearables:write")),
+    x_app_version: Optional[str] = Header(default=None, alias="X-App-Version"),
 ):
     """
     Ingestão em lote para sincronização periódica de leituras acumuladas por wearables no pulso. Requer escopo 'wearables:write'.
@@ -579,26 +626,13 @@ def batch_ingest_wearables(
     results = []
     for reading in batch.readings:
         reading.patient_id = batch.patient_id
-        res = ingest_wearable_reading(reading, _api_key=_api_key)
+        res = ingest_wearable_reading(reading, _api_key=_api_key, x_app_version=x_app_version)
         results.append(res)
     return {
         "status": "success",
         "patient_id": batch.patient_id,
         "processed_count": len(results),
         "latest_result": results[-1] if results else None
-    }
-
-
-@app.get("/api/v1/ops/dashboard-bootstrap")
-def dashboard_bootstrap():
-    """Injeta a chave de leitura no dashboard (não pede colar no UI)."""
-    key = (os.environ.get("READ_API_KEY") or os.environ.get("API_KEY") or "").strip()
-    return {
-        "ok": True,
-        "api_key": key,
-        "fleet_poll_ms": 2000,
-        "page_size": 50,
-        "max_devices": 500,
     }
 
 
@@ -609,6 +643,10 @@ def list_wearable_devices(
     limit: int = Query(default=200, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=10000),
     include_latest: bool = Query(default=False),
+    include_synthetic: bool = Query(
+        default=False,
+        description="Se true, inclui devices de smoke/probe/timecheck. Padrão: ocultos.",
+    ),
     patient_id: Optional[str] = Query(
         default=None,
         description="Se informado, restringe a frota a esse Patient antes da paginação.",
@@ -617,8 +655,7 @@ def list_wearable_devices(
 ):
     """Frota de relógios vista pelo dashboard (compacta, até 500 por página)."""
     from src.security.auth import check_patient_authorization
-    from src.ops.device_registry import list_devices as fleet_list, merge_remote_rows
-    from src.ops.live_watch_bridge import cached_devices
+    from src.ops.dashboard_fleet import present_fleet
 
     wanted = (patient_id or "").strip() or None
     if wanted and not check_patient_authorization(_api_key, wanted):
@@ -629,14 +666,14 @@ def list_wearable_devices(
                 f"para os dados do paciente '{wanted}'."
             ),
         )
-    merge_remote_rows(cached_devices())
-    return fleet_list(
+    return present_fleet(
         q=q,
         online=online,
         limit=limit,
         offset=offset,
         include_latest=include_latest,
         patient_id=wanted,
+        include_synthetic=include_synthetic,
     )
 
 

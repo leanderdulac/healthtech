@@ -20,6 +20,41 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+def _measured_number(source: Optional[Dict[str, Any]], key: str) -> Optional[float]:
+    """Número presente na leitura. Chave ausente não vira um valor de referência."""
+    if not source or key not in source:
+        return None
+    value = source.get(key)
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _phantom_number(phantom: Optional[Dict[str, Any]], key: str) -> Optional[float]:
+    if not phantom or key not in phantom:
+        return None
+    block = phantom.get(key)
+    if not isinstance(block, dict) or "estimate" not in block:
+        return None
+    return _measured_number(block, "estimate")
+
+
+def _abstain(agent_id: str, specialty: str, rationale: str) -> "SpecialistOpinion":
+    return SpecialistOpinion(
+        agent_id=agent_id,
+        specialty=specialty,
+        risk_level="insufficient",
+        confidence=0.0,
+        rationale=rationale,
+        recommended_actions=[],
+        supporting_biomarkers={},
+        mass_assignment={"Critical": 0.0, "Elevated": 0.0, "Normal": 0.0, "Theta": 1.0},
+    )
+
+
 @dataclass
 class SpecialistOpinion:
     """Opinião e distribuição de massa de crença emitida por um agente especialista."""
@@ -62,49 +97,66 @@ class CardiologyAgent:
         hemodynamics: Optional[Dict[str, Any]] = None,
     ) -> SpecialistOpinion:
         """Avalia risco cardiovascular integrando eletrofisiologia, HRV e hemodinâmica."""
-        hr = vitals.get("heart_rate", 75.0)
-        rmssd = (hrv_metrics or {}).get("rmssd", vitals.get("hrv_rmssd", 40.0))
-        sdnn = (hrv_metrics or {}).get("sdnn", 50.0)
-
-        est_sbp = (phantom_data or {}).get("systolic_bp", {}).get("estimate", 120.0) if phantom_data else 120.0
-        est_dbp = (phantom_data or {}).get("diastolic_bp", {}).get("estimate", 80.0) if phantom_data else 80.0
-        pwv = (hemodynamics or {}).get("pwv_bramwell_hill", 7.5)
+        hr = _measured_number(vitals, "heart_rate")
+        rmssd = _measured_number(hrv_metrics, "rmssd")
+        if rmssd is None:
+            rmssd = _measured_number(vitals, "hrv_rmssd")
+        sdnn = _measured_number(hrv_metrics, "sdnn")
+        est_sbp = _phantom_number(phantom_data, "systolic_bp")
+        est_dbp = _phantom_number(phantom_data, "diastolic_bp")
+        pwv = _measured_number(hemodynamics, "pwv_bramwell_hill")
+        if hr is None and rmssd is None and sdnn is None and est_sbp is None and est_dbp is None and pwv is None:
+            return _abstain(
+                self.agent_id,
+                self.specialty,
+                "A leitura não trouxe frequência cardíaca, HRV nem pressão.",
+            )
 
         # Cálculo de scores de instabilidade cardiovascular
         arrhythmia_score = 0.0
-        if hr > 110 or hr < 50:
+        if hr is not None and (hr > 110 or hr < 50):
             arrhythmia_score += 0.4
-        if rmssd < 20.0 or rmssd > 120.0:
+        if rmssd is not None and (rmssd < 20.0 or rmssd > 120.0):
             arrhythmia_score += 0.3
-        if sdnn < 30.0:
+        if sdnn is not None and sdnn < 30.0:
             arrhythmia_score += 0.3
 
         vascular_score = 0.0
-        if est_sbp > 140 or est_dbp > 90:
+        if (est_sbp is not None and est_sbp > 140) or (est_dbp is not None and est_dbp > 90):
             vascular_score += 0.4
-        if pwv > 10.0:  # Rigidez arterial elevada
+        if pwv is not None and pwv > 10.0:  # Rigidez arterial elevada
             vascular_score += 0.4
-        if est_sbp > 170 or est_dbp > 110:
+        if (est_sbp is not None and est_sbp > 170) or (est_dbp is not None and est_dbp > 110):
             vascular_score += 0.2
 
         composite_risk = min(1.0, 0.6 * arrhythmia_score + 0.4 * vascular_score)
+        measured_bits = []
+        if hr is not None:
+            measured_bits.append(f"HR={hr:.1f} bpm")
+        if rmssd is not None:
+            measured_bits.append(f"RMSSD={rmssd:.1f} ms")
+        if est_sbp is not None:
+            measured_bits.append(f"PAS={est_sbp:.0f} mmHg")
+        if pwv is not None:
+            measured_bits.append(f"PWV={pwv:.1f} m/s")
+        detail = ", ".join(measured_bits)
 
         # Determinar nível de risco
         if composite_risk >= 0.7:
             risk_level = "critical"
-            rationale = f"Taquicardia/arritmia severa (HR={hr:.1f} bpm, RMSSD={rmssd:.1f} ms) associada a sobrecarga vascular (PAS={est_sbp:.0f} mmHg, PWV={pwv:.1f} m/s)."
+            rationale = f"Taquicardia/arritmia severa associada a sobrecarga vascular ({detail})."
             actions = ["Solicitar ECG 12 derivações contínuo", "Administrar antiarrítmico/anti-hipertensivo conforme protocolo", "Avaliação cardiológica presencial imediata"]
         elif composite_risk >= 0.4:
             risk_level = "moderate"
-            rationale = f"Instabilidade moderada do tônus autonômico cardíaco (HR={hr:.1f} bpm, PWV={pwv:.1f} m/s)."
+            rationale = f"Instabilidade moderada do tônus autonômico cardíaco ({detail})."
             actions = ["Manter telemetria contínua a cada 5 minutos", "Reavaliar curva pressórica em 30 minutos"]
         else:
             risk_level = "low"
-            rationale = f"Parâmetros hemodinâmicos e autonômicos dentro do setpoint homeostático (HR={hr:.1f} bpm, PAS={est_sbp:.0f} mmHg)."
+            rationale = f"Parâmetros hemodinâmicos e autonômicos dentro do setpoint homeostático ({detail})."
             actions = ["Manter vigilância ambulatorial/domiciliar padrão"]
 
         # Atribuição de massa Dempster-Shafer
-        confidence = min(0.95, max(0.60, 1.0 - (0.1 if rmssd < 10 else 0.0)))
+        confidence = min(0.95, max(0.60, 1.0 - (0.1 if rmssd is not None and rmssd < 10 else 0.0)))
         if risk_level == "critical":
             m_crit = 0.70 * confidence
             m_elev = 0.20 * confidence
@@ -127,12 +179,16 @@ class CardiologyAgent:
             rationale=rationale,
             recommended_actions=actions,
             supporting_biomarkers={
-                "heart_rate": hr,
-                "hrv_rmssd": rmssd,
-                "est_sbp": est_sbp,
-                "est_dbp": est_dbp,
-                "pwv": pwv,
-                "composite_risk": composite_risk,
+                key: value
+                for key, value in {
+                    "heart_rate": hr,
+                    "hrv_rmssd": rmssd,
+                    "est_sbp": est_sbp,
+                    "est_dbp": est_dbp,
+                    "pwv": pwv,
+                    "composite_risk": composite_risk,
+                }.items()
+                if value is not None
             },
             mass_assignment={"Critical": m_crit, "Elevated": m_elev, "Normal": m_norm, "Theta": m_theta},
         )
@@ -152,32 +208,45 @@ class PulmonologyAgent:
         respiratory_rate: Optional[float] = None,
     ) -> SpecialistOpinion:
         """Avalia risco respiratório e descompensação de oxigenação."""
-        spo2_direct = vitals.get("spo2", 97.0)
-        est_spo2 = (phantom_data or {}).get("spo2", {}).get("estimate", spo2_direct) if phantom_data else spo2_direct
-        rr = respiratory_rate or vitals.get("respiratory_rate", 16.0)
+        # Estimativa do filtro não é oximetria. Sem SpO2 e sem FR, o agente cala.
+        spo2_direct = _measured_number(vitals, "spo2")
+        rr = respiratory_rate if respiratory_rate is not None else _measured_number(vitals, "respiratory_rate")
+        _ = phantom_data
+        if spo2_direct is None and rr is None:
+            return _abstain(
+                self.agent_id,
+                self.specialty,
+                "A leitura não trouxe SpO2 nem frequência respiratória.",
+            )
 
         hypoxemia_score = 0.0
-        if est_spo2 < 90.0:
+        if spo2_direct is not None and spo2_direct < 90.0:
             hypoxemia_score += 0.8
-        elif est_spo2 < 94.0:
+        elif spo2_direct is not None and spo2_direct < 94.0:
             hypoxemia_score += 0.4
 
-        if rr > 24.0 or rr < 10.0:
+        if rr is not None and (rr > 24.0 or rr < 10.0):
             hypoxemia_score += 0.3
 
         composite_risk = min(1.0, hypoxemia_score)
+        measured_bits = []
+        if spo2_direct is not None:
+            measured_bits.append(f"SpO2={spo2_direct:.1f}%")
+        if rr is not None:
+            measured_bits.append(f"FR={rr:.0f} rpm")
+        detail = ", ".join(measured_bits)
 
         if composite_risk >= 0.7:
             risk_level = "critical"
-            rationale = f"Dessaturação grave detectada (SpO2 estimado={est_spo2:.1f}%, FR={rr:.0f} rpm). Risco iminente de insuficiência respiratória hipoxêmica."
+            rationale = f"Dessaturação grave detectada ({detail}). Risco iminente de insuficiência respiratória hipoxêmica."
             actions = ["Oxigenoterapia imediata (máscara de Venturi ou Cânula)", "Gasometria arterial urgente", "Radiografia de tórax no leito"]
         elif composite_risk >= 0.35:
             risk_level = "moderate"
-            rationale = f"Tendência de hipoxemia subclínica ou taquipneia compensatória (SpO2={est_spo2:.1f}%, FR={rr:.0f} rpm)."
+            rationale = f"Tendência de hipoxemia subclínica ou taquipneia compensatória ({detail})."
             actions = ["Oximetria contínua", "Posicionamento do paciente a 45 graus", "Vigilância de padrão respiratório"]
         else:
             risk_level = "low"
-            rationale = f"Troca gasosa e saturação periférica preservadas (SpO2={est_spo2:.1f}%, FR={rr:.0f} rpm)."
+            rationale = f"Troca gasosa e saturação periférica preservadas no que a leitura trouxe ({detail})."
             actions = ["Manter monitoramento de rotina"]
 
         confidence = 0.90
@@ -202,7 +271,15 @@ class PulmonologyAgent:
             confidence=confidence,
             rationale=rationale,
             recommended_actions=actions,
-            supporting_biomarkers={"est_spo2": est_spo2, "respiratory_rate": rr, "composite_risk": composite_risk},
+            supporting_biomarkers={
+                key: value
+                for key, value in {
+                    "est_spo2": spo2_direct,
+                    "respiratory_rate": rr,
+                    "composite_risk": composite_risk,
+                }.items()
+                if value is not None
+            },
             mass_assignment={"Critical": m_crit, "Elevated": m_elev, "Normal": m_norm, "Theta": m_theta},
         )
 
@@ -224,10 +301,23 @@ class IntensivistTriageAgent:
         """Determina a prioridade de leito e necessidade de suporte avançado à vida."""
         cardio_crit = cardio_opinion.mass_assignment.get("Critical", 0.0)
         pulmo_crit = pulmo_opinion.mass_assignment.get("Critical", 0.0)
+        cardio_silent = cardio_opinion.risk_level == "insufficient"
+        pulmo_silent = pulmo_opinion.risk_level == "insufficient"
+        if cardio_silent and pulmo_silent:
+            return _abstain(
+                self.agent_id,
+                self.specialty,
+                "O conselho não recebeu SpO2, frequência respiratória nem sinal hemodinâmico medido.",
+            )
 
-        systemic_criticality = 0.5 * cardio_crit + 0.5 * pulmo_crit
-        if cardio_crit > 0.4 and pulmo_crit > 0.4:
-            systemic_criticality += 0.2
+        if pulmo_silent:
+            systemic_criticality = cardio_crit
+        elif cardio_silent:
+            systemic_criticality = pulmo_crit
+        else:
+            systemic_criticality = 0.5 * cardio_crit + 0.5 * pulmo_crit
+            if cardio_crit > 0.4 and pulmo_crit > 0.4:
+                systemic_criticality += 0.2
 
         if systemic_criticality >= 0.5:
             risk_level = "critical"
@@ -343,6 +433,12 @@ class ClinicalConsensusCoordinator:
         elif prob_critical >= 0.25 or prob_elevated >= 0.45:
             consensus_risk = "ELEVATED"
             action_summary = "Risco Clínico Elevado — Vigilância Contínua e Terapia Dirigida"
+        elif final_mass.get("Theta", 0.0) >= 0.5 and prob_normal < 0.45:
+            consensus_risk = "INSUFFICIENT"
+            action_summary = (
+                "Sem SpO2, frequência respiratória ou sinal hemodinâmico medido "
+                "— o conselho não emite parecer."
+            )
         else:
             consensus_risk = "NORMAL"
             action_summary = "Condição Fisiológica Estável — Manter Monitoramento Remoto"

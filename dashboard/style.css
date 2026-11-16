@@ -45,12 +45,15 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
+    flex-wrap: wrap;
 }
 
-.logo-icon {
-    font-size: 2.2rem;
-    color: #0ea5e9;
-    filter: drop-shadow(0 0 8px rgba(14, 165, 233, 0.6));
+.brand-logo {
+    height: 48px;
+    width: auto;
+    display: block;
+    flex-shrink: 0;
 }
 
 .header-logo h1 {
@@ -60,7 +63,9 @@ body {
     letter-spacing: -0.5px;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
+    min-width: 0;
 }
 
 .badge {
@@ -93,8 +98,21 @@ body {
 }
 
 .header-session .btn {
+    flex: none;
     padding: 8px 14px;
     font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.btn-settings {
+    min-height: 36px;
+}
+
+.btn-settings-close {
+    flex: none;
+    width: 40px;
+    min-width: 40px;
+    padding: 8px;
 }
 
 .fleet-panel {
@@ -158,6 +176,24 @@ body {
 .fleet-toolbar input {
     flex: 1;
     min-width: 180px;
+}
+
+.fleet-synthetic {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #94a3b8;
+    font-size: 0.82rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.fleet-synthetic input {
+    flex: none;
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    accent-color: #38bdf8;
 }
 
 .fleet-table-wrap {
@@ -230,6 +266,18 @@ body {
     box-shadow: 0 0 24px rgba(14, 165, 233, 0.18);
 }
 
+.watch-card.stale,
+.metric-card.stale {
+    opacity: 0.78;
+    box-shadow: none;
+    border-color: rgba(148, 163, 184, 0.35);
+}
+
+.watch-card.stale .watch-name,
+.metric-card.stale .metric-value {
+    color: #94a3b8;
+}
+
 .watch-name {
     font-size: 1.35rem;
     font-weight: 600;
@@ -275,9 +323,16 @@ body {
 /* LAYOUT PRINCIPAL */
 .main-layout {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 1fr;
     gap: 20px;
     flex-grow: 1;
+    min-width: 0;
+}
+
+.main-layout-full .dashboard-grid,
+.main-layout-full .fleet-panel {
+    width: 100%;
+    min-width: 0;
 }
 
 /* CARDS GLASSMORPHISM */
@@ -310,10 +365,173 @@ body {
     font-size: 1.3rem;
 }
 
-/* SIDEBAR CONTROLS */
+/* SIDEBAR CONTROLS (agora no painel de configurações) */
 .sidebar {
     display: flex;
     flex-direction: column;
+}
+
+.settings-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.72);
+    z-index: 80;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.settings-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.settings-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(420px, 100%);
+    max-width: 100vw;
+    background: #0b1220;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 90;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+}
+
+.settings-panel.is-open {
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.settings-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-panel-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #f8fafc;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.settings-panel-body {
+    overflow: auto;
+    padding: 16px 18px 24px;
+    flex: 1;
+    -webkit-overflow-scrolling: touch;
+}
+
+.settings-panel-body .card {
+    margin-bottom: 16px;
+}
+
+.settings-panel-body .card:last-child {
+    margin-bottom: 0;
+}
+
+body.settings-open,
+body.device-details-open {
+    overflow: hidden;
+}
+
+.device-details-auth-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+.device-details-auth-prompt .device-details-status {
+    margin: 0;
+}
+.device-details-key-form {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+}
+.device-details-key-form label {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    font-weight: 500;
+}
+.device-details-key-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+.device-details-key-row input {
+    flex: 1 1 14rem;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.8);
+    color: #f8fafc;
+    font-size: 0.9rem;
+}
+
+.device-details-status {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+.device-details-block h3 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.device-details-note {
+    margin: 0 0 12px;
+    font-size: 0.8rem;
+    color: #cbd5e1;
+    line-height: 1.4;
+}
+
+.device-details-dl {
+    display: grid;
+    gap: 8px 0;
+    margin: 0;
+}
+
+.device-details-row {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    gap: 8px 12px;
+    align-items: start;
+}
+
+.device-details-dl dt {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.device-details-dl dd {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 0.9rem;
+    word-break: break-word;
 }
 
 .control-group {
@@ -1073,12 +1291,39 @@ button.nav-btn.active {
     }
 
     .header-logo,
+    .header-session,
     .connection-status {
         justify-content: center;
     }
 
+    .brand-logo {
+        height: 40px;
+    }
+
     .header-nav {
         width: 100%;
+    }
+}
+
+@media (max-width: 520px) {
+    .header-session {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .settings-panel {
+        width: 100%;
+    }
+
+    .header-logo {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .header-logo h1 {
+        flex-direction: column;
+        font-size: 1.35rem;
+        text-align: center;
     }
 }
 

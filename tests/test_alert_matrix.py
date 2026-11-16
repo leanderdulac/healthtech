@@ -61,11 +61,29 @@ def test_hypoglycemia_severe():
 
 
 def test_generate_dataset_balance():
+    from src.clinical_intelligence.alert_matrix_dataset import (
+        _SEVERITY_RANK,
+        _r3_principal_by_base,
+        _rule_severity,
+    )
+
     df = generate_dataset(n_per_rule=5, n_normal=50, n_false_positive=50, seed=1)
     assert len(df) > 100
     assert df["is_false_positive"].sum() > 0
     assert df["is_true_alert"].sum() > 0
     assert set(df["severity"].unique()).issubset({"none", "leve", "moderado", "critico"})
+    report = df.attrs["filter_report"]
+    assert report["rows_out"] == len(df)
+    assert report["rows_removed"] == report["rows_in"] - report["rows_out"]
+    sampled = df["sampled_rule_id"].fillna("").astype(str)
+    primary = df["rule_id"].fillna("").astype(str)
+    mismatch = (sampled != "") & (primary != "") & (sampled != primary)
+    accepted = _r3_principal_by_base()
+    severity = _rule_severity()
+    for base, winner in zip(sampled[mismatch], primary[mismatch]):
+        if base in accepted:
+            assert accepted[base] == winner
+            assert _SEVERITY_RANK[severity[winner]] > _SEVERITY_RANK[severity[base]]
 
 
 def test_decision_support_is_never_a_mandatory_protocol():

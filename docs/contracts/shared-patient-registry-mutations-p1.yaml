@@ -1,0 +1,722 @@
+openapi: 3.0.3
+info:
+  title: HealthTech Core — Shared Patient Registry Mutations (P1)
+  version: 0.1.0-draft
+  description: |
+    DRAFT for workshop — NOT CONFIRMED.
+    Extends P0 patient reads with create/update/search/dedup/consents/attachments.
+    Service-to-service auth only (X-API-Key). Human identity stays in Next2U BFF.
+  contact:
+    name: HealthTech Core
+    url: https://github.com/leanderdulac/healthtech
+servers:
+  - url: https://healthtech-secure-api-xb6tlskpoq-uc.a.run.app
+    description: Core secure (GCP)
+  - url: http://localhost:8080
+    description: Local
+tags:
+  - name: patients-read
+    description: CONFIRMED P0 surfaces (continuity)
+  - name: patients-write
+    description: DRAFT mutations
+  - name: patients-dedup
+    description: DRAFT search / dedup / merge
+  - name: patients-consents
+    description: DRAFT consents
+  - name: patients-attachments
+    description: DRAFT attachment metadata
+paths:
+  /api/v1/patients:
+    get:
+      tags: [patients-read]
+      summary: Authorized enumeration (CONFIRMED P0)
+      operationId: listPatientsAuthorized
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Territory'
+        - $ref: '#/components/parameters/MunicipalityId'
+        - $ref: '#/components/parameters/UbsId'
+      responses:
+        '200':
+          description: Authorized page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientListResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    post:
+      tags: [patients-write]
+      summary: Create patient (DRAFT)
+      operationId: createPatient
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientCreateRequest' }
+      responses:
+        '201':
+          description: Created
+          headers:
+            ETag:
+              schema: { type: string }
+              description: registry_version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Patient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Idempotency or fingerprint conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConflictError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /api/v1/patients/search:
+    post:
+      tags: [patients-dedup]
+      summary: Search registry (DRAFT)
+      description: |
+        Operator search. Does NOT replace territorial GET /patients.
+        BFF must still enforce professional territory before exposing hits.
+      operationId: searchPatients
+      security: [{ ApiKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientSearchRequest' }
+      responses:
+        '200':
+          description: Ranked hits
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientSearchResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/patients/dedup/candidates:
+    post:
+      tags: [patients-dedup]
+      summary: Suggest duplicates (DRAFT) — never auto-merge
+      operationId: suggestDedupCandidates
+      security: [{ ApiKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DedupRequest' }
+      responses:
+        '200':
+          description: Suggestions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DedupResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/patients/{patient_id}:
+    parameters:
+      - $ref: '#/components/parameters/PatientId'
+    get:
+      tags: [patients-read]
+      summary: Get patient (P0 + DRAFT registry_version)
+      operationId: getPatient
+      security: [{ ApiKeyAuth: [] }]
+      responses:
+        '200':
+          description: Patient
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Patient' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    patch:
+      tags: [patients-write]
+      summary: Patch patient with optimistic concurrency (DRAFT)
+      operationId: patchPatient
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientPatchRequest' }
+      responses:
+        '200':
+          description: Updated
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Patient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Version conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionConflictError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /api/v1/patients/{patient_id}/merge:
+    post:
+      tags: [patients-dedup]
+      summary: Merge duplicate into path survivor (DRAFT)
+      operationId: mergePatients
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MergeRequest' }
+      responses:
+        '200':
+          description: Survivor
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MergeResult' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/patients/{patient_id}/links:
+    put:
+      tags: [patients-write]
+      summary: Replace ACS / caregiver / program links (DRAFT)
+      operationId: putPatientLinks
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PatientLinks' }
+      responses:
+        '200':
+          description: Updated patient
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Patient' }
+        '409':
+          description: Version conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionConflictError' }
+
+  /api/v1/patients/{patient_id}/consents:
+    get:
+      tags: [patients-consents]
+      summary: List consents (DRAFT)
+      operationId: listConsents
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+      responses:
+        '200':
+          description: Consents
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsentList' }
+    put:
+      tags: [patients-consents]
+      summary: Upsert consents (DRAFT)
+      operationId: putConsents
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConsentList' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConsentList' }
+        '409':
+          description: Version conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionConflictError' }
+
+  /api/v1/patients/{patient_id}/attachments:
+    get:
+      tags: [patients-attachments]
+      summary: List attachment metadata (DRAFT)
+      operationId: listAttachments
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+      responses:
+        '200':
+          description: Metadata list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttachmentList' }
+    post:
+      tags: [patients-attachments]
+      summary: Register attachment; return signed upload URL (DRAFT)
+      operationId: createAttachment
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttachmentCreateRequest' }
+      responses:
+        '201':
+          description: Metadata + upload URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttachmentCreateResponse' }
+
+  /api/v1/patients/{patient_id}/history:
+    get:
+      tags: [patients-write]
+      summary: Version history summary (DRAFT)
+      operationId: getPatientHistory
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PatientId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: History page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PatientHistoryResponse' }
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Service key. Proposed scopes — patients:read (P0), patients:write,
+        patients:merge, patients:consent. Human JWT never sent to Core.
+
+  parameters:
+    PatientId:
+      name: patient_id
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 64 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, maximum: 10000, default: 0 }
+    Territory:
+      name: territory
+      in: query
+      description: Repeatable. municipality_id or municipality_id:ubs_id
+      schema: { type: array, items: { type: string } }
+      style: form
+      explode: true
+    MunicipalityId:
+      name: municipality_id
+      in: query
+      schema: { type: array, items: { type: string } }
+      style: form
+      explode: true
+    UbsId:
+      name: ubs_id
+      in: query
+      schema: { type: array, items: { type: string } }
+      style: form
+      explode: true
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Opaque registry_version from last ETag
+      schema: { type: string, minLength: 1 }
+
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Missing/invalid API key
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Scope or allow-list denied
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Patient not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ConflictError' }
+    Unavailable:
+      description: Operational DB unavailable
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+
+    ConflictError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            conflict_code:
+              type: string
+              enum: [idempotency_replay, duplicate_fingerprint, merge_race]
+
+    VersionConflictError:
+      type: object
+      required: [detail, current]
+      properties:
+        detail: { type: string, example: registry_version mismatch }
+        current: { $ref: '#/components/schemas/Patient' }
+
+    PatientListResponse:
+      type: object
+      required: [items, patients, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Patient' }
+        patients:
+          type: array
+          items: { $ref: '#/components/schemas/Patient' }
+        total: { type: integer, minimum: 0 }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    Patient:
+      type: object
+      required: [patient_id, registry_version, updated_at]
+      properties:
+        patient_id: { type: string }
+        registry_version:
+          type: string
+          description: Opaque monotonic version (ETag)
+        display_name: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        caregiver_phone: { type: string, nullable: true }
+        birth_date: { type: string, format: date, nullable: true }
+        sex:
+          type: string
+          enum: [female, male, other, unknown]
+          nullable: true
+        cpf_fingerprint:
+          type: string
+          nullable: true
+          description: One-way fingerprint only — never raw CPF
+        address: { $ref: '#/components/schemas/Address' }
+        programs:
+          type: array
+          items: { type: string }
+        diseases:
+          type: array
+          items: { type: string }
+        clinical_flags:
+          type: object
+          additionalProperties: true
+        isolation_social: { type: boolean, nullable: true }
+        is_demo: { type: boolean, default: false }
+        municipality_id: { type: string, nullable: true }
+        ubs_id:
+          type: string
+          nullable: true
+          description: Same string as Next2U health_unit_id
+        links: { $ref: '#/components/schemas/PatientLinks' }
+        consent_summary:
+          type: array
+          items: { $ref: '#/components/schemas/ConsentSummaryItem' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Address:
+      type: object
+      properties:
+        street: { type: string }
+        number: { type: string }
+        complement: { type: string }
+        district: { type: string }
+        city: { type: string }
+        state: { type: string }
+        postal_code: { type: string }
+        geo:
+          type: object
+          properties:
+            lat: { type: number }
+            lon: { type: number }
+
+    PatientCreateRequest:
+      type: object
+      required: [display_name]
+      properties:
+        patient_id:
+          type: string
+          description: Optional client suggestion; Core may mint instead
+        display_name: { type: string, minLength: 1 }
+        phone: { type: string }
+        caregiver_phone: { type: string }
+        birth_date: { type: string, format: date }
+        sex: { type: string, enum: [female, male, other, unknown] }
+        cpf_fingerprint: { type: string }
+        address: { $ref: '#/components/schemas/Address' }
+        programs:
+          type: array
+          items: { type: string }
+        diseases:
+          type: array
+          items: { type: string }
+        isolation_social: { type: boolean }
+        is_demo: { type: boolean, default: false }
+        municipality_id: { type: string }
+        ubs_id: { type: string }
+        links: { $ref: '#/components/schemas/PatientLinks' }
+
+    PatientPatchRequest:
+      type: object
+      description: Partial update; omitted = unchanged
+      properties:
+        display_name: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        caregiver_phone: { type: string, nullable: true }
+        birth_date: { type: string, format: date, nullable: true }
+        sex: { type: string, nullable: true }
+        cpf_fingerprint: { type: string, nullable: true }
+        address: { $ref: '#/components/schemas/Address' }
+        programs:
+          type: array
+          items: { type: string }
+        diseases:
+          type: array
+          items: { type: string }
+        clinical_flags:
+          type: object
+          additionalProperties: true
+        isolation_social: { type: boolean, nullable: true }
+        municipality_id: { type: string, nullable: true }
+        ubs_id: { type: string, nullable: true }
+        links: { $ref: '#/components/schemas/PatientLinks' }
+
+    PatientLinks:
+      type: object
+      properties:
+        acs_agent_id: { type: string, nullable: true }
+        caregiver_subject_id:
+          type: string
+          nullable: true
+          description: Caregiver identity subject (not raw login)
+        caregiver_relationship: { type: string, nullable: true }
+        program_enrollments:
+          type: array
+          items: { type: string }
+
+    PatientSearchRequest:
+      type: object
+      properties:
+        q: { type: string, description: Free text name/phone }
+        cpf_fingerprint: { type: string }
+        phone: { type: string }
+        municipality_id: { type: string }
+        ubs_id: { type: string }
+        limit: { type: integer, minimum: 1, maximum: 50, default: 20 }
+
+    PatientSearchResponse:
+      type: object
+      required: [hits]
+      properties:
+        hits:
+          type: array
+          items:
+            type: object
+            required: [patient, score]
+            properties:
+              patient: { $ref: '#/components/schemas/Patient' }
+              score: { type: number }
+              match_reasons:
+                type: array
+                items: { type: string }
+
+    DedupRequest:
+      type: object
+      required: [anchor]
+      properties:
+        anchor:
+          oneOf:
+            - type: object
+              required: [patient_id]
+              properties:
+                patient_id: { type: string }
+            - $ref: '#/components/schemas/PatientCreateRequest'
+        limit: { type: integer, minimum: 1, maximum: 20, default: 10 }
+
+    DedupResponse:
+      type: object
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          items:
+            type: object
+            required: [patient_id, score, reasons]
+            properties:
+              patient_id: { type: string }
+              score: { type: number, minimum: 0, maximum: 1 }
+              reasons:
+                type: array
+                items: { type: string }
+
+    MergeRequest:
+      type: object
+      required: [duplicate_patient_id, reason]
+      properties:
+        duplicate_patient_id: { type: string }
+        reason: { type: string, minLength: 3 }
+        reassign_wearables: { type: boolean, default: true }
+        reassign_open_work: { type: boolean, default: false }
+
+    MergeResult:
+      type: object
+      required: [survivor, retired_patient_id]
+      properties:
+        survivor: { $ref: '#/components/schemas/Patient' }
+        retired_patient_id: { type: string }
+        reassigned:
+          type: object
+          additionalProperties: { type: integer }
+
+    ConsentSummaryItem:
+      type: object
+      required: [purpose, status]
+      properties:
+        purpose:
+          type: string
+          enum: [care, telemetry, messaging_sm_click, research, caregiver_share]
+        status:
+          type: string
+          enum: [granted, denied, revoked, unknown]
+        updated_at: { type: string, format: date-time }
+
+    ConsentRecord:
+      allOf:
+        - $ref: '#/components/schemas/ConsentSummaryItem'
+        - type: object
+          properties:
+            evidence_attachment_id: { type: string, nullable: true }
+            actor_subject_id: { type: string }
+            note: { type: string }
+
+    ConsentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ConsentRecord' }
+        registry_version: { type: string }
+
+    AttachmentCreateRequest:
+      type: object
+      required: [filename, content_type, byte_size, kind]
+      properties:
+        filename: { type: string }
+        content_type: { type: string }
+        byte_size: { type: integer, minimum: 1, maximum: 20971520 }
+        kind:
+          type: string
+          enum: [id_document, consent_form, clinical_scan, other]
+
+    AttachmentCreateResponse:
+      type: object
+      required: [attachment_id, upload_url, expires_at]
+      properties:
+        attachment_id: { type: string }
+        upload_url: { type: string, format: uri }
+        expires_at: { type: string, format: date-time }
+
+    AttachmentMeta:
+      type: object
+      required: [attachment_id, kind, filename, created_at]
+      properties:
+        attachment_id: { type: string }
+        kind: { type: string }
+        filename: { type: string }
+        content_type: { type: string }
+        byte_size: { type: integer }
+        created_at: { type: string, format: date-time }
+        download_url: { type: string, format: uri, nullable: true }
+
+    AttachmentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AttachmentMeta' }
+
+    PatientHistoryResponse:
+      type: object
+      required: [items, total]
+      properties:
+        total: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            required: [registry_version, at, actor_type]
+            properties:
+              registry_version: { type: string }
+              at: { type: string, format: date-time }
+              actor_type: { type: string, enum: [service, professional_bff, system] }
+              summary: { type: string }

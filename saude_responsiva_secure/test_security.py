@@ -283,24 +283,53 @@ def test_pydantic_input_validation_and_sanitization():
     assert res_filter.status_code == 422
 
 
-def test_lgpd_patient_anonymization_endpoint():
+def test_lgpd_patient_anonymization_endpoint(tmp_path, monkeypatch, caplog):
+    import json
+    import logging
+
+    from app.services.pilot_review import record_ingest, review_path
+    from src.ops.device_registry import list_devices
+
+    monkeypatch.setenv("PILOT_REVIEW_PATH", str(tmp_path / "events.jsonl"))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("OPERATIONAL_DATABASE_URL", raising=False)
     client.post(
         "/api/v1/wearables/ingest",
         headers={"X-API-Key": INGEST_KEY},
-        json={"patient_id": "PAT-LGPD-DEL", "heart_rate": 80.0},
+        json={"patient_id": "PAT-LGPD-DEL", "device_id": "DEV-LGPD-DEL", "heart_rate": 80.0},
     )
+    record_ingest(
+        {
+            "patient_id": "PAT-LGPD-DEL",
+            "device_id": "DEV-LGPD-DEL",
+            "clinical_alerts": {"engine": "alert_matrix_rules", "pilot_eligible": False},
+        }
+    )
+    assert any(
+        row.get("patient_id") == "PAT-LGPD-DEL"
+        for row in list_devices(patient_id="PAT-LGPD-DEL", include_synthetic=True)["devices"]
+    )
+
+    caplog.set_level(logging.INFO, logger="saude_responsiva.audit")
     del_res = client.delete(
         "/api/v1/patient/PAT-LGPD-DEL/anonymize",
         headers={"X-API-Key": ADMIN_KEY},
     )
     assert del_res.status_code == 200
     assert del_res.json()["status"] == "success"
+    assert "PAT-LGPD-DEL" not in caplog.text
+    assert "redigido" in caplog.text
 
     get_res = client.get(
         "/api/v1/wearables/patient/PAT-LGPD-DEL/latest",
         headers={"X-API-Key": ADMIN_KEY},
     )
     assert get_res.status_code == 404
+    fleet = list_devices(patient_id="PAT-LGPD-DEL", include_synthetic=True)
+    assert fleet["devices"] == []
+    leftover = review_path().read_text(encoding="utf-8") if review_path().is_file() else ""
+    assert "PAT-LGPD-DEL" not in leftover
+    assert json.loads(caplog.records[-1].message)["path"].endswith("/anonymize") or "redigido" in caplog.text
 
 
 def test_batch_ingest():
@@ -317,6 +346,83 @@ def test_batch_ingest():
     )
     assert response.status_code == 200
     assert response.json()["processed_count"] == 2
+
+
+def test_ingest_resend_with_client_reading_id_is_duplicate():
+    payload = {
+        "patient_id": "PAT-IDEM-SEC",
+        "heart_rate": 77.0,
+        "timestamp": "2026-09-24T12:00:00Z",
+        "client_reading_id": "room-sec-1",
+    }
+    first = client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json=payload,
+    )
+    second = client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json=payload,
+    )
+    assert first.status_code == 200
+    assert first.json()["ingest_status"] == "accepted"
+    assert second.status_code == 200
+    assert second.json()["ingest_status"] == "duplicate"
+    hist = client.get(
+        "/api/v1/wearables/patient/PAT-IDEM-SEC/history",
+        headers={"X-API-Key": READ_KEY},
+    )
+    assert hist.status_code == 200
+    assert hist.json()["total_records"] == 1
+
+
+def test_batch_ingest_reports_partial_duplicates():
+    seed = {
+        "patient_id": "PAT-IDEM-SEC-B",
+        "heart_rate": 70.0,
+        "timestamp": "2026-09-24T08:00:00Z",
+        "client_reading_id": "room-sec-b1",
+    }
+    client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json=seed,
+    )
+    response = client.post(
+        "/api/v1/wearables/batch-ingest",
+        headers={"X-API-Key": INGEST_KEY},
+        json={
+            "patient_id": "PAT-IDEM-SEC-B",
+            "readings": [
+                seed,
+                {
+                    "patient_id": "PAT-IDEM-SEC-B",
+                    "heart_rate": 71.0,
+                    "timestamp": "2026-09-24T08:05:00Z",
+                    "client_reading_id": "room-sec-b2",
+                },
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["duplicate_count"] == 1
+    assert body["accepted_count"] == 1
+    assert [item["status"] for item in body["results"]] == ["duplicate", "accepted"]
+
+
+def test_read_key_still_cannot_write_after_idempotency():
+    response = client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": READ_KEY},
+        json={
+            "patient_id": "PAT-IDEM-SEC-AUTH",
+            "heart_rate": 78.0,
+            "client_reading_id": "should-not-store",
+        },
+    )
+    assert response.status_code == 403
 
 
 def test_bmo_analysis_requires_read_scope():

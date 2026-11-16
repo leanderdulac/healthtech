@@ -39,6 +39,38 @@ class TestMultiAgentConsensus(unittest.TestCase):
         self.assertEqual(crit_op.risk_level, "critical")
         self.assertGreater(crit_op.mass_assignment["Critical"], 0.5)
 
+    def test_pulmonology_stays_silent_without_a_reading(self):
+        silent = self.pulmo.evaluate(
+            vitals={"heart_rate": 80.0},
+            phantom_data={"spo2": {"estimate": 80.0}},
+        )
+        self.assertEqual(silent.risk_level, "insufficient")
+        self.assertEqual(silent.mass_assignment["Theta"], 1.0)
+        self.assertNotIn("97", silent.rationale)
+        self.assertNotIn("16", silent.rationale)
+        self.assertNotIn("est_spo2", silent.supporting_biomarkers)
+
+        measured = self.pulmo.evaluate(vitals={"spo2": 96.0})
+        self.assertIn("96", measured.rationale)
+        self.assertNotIn("16", measured.rationale)
+        self.assertNotIn("respiratory_rate", measured.supporting_biomarkers)
+
+    def test_cardiology_does_not_invent_a_normal_reading(self):
+        silent = self.cardio.evaluate(vitals={})
+        self.assertEqual(silent.risk_level, "insufficient")
+        self.assertNotIn("75", silent.rationale)
+        self.assertNotIn("120", silent.rationale)
+
+    def test_empty_reading_is_not_called_stable(self):
+        consensus = self.coordinator.reach_consensus(
+            patient_id="PAT-EMPTY",
+            vitals={},
+        )
+        self.assertEqual(consensus["consensus_risk"], "INSUFFICIENT")
+        pulmo = consensus["specialist_opinions"][1]
+        self.assertNotIn("97", pulmo["rationale"])
+        self.assertNotIn("16", pulmo["rationale"])
+
     def test_pulmonology_agent_hypoxemia(self):
         # Descompensação respiratória
         pulmo_crit = self.pulmo.evaluate(

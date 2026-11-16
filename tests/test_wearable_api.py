@@ -2,6 +2,8 @@
 test_wearable_api.py — Testes dos endpoints de ingestão e monitoramento de wearables
 """
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from src.api_server import app
@@ -10,6 +12,32 @@ client = TestClient(app)
 
 INGEST_HEADERS = {"X-API-Key": "ht_ingest_test_key_32chars_long_token"}
 READ_HEADERS = {"X-API-Key": "ht_read_test_key_32chars_long_token"}
+
+
+def test_ppg_waveform_keeps_measured_heart_rate_and_measured_alerts():
+    response = client.post(
+        "/api/v1/wearables/ingest",
+        headers=INGEST_HEADERS,
+        json={
+            "patient_id": "TEST_PATIENT_PPG",
+            "device_id": "VE30",
+            "heart_rate": 76.0,
+            "spo2": 98.0,
+            "skin_temp": 33.4,
+            "ppg_signal": [500.0, 520.0, 560.0, 610.0, 580.0, 530.0, 505.0, 495.0],
+            "filter_type": "BMO",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["cleaned_telemetry"]["heart_rate_clean"] == 76.0
+    assert data["cleaned_telemetry"]["ppg_role"] == "waveform"
+    assert data["phantom_data"]["not_a_measurement"] is True
+    alerts = data["clinical_alerts"]
+    assert alerts["is_true_alert"] is False
+    assert alerts["vitals_used"]["hr"] == 76.0
+    assert alerts["vitals_used"]["pas"] is None
+    assert alerts["engine"] == "alert_matrix_rules"
 
 
 def test_wearable_ingest_endpoint():
@@ -63,11 +91,19 @@ def test_wearable_get_latest_and_history():
     assert len(hist_data["records"]) == 2
 
 
-def test_dashboard_bootstrap_saves_read_key(monkeypatch):
+def test_dashboard_bootstrap_does_not_return_api_key(monkeypatch):
     monkeypatch.setenv("READ_API_KEY", "ht_read_test_key_32chars_long_token")
+    monkeypatch.setenv("API_KEY", "ht_admin_test_key_32chars_long_token")
     res = client.get("/api/v1/ops/dashboard-bootstrap")
     assert res.status_code == 200
-    assert res.json()["api_key"] == "ht_read_test_key_32chars_long_token"
+    body = res.json()
+    assert "api_key" not in body
+    assert body["ok"] is True
+    assert body["fleet_summary_path"] == "/api/v1/ops/fleet-summary"
+    for env_name in ("READ_API_KEY", "API_KEY"):
+        configured = os.environ.get(env_name)
+        if configured:
+            assert configured not in res.text
 
 
 def test_device_registry_handles_hundreds_of_watches():
@@ -91,8 +127,14 @@ def test_device_registry_handles_hundreds_of_watches():
 
 
 def test_live_watch_bridge_module_imports():
-    from src.ops.live_watch_bridge import cached_devices, new_ingest_frames, poll_once
+    from src.ops.live_watch_bridge import (
+        cached_devices,
+        new_ingest_frames,
+        poll_once,
+        reset_bridge_state,
+    )
 
+    reset_bridge_state()
     assert cached_devices() == []
     assert new_ingest_frames([]) == []
     devices, frames = poll_once()

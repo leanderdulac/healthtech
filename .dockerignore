@@ -6,10 +6,12 @@ node_modules
 next2u-web/node_modules
 next2u-web/.next
 companion-android
+next2u-instalar
 **/__pycache__
 **/*.pyc
 data/chroma_db
 data/lakehouse
+data/ops/private
 data/models/_pre_v1_backup
 data/models/language_v1/train.log
 data/models/temporal_v1_train.log

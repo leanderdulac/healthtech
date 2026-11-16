@@ -31,11 +31,10 @@
 GET {BASE_URL}/api/health
 ```
 
-BuildConfig / `local.properties` (nunca commitar a chave):
+BuildConfig / `local.properties` só levam URL e paciente. A API key é digitada no app e guardada cifrada; não entra no APK.
 
 ```properties
 HEALTHTECH_BASE_URL=http://10.0.2.2:8080
-HEALTHTECH_INGEST_API_KEY=
 HEALTHTECH_PATIENT_ID=PAT-HBAND-001
 ```
 

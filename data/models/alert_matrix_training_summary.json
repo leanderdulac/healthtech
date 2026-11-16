@@ -1,17 +1,30 @@
 {
   "n_rules": 158,
-  "n_samples": 21100,
+  "n_samples": 15686,
   "metrics": {
-    "severity_f1_macro": 0.9389202779358259,
-    "false_positive_precision": 0.8467874794069192,
-    "false_positive_recall": 0.9980582524271845,
-    "false_positive_f1": 0.9162210338680927,
+    "severity_f1_macro": 0.8953337085350772,
+    "false_positive_precision": 0.9005847953216374,
+    "false_positive_recall": 1.0,
+    "false_positive_f1": 0.9476923076923077,
     "true_alert_precision": 1.0,
-    "true_alert_recall": 0.9988469299509946,
-    "true_alert_f1": 0.9994231323911162
+    "true_alert_recall": 0.995722433460076,
+    "true_alert_f1": 0.9978566325315551
   },
   "model_path": "data/models/alert_matrix_classifier.pkl",
   "dataset": "data/clinical_intelligence/alert_matrix_training.csv",
+  "filter": {
+    "rows_in": 21100,
+    "dropped_redundant_tie": 654,
+    "dropped_divergent_overlap": 4281,
+    "kept_r3_upgrade": 145,
+    "kept_unreviewed_cofire": 9730,
+    "dropped_conflicting_label": 0,
+    "dropped_duplicate": 479,
+    "rows_out": 15686,
+    "rows_removed": 5414
+  },
+  "label_source": "primary_rule_id da matriz após a precedência R3",
+  "metrics_note": "F1 calculado no dataset sintético gerado pelas mesmas regras. Não é validação clínica.",
   "next2u": {
     "n_base_alerts": 158,
     "n_expanded_patterns": 971,

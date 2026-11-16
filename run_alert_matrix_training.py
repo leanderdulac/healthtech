@@ -70,6 +70,8 @@ def main() -> int:
         n_ui_fp=args.n_ui_fp,
         seed=args.seed,
     )
+    filter_report = dict(getattr(df, "attrs", {}).get("filter_report") or {})
+    logger.info("Filtro R3 (divergência e redundância): %s", filter_report)
     out_csv = Path(args.dataset_out)
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_csv, index=False)
@@ -134,6 +136,12 @@ def main() -> int:
         },
         "model_path": str(model_path),
         "dataset": str(out_csv),
+        "filter": filter_report,
+        "label_source": "primary_rule_id da matriz após a precedência R3",
+        "metrics_note": (
+            "F1 calculado no dataset sintético gerado pelas mesmas regras. "
+            "Não é validação clínica."
+        ),
         "next2u": {
             "n_base_alerts": 158,
             "n_expanded_patterns": 971,

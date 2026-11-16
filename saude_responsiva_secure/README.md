@@ -42,7 +42,7 @@ saude_responsiva_secure/
 | Anti-IDOR | `ALLOWED_PATIENT_IDS` + `require_patient_access` |
 | Rate limit | janela deslizante por path/chave (`RATE_LIMIT_INGEST` default 300/min) |
 | Clinical alerts | subset `clinical_intelligence` via `scripts/sync_secure_vendor.py` (`_vendor_src/`) |
-| Cadastro operacional | subset `ops`: `timestamps`, `patients_routes`, `operational_patients`, `live_devices`, `device_registry`  |
+| Cadastro operacional | subset `ops`: `timestamps`, `patients_routes`, `operational_patients`, `live_devices`, `device_registry`, `device_detail`  |
 | Headers | HSTS, CSP, nosniff, X-Frame-Options, Referrer-Policy |
 | Auditoria | Middleware JSON com `X-Request-ID` e chave mascarada |
 | Validação | Pydantic v2 (limites fisiológicos, patient_id sanitizado) |
@@ -85,8 +85,8 @@ docker run --rm -p 8080:8080 \
 |--------|------|--------|
 | GET | `/api/health` | público |
 | GET | `/api/status` | `admin` |
-| POST | `/api/v1/wearables/ingest` | `wearables:write` |
-| POST | `/api/v1/wearables/batch-ingest` | `wearables:write` |
+| POST | `/api/v1/wearables/ingest` | `wearables:write` (idempotente + persistido em Postgres quando `DATABASE_URL` existe) |
+| POST | `/api/v1/wearables/batch-ingest` | `wearables:write` (resultados por item: accepted / duplicate / rejected) |
 | GET | `/api/v1/wearables/patient/{id}/latest` | `wearables:read` + paciente |
 | GET | `/api/v1/wearables/patient/{id}/history` | `wearables:read` + paciente |
 | GET | `/api/v1/patients` | `wearables:read` (authz **antes** de LIMIT/OFFSET; fail-closed sem restrição) |
@@ -104,7 +104,8 @@ docker run --rm -p 8080:8080 \
 curl -s -X POST http://localhost:8080/api/v1/wearables/ingest \
   -H "X-API-Key: $INGEST_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"patient_id":"PAT-001","heart_rate":78.0,"hrv_rmssd":42.0,"spo2":98.0}'
+  -H "Idempotency-Key: flush-chunk-01" \
+  -d '{"patient_id":"PAT-001","heart_rate":78.0,"hrv_rmssd":42.0,"spo2":98.0,"timestamp":"2026-09-24T12:00:00Z","client_reading_id":"room-uuid-001"}'
 ```
 
 ## Testes

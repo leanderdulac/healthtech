@@ -36,8 +36,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const host = window.location.host;
     const isHttps = protocol === "https:";
     const urlParams = new URLSearchParams(window.location.search);
-    // Nunca embutir chave real no frontend versionado — use ?api_key= ou localStorage
+    // Chaves injetadas pelo bootstrap antigo não são confiáveis — exigir opt-in do operador.
+    const API_KEY_TRUST = "2026-09-24-ops";
+    if (localStorage.getItem("api_key_trust") !== API_KEY_TRUST) {
+        localStorage.removeItem("api_key");
+        localStorage.setItem("api_key_trust", API_KEY_TRUST);
+    }
     let apiKey = urlParams.get("api_key") || localStorage.getItem("api_key") || "";
+    if (urlParams.get("api_key")) {
+        localStorage.setItem("api_key", apiKey);
+        localStorage.setItem("api_key_trust", API_KEY_TRUST);
+    }
+    const fleetLogic = window.HealthtechFleetLogic || {};
     
     let API_URL = `${protocol}//${host}`;
     let WS_HOST = host;
@@ -60,6 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let lastIngestStamp = "";
     let fleetDevices = [];
     let selectedDeviceId = "";
+    let deviceDetailsApi = null;
     let fleetPage = 0;
     const FLEET_PAGE_SIZE = 50;
     const DISPLAY_TZ = "America/Sao_Paulo";
@@ -107,7 +118,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (sec < 4) return "agora";
         if (sec < 60) return `há ${sec}s`;
         if (sec < 3600) return `há ${Math.floor(sec / 60)} min`;
-        return `há ${Math.floor(sec / 3600)} h`;
+        if (sec < 86400) return `há ${Math.floor(sec / 3600)} h`;
+        const days = Math.floor(sec / 86400);
+        if (days === 1) return "há 1 dia";
+        return `há ${days} dias`;
     }
 
     function liveStamp(rowOrFrame) {
@@ -324,25 +338,31 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2. CONEXÃO WEBSOCKET E COMUNICAÇÃO BIDIRECIONAL
     // ========================================================================
     function updateStatusIndicator(status) {
-        wsStatusIndicator.className = "connection-status";
-        const indicator = wsStatusIndicator.querySelector(".status-indicator");
-        const text = wsStatusIndicator.querySelector(".status-text");
-
         if (status === "connected") {
-            indicator.className = "status-indicator green";
-            text.textContent = "Conectado";
             isConnected = true;
         } else if (status === "connecting") {
-            indicator.className = "status-indicator yellow";
-            text.textContent = "Conectando...";
             isConnected = false;
         } else {
-            indicator.className = "status-indicator red";
-            text.textContent = "Desconectado";
             isConnected = false;
-            // Desativar botões
             btnStart.disabled = true;
             btnStop.disabled = true;
+        }
+    }
+
+    function updateFleetPill(mode) {
+        if (!wsStatusIndicator) return;
+        const indicator = wsStatusIndicator.querySelector(".status-indicator");
+        const text = wsStatusIndicator.querySelector(".status-text");
+        if (!indicator || !text) return;
+        if (mode === "live") {
+            indicator.className = "status-indicator green";
+            text.textContent = "Sinal no prazo";
+        } else if (mode === "stale") {
+            indicator.className = "status-indicator yellow";
+            text.textContent = "Sem leitura recente";
+        } else {
+            indicator.className = "status-indicator red";
+            text.textContent = "Painel sem resposta";
         }
     }
 
@@ -352,9 +372,6 @@ document.addEventListener("DOMContentLoaded", () => {
             reconnectTimer = null;
         }
         if (!apiKey) {
-            updateStatusIndicator("disconnected");
-            const hint = document.getElementById("watch-sub");
-            if (hint) hint.textContent = "Informe a API key no canto superior para ver o relógio.";
             return;
         }
         updateStatusIndicator("connecting");
@@ -382,7 +399,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             if (data.type === "patient_ingest") {
-                applyIngestFrame(data.data || data);
+                applyIngestFrame(data.data || data, { fromLiveIngest: true });
                 return;
             }
             if (data && data.sensor_readings) {
@@ -429,17 +446,18 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
-    function applyIngestFrame(ing) {
+    function applyIngestFrame(ing, options) {
         if (!ing) return;
+        const opts = options || {};
         const deviceId = ing.device_id || "";
         if (deviceId && !selectedDeviceId) selectedDeviceId = deviceId;
         if (selectedDeviceId && deviceId && deviceId !== selectedDeviceId) {
-            upsertFleetFromIngest(ing);
+            upsertFleetFromIngest(ing, opts);
             return;
         }
         const stamp = `${deviceId}|${liveStamp(ing)}`;
         renderWatchFromIngest(ing);
-        upsertFleetFromIngest(ing);
+        upsertFleetFromIngest(ing, opts);
         if (stamp && stamp === lastIngestStamp) return;
         lastIngestStamp = stamp;
         const raw = ing.raw_telemetry || {};
@@ -467,6 +485,20 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         if (!Number.isFinite(hr)) return;
         handleTelemetryFrame(frame);
+        setVitalsStale(ing.online !== true, formatAge(liveStamp(ing)));
+    }
+
+    function setVitalsStale(isStale, ageText) {
+        ["card-bpm", "card-bp", "card-spo2", "card-glucose"].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle("stale", isStale);
+        });
+        if (!isStale) return;
+        const staleLabel = ageText ? `Última leitura ${ageText}` : "Última leitura indisponível";
+        if (subBpm) subBpm.textContent = staleLabel;
+        if (subBp) subBp.textContent = staleLabel;
+        if (subSpo2) subSpo2.textContent = staleLabel;
+        if (subGlucose) subGlucose.textContent = staleLabel;
     }
 
     function renderWatchFromIngest(ing) {
@@ -476,21 +508,28 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!name || !sub) return;
         const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? (ing.raw_telemetry || {}).heart_rate_bpm;
         const spo2 = (ing.raw_telemetry || {}).spo2_percent;
+        const isOnline = ing.online === true;
         name.textContent = ing.device_id || "VE30";
         const bits = [];
+        const age = formatAge(liveStamp(ing));
+        if (!isOnline) {
+            bits.push(age ? `Offline · Última leitura ${age}` : "Offline · sem leitura recente");
+        }
         if (hr != null) bits.push(`${Math.round(Number(hr))} BPM`);
         if (spo2 != null) bits.push(`SpO₂ ${Number(spo2).toFixed(0)}%`);
         const when = ing.last_seen_local || formatLocal(liveStamp(ing));
-        const age = formatAge(liveStamp(ing));
-        if (when && when !== "—") bits.push(age ? `${when} · ${age}` : when);
+        if (when && when !== "—") bits.push(isOnline && age ? `${when} · ${age}` : when);
         if (ing.patient_id) bits.push(ing.patient_id);
-        sub.textContent = bits.join(" · ") || "Telemetria recebida";
-        if (card) card.classList.add("online");
+        sub.textContent = bits.join(" · ") || (isOnline ? "Telemetria recebida" : "Sem leitura recente");
+        if (card) {
+            card.classList.toggle("online", isOnline);
+            card.classList.toggle("stale", !isOnline);
+        }
+        setVitalsStale(!isOnline, age);
     }
 
     function deviceToIngest(row) {
-        if (row && row.latest) return row.latest;
-        return {
+        const base = row && row.latest ? { ...row.latest } : {
             device_id: row.device_id,
             patient_id: row.patient_id,
             timestamp: row.last_seen,
@@ -499,31 +538,67 @@ document.addEventListener("DOMContentLoaded", () => {
             device_time_local: row.device_time_local,
             raw_telemetry: {
                 heart_rate_bpm: row.heart_rate,
-                spo2_percent: row.spo2
+                spo2_percent: row.spo2,
+                steps: row.steps,
+                blood_pressure_sys: row.blood_pressure_sys,
+                blood_pressure_dia: row.blood_pressure_dia,
+                device_model: row.device_model
             },
             cleaned_telemetry: { heart_rate_clean: row.heart_rate }
         };
+        base.online = row.online === true;
+        base.last_seen = row.last_seen || base.last_seen;
+        base.received_at = row.received_at || base.received_at;
+        base.last_seen_local = row.last_seen_local || base.last_seen_local;
+        return base;
     }
 
-    function upsertFleetFromIngest(ing) {
+    function includeSyntheticFleet() {
+        const box = document.getElementById("fleet-include-synthetic");
+        if (box) return !!box.checked;
+        return urlParams.get("include_synthetic") === "1" || urlParams.get("include_synthetic") === "true";
+    }
+
+    function upsertFleetFromIngest(ing, options) {
         if (!ing || !ing.device_id) return;
-        const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? (ing.raw_telemetry || {}).heart_rate_bpm;
-        const spo2 = (ing.raw_telemetry || {}).spo2_percent;
+        const opts = options || {};
+        if (!includeSyntheticFleet() && typeof fleetLogic.isSyntheticDevice === "function"
+            && fleetLogic.isSyntheticDevice(ing)) {
+            return;
+        }
+        const raw = ing.raw_telemetry || {};
+        const hr = (ing.cleaned_telemetry || {}).heart_rate_clean ?? raw.heart_rate_bpm;
+        const spo2 = raw.spo2_percent;
+        const idx = fleetDevices.findIndex((d) => d.device_id === ing.device_id);
+        const existing = idx >= 0 ? fleetDevices[idx] : {};
+        const online = typeof fleetLogic.resolveFleetOnline === "function"
+            ? fleetLogic.resolveFleetOnline(existing, ing, !!opts.fromLiveIngest)
+            : (opts.fromLiveIngest
+                ? false
+                : (typeof ing.online === "boolean" ? ing.online : existing.online === true));
         const next = {
             device_id: ing.device_id,
             patient_id: ing.patient_id,
-            last_seen: ing.received_at || ing.timestamp,
-            received_at: ing.received_at || ing.timestamp,
+            last_seen: ing.received_at || ing.last_seen || ing.timestamp,
+            received_at: ing.received_at || ing.last_seen || ing.timestamp,
             last_seen_local: ing.last_seen_local || formatLocal(liveStamp(ing)),
             device_time_local: ing.device_time_local,
-            online: true,
+            online,
             heart_rate: hr,
             spo2,
+            steps: ing.steps ?? raw.steps,
+            blood_pressure_sys: ing.blood_pressure_sys ?? raw.blood_pressure_sys,
+            blood_pressure_dia: ing.blood_pressure_dia ?? raw.blood_pressure_dia,
+            device_model: ing.device_model ?? raw.device_model,
+            last_steps_at: ing.last_steps_at,
+            last_bp_at: ing.last_bp_at,
             latest: ing
         };
-        const idx = fleetDevices.findIndex((d) => d.device_id === ing.device_id);
-        if (idx >= 0) fleetDevices[idx] = { ...fleetDevices[idx], ...next };
-        else fleetDevices.unshift(next);
+        const merged = typeof fleetLogic.carryLastActivity === "function"
+            ? fleetLogic.carryLastActivity(existing, next)
+            : next;
+        if (idx >= 0) fleetDevices[idx] = { ...fleetDevices[idx], ...merged };
+        else fleetDevices.unshift(merged);
         renderFleetTable();
     }
 
@@ -555,7 +630,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (pageEl) pageEl.textContent = `${fleetPage + 1} / ${pages}`;
         const slice = rows.slice(fleetPage * FLEET_PAGE_SIZE, (fleetPage + 1) * FLEET_PAGE_SIZE);
         if (!slice.length) {
-            body.innerHTML = '<tr><td colspan="6" class="fleet-empty">Nenhum relógio nesta página.</td></tr>';
+            body.innerHTML = '<tr><td colspan="8" class="fleet-empty">Nenhum relógio nesta página.</td></tr>';
             return;
         }
         const esc = (value) => String(value ?? "")
@@ -569,12 +644,22 @@ document.addEventListener("DOMContentLoaded", () => {
             const age = formatAge(d.received_at || d.last_seen);
             const hr = d.heart_rate != null ? Math.round(Number(d.heart_rate)) : "—";
             const spo2 = d.spo2 != null ? Number(d.spo2).toFixed(0) + "%" : "—";
+            const steps = typeof fleetLogic.formatSteps === "function"
+                ? fleetLogic.formatSteps(d.steps)
+                : (d.steps != null ? Math.round(Number(d.steps)).toLocaleString("pt-BR") : "—");
+            const bp = typeof fleetLogic.formatBloodPressure === "function"
+                ? fleetLogic.formatBloodPressure(d.blood_pressure_sys, d.blood_pressure_dia)
+                : (d.blood_pressure_sys != null && d.blood_pressure_dia != null
+                    ? `${Math.round(Number(d.blood_pressure_sys))}/${Math.round(Number(d.blood_pressure_dia))}`
+                    : "—");
             return `<tr data-device="${esc(d.device_id)}" class="${selected}">
                 <td><span class="fleet-dot ${d.online ? "on" : "off"}"></span>${d.online ? "Online" : "Offline"}</td>
                 <td>${esc(d.device_id)}</td>
                 <td>${esc(d.patient_id || "—")}</td>
                 <td>${hr}</td>
                 <td>${spo2}</td>
+                <td>${esc(steps)}</td>
+                <td>${esc(bp)}</td>
                 <td>${esc(age ? `${when} · ${age}` : when)}</td>
             </tr>`;
         }).join("");
@@ -582,8 +667,11 @@ document.addEventListener("DOMContentLoaded", () => {
             tr.addEventListener("click", () => {
                 selectedDeviceId = tr.getAttribute("data-device") || "";
                 const row = fleetDevices.find((d) => d.device_id === selectedDeviceId);
-                if (row) applyIngestFrame(deviceToIngest(row));
+                if (row) applyIngestFrame(deviceToIngest(row), { fromLiveIngest: false });
                 renderFleetTable();
+                if (deviceDetailsApi && typeof deviceDetailsApi.show === "function") {
+                    deviceDetailsApi.show(selectedDeviceId);
+                }
             });
         });
     }
@@ -591,22 +679,33 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderWatchStrip(devices) {
         const incoming = devices || [];
         const byId = {};
-        fleetDevices.forEach((d) => {
-            if (d && d.device_id) byId[d.device_id] = d;
-        });
         incoming.forEach((row) => {
             if (!row || !row.device_id) return;
-            const prev = byId[row.device_id] || {};
-            byId[row.device_id] = { ...prev, ...row };
+            if (!includeSyntheticFleet() && typeof fleetLogic.isSyntheticDevice === "function"
+                && fleetLogic.isSyntheticDevice(row)) {
+                return;
+            }
+            const prev = fleetDevices.find((d) => d.device_id === row.device_id) || {};
+            const merged = typeof fleetLogic.carryLastActivity === "function"
+                ? fleetLogic.carryLastActivity(prev, { ...prev, ...row })
+                : { ...prev, ...row };
+            if (prev.online && typeof fleetLogic.isRecentLiveStamp === "function"
+                && fleetLogic.isRecentLiveStamp(prev.received_at || prev.last_seen)) {
+                merged.online = true;
+            }
+            byId[row.device_id] = merged;
         });
         fleetDevices = Object.values(byId);
+        if (selectedDeviceId && !fleetDevices.some((d) => d.device_id === selectedDeviceId)) {
+            selectedDeviceId = "";
+        }
         renderFleetTable();
         const focused = fleetDevices.find((d) => d.device_id === selectedDeviceId)
             || fleetDevices.find((d) => d.online)
             || fleetDevices[0];
         if (focused) {
             if (!selectedDeviceId) selectedDeviceId = focused.device_id;
-            applyIngestFrame(deviceToIngest(focused));
+            applyIngestFrame(deviceToIngest(focused), { fromLiveIngest: false });
             return;
         }
         const name = document.getElementById("watch-name");
@@ -614,35 +713,70 @@ document.addEventListener("DOMContentLoaded", () => {
         const card = document.getElementById("card-watch");
         if (name) name.textContent = "Nenhum relógio no painel";
         if (sub) sub.textContent = "Aguardando ingestão dos apps companion…";
-        if (card) card.classList.remove("online");
+        if (card) {
+            card.classList.remove("online");
+            card.classList.add("stale");
+        }
+        setVitalsStale(true, "");
     }
 
+    let devicePollInFlight = false;
     async function pollDevices() {
-        if (!apiKey) {
-            renderWatchStrip([]);
-            return;
-        }
+        if (devicePollInFlight) return;
+        devicePollInFlight = true;
+        const qs = new URLSearchParams({ limit: "500" });
+        if (includeSyntheticFleet()) qs.set("include_synthetic", "true");
         try {
-            const res = await fetch(`${API_URL}/api/v1/wearables/devices?limit=500`, {
-                headers: { "X-API-Key": apiKey },
+            const res = await fetch(`${API_URL}/api/v1/ops/fleet-summary?${qs}`, {
                 cache: "no-store"
             });
-            if (!res.ok) return;
+            if (!res.ok) {
+                updateFleetPill("down");
+                return;
+            }
             const data = await res.json();
-            renderWatchStrip(data.devices || []);
+            const devices = data.devices || [];
+            renderWatchStrip(devices);
+            updateFleetPill(devices.some((row) => row && row.online) ? "live" : "stale");
         } catch (err) {
-            /* o painel continua com o último estado conhecido */
+            updateFleetPill("down");
+        } finally {
+            devicePollInFlight = false;
         }
     }
 
     function startDevicePoll() {
         if (devicePollTimer) clearInterval(devicePollTimer);
         pollDevices();
-        if (!apiKey) return;
         devicePollTimer = setInterval(pollDevices, 2000);
         if (!window.__fleetClock) {
             window.__fleetClock = setInterval(() => renderFleetTable(), 1000);
         }
+    }
+
+    async function fetchDeviceDetail(deviceId) {
+        const id = String(deviceId || "").trim();
+        if (!id) {
+            return { ok: false, status: 404, hasKey: !!apiKey };
+        }
+        if (!apiKey) {
+            return { ok: false, status: 401, hasKey: false };
+        }
+        const res = await fetch(
+            `${API_URL}/api/v1/ops/devices/${encodeURIComponent(id)}`,
+            {
+                cache: "no-store",
+                headers: {
+                    Accept: "application/json",
+                    "X-API-Key": apiKey
+                }
+            }
+        );
+        if (!res.ok) {
+            return { ok: false, status: res.status, hasKey: true };
+        }
+        const data = await res.json();
+        return { ok: true, ...data, hasKey: true };
     }
 
     async function bootstrapDashboard() {
@@ -650,15 +784,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(`${API_URL}/api/v1/ops/dashboard-bootstrap`, { cache: "no-store" });
             if (res.ok) {
                 const cfg = await res.json();
-                if (cfg.api_key) {
-                    apiKey = cfg.api_key;
-                    localStorage.setItem("api_key", apiKey);
-                    const display = document.getElementById("api-key-display");
-                    if (display) display.value = apiKey;
+                if (cfg && Object.prototype.hasOwnProperty.call(cfg, "api_key")) {
+                    delete cfg.api_key;
                 }
+                const display = document.getElementById("api-key-display");
+                if (display && apiKey) display.value = apiKey;
             }
         } catch (err) {
-            /* segue com localStorage se o bootstrap falhar */
+            /* segue sem chave: a frota pública não precisa dela */
         }
         connectWebSocket();
         startDevicePoll();
@@ -909,6 +1042,51 @@ document.addEventListener("DOMContentLoaded", () => {
     if (fleetFilter) fleetFilter.addEventListener("change", () => { fleetPage = 0; renderFleetTable(); });
     if (fleetPrev) fleetPrev.addEventListener("click", () => { fleetPage -= 1; renderFleetTable(); });
     if (fleetNext) fleetNext.addEventListener("click", () => { fleetPage += 1; renderFleetTable(); });
+    const fleetSynthetic = document.getElementById("fleet-include-synthetic");
+    if (fleetSynthetic) {
+        if (urlParams.get("include_synthetic") === "1" || urlParams.get("include_synthetic") === "true") {
+            fleetSynthetic.checked = true;
+        }
+        fleetSynthetic.addEventListener("change", () => {
+            fleetPage = 0;
+            pollDevices();
+        });
+    }
+
+    function persistOperatorKey(nextKey) {
+        apiKey = (nextKey || "").trim();
+        if (apiKey) {
+            localStorage.setItem("api_key", apiKey);
+            localStorage.setItem("api_key_trust", API_KEY_TRUST);
+        } else {
+            localStorage.removeItem("api_key");
+        }
+        connectWebSocket();
+        if (
+            deviceDetailsApi
+            && typeof deviceDetailsApi.isOpen === "function"
+            && deviceDetailsApi.isOpen()
+            && typeof deviceDetailsApi.show === "function"
+        ) {
+            const openId = typeof deviceDetailsApi.currentDeviceId === "function"
+                ? deviceDetailsApi.currentDeviceId()
+                : "";
+            if (openId) deviceDetailsApi.show(openId);
+        }
+    }
+
+    const btnSaveKey = document.getElementById("btn-save-key");
+    if (btnSaveKey && apiKeyDisplay) {
+        btnSaveKey.addEventListener("click", () => {
+            persistOperatorKey(apiKeyDisplay.value);
+            if (copyFeedback) {
+                copyFeedback.textContent = apiKey
+                    ? "Chave guardada neste navegador. Use só para o canal ao vivo."
+                    : "Chave removida. A frota pública continua visível.";
+                setTimeout(() => { copyFeedback.textContent = ""; }, 4000);
+            }
+        });
+    }
 
     if (btnCopyKey && apiKeyDisplay) {
         btnCopyKey.addEventListener("click", () => {
@@ -1241,6 +1419,50 @@ console.log(data);`
 
     const initialTab = urlParams.get("tab");
     if (initialTab) window.switchTab(initialTab);
+
+    const settingsApi = window.HealthtechSettingsPanel;
+    let settingsPanelApi = null;
+    if (settingsApi && typeof settingsApi.bindSettingsPanel === "function") {
+        settingsPanelApi = settingsApi.bindSettingsPanel(document);
+    }
+
+    const detailsModule = window.HealthtechDeviceDetails;
+    if (detailsModule && typeof detailsModule.bindDeviceDetailsPanel === "function") {
+        deviceDetailsApi = detailsModule.bindDeviceDetailsPanel(document, {
+            fetchDetail: fetchDeviceDetail,
+            onOpen() {
+                if (settingsPanelApi && typeof settingsPanelApi.close === "function") {
+                    settingsPanelApi.close();
+                }
+            },
+            onRequestApiAccess() {
+                if (typeof window.switchTab === "function") {
+                    window.switchTab("api-access");
+                }
+                const input = document.getElementById("api-key-display");
+                if (input) {
+                    if (typeof input.focus === "function") input.focus();
+                    if (typeof input.scrollIntoView === "function") {
+                        input.scrollIntoView({ block: "center" });
+                    }
+                }
+            },
+            onSaveApiKey(nextKey) {
+                persistOperatorKey(nextKey);
+                const input = document.getElementById("api-key-display");
+                if (input) input.value = nextKey || "";
+            }
+        });
+    }
+
+    const openSettingsBtn = document.getElementById("btn-open-settings");
+    if (openSettingsBtn) {
+        openSettingsBtn.addEventListener("click", () => {
+            if (deviceDetailsApi && typeof deviceDetailsApi.close === "function") {
+                deviceDetailsApi.close();
+            }
+        });
+    }
 
     bootstrapDashboard();
 });

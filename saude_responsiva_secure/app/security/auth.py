@@ -10,6 +10,7 @@ Chaves (exatas, comparadas com hmac.compare_digest — sem prefix matching):
   - ADMIN_API_KEY ou API_KEY → todos os escopos
   - INGEST_API_KEY → wearables:write
   - READ_API_KEY → wearables:read
+  - SMCLICK_READ_API_KEY → wearables:read (exclusiva do SM Click)
 """
 
 from __future__ import annotations
@@ -81,6 +82,7 @@ def get_key_scopes(provided_key: Optional[str], settings: Optional[Settings] = N
     admin_key = (settings.admin_api_key or settings.api_key or "").strip()
     ingest_key = (settings.ingest_api_key or "").strip()
     read_key = (settings.read_api_key or "").strip()
+    smclick_key = (settings.smclick_read_api_key or "").strip()
 
     if admin_key and _safe_eq(provided_key, admin_key):
         scopes.update(["wearables:write", "wearables:read", "admin"])
@@ -89,6 +91,9 @@ def get_key_scopes(provided_key: Optional[str], settings: Optional[Settings] = N
         scopes.add("wearables:write")
 
     if read_key and _safe_eq(provided_key, read_key):
+        scopes.add("wearables:read")
+
+    if smclick_key and _safe_eq(provided_key, smclick_key):
         scopes.add("wearables:read")
 
     # Dev-only: chaves de teste longas usadas nos testes unitários (nunca em prod)
@@ -257,6 +262,7 @@ def validate_api_keys_on_startup(settings: Optional[Settings] = None) -> None:
         settings.admin_api_key or settings.api_key,
         settings.ingest_api_key,
         settings.read_api_key,
+        settings.smclick_read_api_key,
     ]
     configured = [k for k in keys if k and k.strip()]
     if not configured:

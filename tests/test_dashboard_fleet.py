@@ -1,0 +1,401 @@
+"""Frota do dashboard: status online, filtro sintético e bootstrap sem chave."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from src.api_server import app
+from src.ops.device_registry import clear_all, is_synthetic_device, list_devices, upsert_frame
+from src.ops.fleet_online import resolve_fleet_online
+from src.ops.timestamps import ONLINE_WITHIN_SECONDS
+
+client = TestClient(app)
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _stale_iso() -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+
+
+def _fresh_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def setup_function() -> None:
+    clear_all()
+
+
+def teardown_function() -> None:
+    clear_all()
+
+
+def test_online_window_covers_the_half_hour_cycle_and_not_a_two_hour_gap():
+    assert ONLINE_WITHIN_SECONDS == 50 * 60
+    now = datetime.now(timezone.utc)
+    within_cycle = {"received_at": (now - timedelta(minutes=30)).isoformat()}
+    assert resolve_fleet_online(None, within_cycle, True, now=now) is True
+    two_hours = {"received_at": (now - timedelta(hours=2)).isoformat(), "online": True}
+    assert resolve_fleet_online(None, two_hours, True, now=now) is False
+
+
+def test_resolve_fleet_online_focus_does_not_fake_status():
+    stale = {
+        "device_id": "ve30-smoke",
+        "online": False,
+        "timestamp": _stale_iso(),
+        "received_at": _stale_iso(),
+    }
+    assert resolve_fleet_online({"online": False}, stale, from_live_ingest=False) is False
+    recent_but_focus = {
+        "device_id": "ve30-smoke",
+        "timestamp": _fresh_iso(),
+        "received_at": _fresh_iso(),
+    }
+    assert resolve_fleet_online({"online": False}, recent_but_focus, from_live_ingest=False) is False
+    assert resolve_fleet_online({}, recent_but_focus, from_live_ingest=False) is False
+
+
+def test_resolve_fleet_online_live_ws_uses_recency():
+    now = datetime.now(timezone.utc)
+    live = {"device_id": "VE30-REAL-001", "received_at": now.isoformat()}
+    assert resolve_fleet_online({}, live, from_live_ingest=True, now=now) is True
+    stale = {
+        "device_id": "VE30-REAL-001",
+        "received_at": (now - timedelta(seconds=ONLINE_WITHIN_SECONDS + 30)).isoformat(),
+    }
+    assert resolve_fleet_online({}, stale, from_live_ingest=True, now=now) is False
+    assert resolve_fleet_online({}, {"online": True}, from_live_ingest=False, now=now) is True
+
+
+def test_is_synthetic_device_known_patterns():
+    assert is_synthetic_device({"device_id": "ve30-smoke", "patient_id": "smoke-alert-aa"})
+    assert is_synthetic_device({"device_id": "VE30-PROBE-001", "patient_id": "PAT-1"})
+    assert is_synthetic_device({"device_id": "VE30-TIMECHECK", "patient_id": "PAT-2"})
+    assert is_synthetic_device({"device_id": "watch-1", "patient_id": "smoke-pr14"})
+    assert is_synthetic_device({"device_id": "clinic-01", "synthetic": True})
+    assert not is_synthetic_device({"device_id": "VE30-AA:BB:CC:DD:EE:FF", "patient_id": "PAT-KEEP"})
+
+
+def test_list_devices_hides_synthetic_by_default_and_opt_in():
+    upsert_frame(
+        {
+            "patient_id": "PAT-KEEP",
+            "device_id": "VE30-REAL-001",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 70, "spo2_percent": 97},
+        }
+    )
+    upsert_frame(
+        {
+            "patient_id": "smoke-alert-zz",
+            "device_id": "ve30-smoke",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 88, "spo2_percent": 96},
+        }
+    )
+    hidden = list_devices(limit=50)
+    ids = {row["device_id"] for row in hidden["devices"]}
+    assert "VE30-REAL-001" in ids
+    assert "ve30-smoke" not in ids
+    assert hidden["include_synthetic"] is False
+    shown = list_devices(limit=50, include_synthetic=True)
+    ids_all = {row["device_id"] for row in shown["devices"]}
+    assert "ve30-smoke" in ids_all
+    assert shown["include_synthetic"] is True
+
+
+def test_dashboard_bootstrap_omits_key_even_if_env_set(monkeypatch):
+    monkeypatch.setenv("READ_API_KEY", "ht_read_test_key_32chars_long_token")
+    monkeypatch.setenv("API_KEY", "ht_admin_test_key_32chars_long_token")
+    res = client.get("/api/v1/ops/dashboard-bootstrap")
+    assert res.status_code == 200
+    body = res.json()
+    assert "api_key" not in body
+    assert "READ_API_KEY" not in res.text
+    assert "API_KEY" not in body
+    for env_name in ("READ_API_KEY", "API_KEY"):
+        value = os.environ.get(env_name)
+        if value:
+            assert value not in res.text
+    assert body["fleet_summary_path"] == "/api/v1/ops/fleet-summary"
+    assert body["device_details_path"] == "/api/v1/ops/devices/{device_id}"
+    assert "device_details" in body["auth_required_for"]
+
+
+def test_fleet_summary_is_public_and_hides_synthetics():
+    upsert_frame(
+        {
+            "patient_id": "PAT-KEEP",
+            "device_id": "VE30-REAL-001",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 71, "spo2_percent": 98},
+        }
+    )
+    upsert_frame(
+        {
+            "patient_id": "smoke-alert-zz",
+            "device_id": "VE30-PROBE-001",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 90, "spo2_percent": 95},
+        }
+    )
+    public = client.get("/api/v1/ops/fleet-summary?limit=500")
+    assert public.status_code == 200
+    body = public.json()
+    assert body["public"] is True
+    assert "api_key" not in body
+    ids = {row["device_id"] for row in body["devices"]}
+    assert "VE30-REAL-001" in ids
+    assert "VE30-PROBE-001" not in ids
+    for row in body["devices"]:
+        assert "latest" not in row
+        assert set(row).issubset(
+            {
+                "device_id",
+                "patient_id",
+                "last_seen",
+                "received_at",
+                "last_seen_local",
+                "device_time_local",
+                "online",
+                "age_seconds",
+                "heart_rate",
+                "spo2",
+                "steps",
+                "blood_pressure_sys",
+                "blood_pressure_dia",
+                "device_model",
+                "last_steps_at",
+                "last_bp_at",
+                "last_spo2_at",
+                "synthetic",
+            }
+        )
+        assert row["online"] is False
+
+    opted = client.get("/api/v1/ops/fleet-summary?limit=500&include_synthetic=true")
+    assert opted.status_code == 200
+    opted_ids = {row["device_id"] for row in opted.json()["devices"]}
+    assert "VE30-PROBE-001" in opted_ids
+
+
+def _secure_row(device_id: str, patient_id: str, when: datetime, heart: float = 75, spo2: float = 99) -> dict:
+    return {
+        "device_id": device_id,
+        "patient_id": patient_id,
+        "last_seen": when.isoformat(),
+        "online": False,
+        "heart_rate": heart,
+        "spo2": spo2,
+    }
+
+
+def test_fleet_summary_uses_secure_api_and_drops_local_ghosts(monkeypatch):
+    upsert_frame(
+        {
+            "patient_id": "PAT-HBAND-001Frota",
+            "device_id": "84:03:A6:48:DD:ED",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 79, "spo2_percent": 98},
+        }
+    )
+    upsert_frame(
+        {
+            "patient_id": "smoke-ctx-patient",
+            "device_id": "smoke-ctx-device",
+            "timestamp": _fresh_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 72, "spo2_percent": 88},
+        }
+    )
+    fresh = datetime.now(timezone.utc)
+    monkeypatch.setattr(
+        "src.ops.dashboard_fleet.fetch_secure_fleet",
+        lambda timeout=8.0: [
+            _secure_row("84:03:A6:48:DD:ED", "PAT-HBAND-001", fresh, 75, 99),
+            _secure_row("smoke-ctx-device", "smoke-ctx-patient", fresh, 72, 88),
+            _secure_row(
+                "E4:A8:B6:12:89:A4",
+                "PAT-HBAND-001",
+                fresh - timedelta(hours=5),
+                74,
+                98,
+            ),
+        ],
+    )
+    res = client.get("/api/v1/ops/fleet-summary?limit=500")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["source"] == "secure-api"
+    ids = [row["device_id"] for row in body["devices"]]
+    assert ids[0] == "84:03:A6:48:DD:ED"
+    assert "smoke-ctx-device" not in ids
+    assert "E4:A8:B6:12:89:A4" in ids
+    live = body["devices"][0]
+    assert live["patient_id"] == "PAT-HBAND-001"
+    assert live["online"] is True
+    assert live["heart_rate"] == 75
+    assert live["spo2"] == 99
+    stale = next(row for row in body["devices"] if row["device_id"] == "E4:A8:B6:12:89:A4")
+    assert stale["online"] is False
+    assert body["counts"]["online"] == 1
+    assert body["counts"]["total"] == 2
+
+
+def test_fleet_summary_empty_secure_fleet_does_not_revive_ghosts(monkeypatch):
+    upsert_frame(
+        {
+            "patient_id": "PAT-OLD",
+            "device_id": "VE30-GHOST",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 60, "spo2_percent": 97},
+        }
+    )
+    monkeypatch.setattr("src.ops.dashboard_fleet.fetch_secure_fleet", lambda timeout=8.0: [])
+    res = client.get("/api/v1/ops/fleet-summary?limit=500")
+    body = res.json()
+    assert body["source"] == "secure-api"
+    assert body["devices"] == []
+    assert body["counts"]["total"] == 0
+
+
+def test_fleet_summary_falls_back_to_local_when_bridge_is_down(monkeypatch):
+    monkeypatch.setattr("src.ops.dashboard_fleet.fetch_secure_fleet", lambda timeout=8.0: None)
+    upsert_frame(
+        {
+            "patient_id": "PAT-KEEP",
+            "device_id": "VE30-LOCAL",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 70, "spo2_percent": 97},
+        }
+    )
+    res = client.get("/api/v1/ops/fleet-summary?limit=500")
+    body = res.json()
+    assert body["source"] == "local"
+    assert {row["device_id"] for row in body["devices"]} == {"VE30-LOCAL"}
+
+
+def test_authenticated_devices_default_hides_synthetic():
+    upsert_frame(
+        {
+            "patient_id": "PAT-KEEP",
+            "device_id": "VE30-REAL-002",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 66, "spo2_percent": 97},
+        }
+    )
+    upsert_frame(
+        {
+            "patient_id": "PAT-KEEP",
+            "device_id": "smoke-pr14",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 80, "spo2_percent": 96},
+        }
+    )
+    listed = client.get(
+        "/api/v1/wearables/devices?limit=200",
+        headers={"X-API-Key": "ht_read_test_key_32chars_long_token"},
+    )
+    assert listed.status_code == 200
+    ids = {row["device_id"] for row in listed.json()["devices"]}
+    assert "VE30-REAL-002" in ids
+    assert "smoke-pr14" not in ids
+    shown = client.get(
+        "/api/v1/wearables/devices?limit=200&include_synthetic=true",
+        headers={"X-API-Key": "ht_read_test_key_32chars_long_token"},
+    )
+    assert "smoke-pr14" in {row["device_id"] for row in shown.json()["devices"]}
+
+
+def test_ingest_endpoints_still_require_write_scope():
+    payload = {
+        "patient_id": "PAT-KEEP",
+        "device_id": "VE30-REAL-INGEST",
+        "heart_rate": 74.0,
+    }
+    denied = client.post("/api/v1/wearables/ingest", json=payload)
+    assert denied.status_code in {401, 403}
+    ok = client.post(
+        "/api/v1/wearables/ingest",
+        headers={"X-API-Key": "ht_ingest_test_key_32chars_long_token"},
+        json=payload,
+    )
+    assert ok.status_code == 200
+    batch = client.post(
+        "/api/v1/wearables/batch-ingest",
+        headers={"X-API-Key": "ht_ingest_test_key_32chars_long_token"},
+        json={"patient_id": "PAT-KEEP", "readings": [payload]},
+    )
+    assert batch.status_code == 200
+
+
+def test_settings_panel_js_closes_on_escape_and_backdrop():
+    import shutil
+
+    node = shutil.which("node") or shutil.which("nodejs")
+    assert node, "node is required to verify dashboard/settings_panel.js"
+    script = ROOT / "tests" / "js" / "test_settings_panel.js"
+    result = subprocess.run(
+        [node, str(script)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_painel_principal_moves_sidebar_into_settings_drawer():
+    html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+    css = (ROOT / "dashboard" / "style.css").read_text(encoding="utf-8")
+    app_js = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+    dashboard = html.split('id="view-dashboard"', 1)[1].split('id="view-api-access"', 1)[0]
+    assert 'class="sidebar"' not in dashboard
+    assert 'id="btn-open-settings"' in html
+    assert "Configurações" in html
+    header_session = html.split('class="header-session"', 1)[1].split("</header>", 1)[0]
+    assert 'id="ws-status"' in header_session
+    assert header_session.find('id="ws-status"') < header_session.find('id="btn-open-settings"')
+    panel = html.split('id="settings-panel"', 1)[1]
+    for control_id in (
+        "btn-start",
+        "btn-stop",
+        "filter-select",
+        "kalman-select",
+        "search-input",
+        "btn-search",
+        "search-results-box",
+        "btn-close-settings",
+    ):
+        assert f'id="{control_id}"' in panel
+    assert "RAG USP Search" in panel
+    assert 'id="settings-backdrop"' in html
+    assert 'main-layout-full' in html
+    assert 'id="fleet-panel"' in dashboard
+    assert "grid-template-columns: 320px 1fr" not in css
+    assert ".settings-panel" in css
+    assert "bindSettingsPanel" in app_js
+    assert "settings_panel.js?v=20261115v" in html
+    assert "style.css?v=20261115v" in html
+    assert "app.js?v=20261115v" in html
+    assert "device_details.js?v=20261115v" in html
+    assert 'id="device-details-panel"' in html
+    assert "Detalhes do relógio" in html
+
+
+def test_fleet_logic_js_focus_does_not_fake_online():
+    import shutil
+
+    node = shutil.which("node") or shutil.which("nodejs")
+    assert node, "node is required to verify dashboard/fleet_logic.js"
+    script = ROOT / "tests" / "js" / "test_fleet_logic.js"
+    result = subprocess.run(
+        [node, str(script)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

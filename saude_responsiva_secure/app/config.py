@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     admin_api_key: str = ""
     ingest_api_key: str = ""
     read_api_key: str = ""
+    # Chave read-only exclusiva do SM Click (escopo wearables:read). Revogável sem afetar a Web.
+    smclick_read_api_key: str = ""
     auth_disabled: bool = False
     secret_salt: str = "default-salt"
     allowed_patient_ids: str = ""
@@ -45,8 +47,12 @@ class Settings(BaseSettings):
     rate_limit_batch: str = "30/minute"
     rate_limit_admin: str = "10/minute"
 
-    # Telemetria em memória
+    # Telemetria em memória (fallback só sem DATABASE_URL)
     history_max_per_patient: int = 100
+
+    # Postgres operacional (Cloud SQL). Alias: OPERATIONAL_DATABASE_URL.
+    database_url: str = ""
+    operational_database_url: str = ""
 
     @field_validator("environment")
     @classmethod

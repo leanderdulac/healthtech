@@ -49,6 +49,9 @@ def test_ble_sim_is_not_claimed_as_physical_hband():
     sdk = [r for r in payload["device"]["roadmap"] if r["id"] == "ble_hband_sdk"][0]
     assert sim["done"] is True
     assert sdk["done"] is False
+    assert payload["pilot"]["eligible"] is False
+    assert payload["pilot"]["eligible_sessions"] == 0
+    assert "ble_sim" in payload["pilot"]["excluded_sources"]
 
 
 def test_ble_hband_marks_physical_pairing():
@@ -56,6 +59,18 @@ def test_ble_hband_marks_physical_pairing():
     assert payload["device"]["status"] == "ble_hband"
     assert payload["device"]["ble_physical"] is True
     assert payload["device"]["pairing_ready"] is True
+    assert payload["pilot"]["eligible"] is True
+    assert payload["pilot"]["eligible_sessions"] == 1
+    assert payload["pilot"]["excluded_sessions"] == 0
+
+
+def test_ble_standard_counts_as_physical_watch():
+    payload = build_connection_status({"PAT-TEST-001": [_frame("ble_standard", 4, device_id="WATCH-AA")]})
+    assert payload["device"]["status"] == "ble_standard"
+    assert payload["device"]["ble_physical"] is True
+    assert payload["device"]["ble_simulated"] is False
+    assert payload["pilot"]["eligible"] is True
+    assert payload["pilot"]["eligible_sessions"] == 1
 
 
 def test_manual_http_is_via_app_not_ble():

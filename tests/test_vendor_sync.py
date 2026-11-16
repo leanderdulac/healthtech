@@ -20,6 +20,8 @@ VENDORED_OPS = (
     "patients_routes.py",
     "live_devices.py",
     "device_registry.py",
+    "device_detail.py",
+    "device_detail_routes.py",
 )
 EXCLUDED_OPS = (
     "live_watch_bridge.py",
@@ -41,6 +43,10 @@ from src.ops.operational_patients import list_patients
 from src.ops.patients_routes import router as patients_router
 from src.ops.device_registry import upsert_frame
 from src.ops.live_devices import summarize_frame
+from src.ops.device_detail_routes import router as device_detail_router
+
+detail_paths = {getattr(r, "path", "") for r in device_detail_router.routes}
+assert any("{device_id}" in p for p in detail_paths), detail_paths
 
 assert callable(stamp_ingest)
 assert callable(upsert_frame)
@@ -69,6 +75,7 @@ openapi_paths = set((application.openapi() or {}).get("paths") or {})
 assert "/api/v1/patients" in openapi_paths, sorted(openapi_paths)
 assert "/api/v1/patients/{patient_id}" in openapi_paths, sorted(openapi_paths)
 assert "/api/v1/wearables/ingest" in openapi_paths, sorted(openapi_paths)
+assert "/api/v1/ops/devices/{device_id}" in openapi_paths, sorted(openapi_paths)
 
 client = TestClient(application)
 ingest = client.post(

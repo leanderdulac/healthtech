@@ -6,6 +6,44 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+# Fonte única: validador Pydantic e /openapi.json (docs/openapi/hband-wearable.yaml).
+INGEST_SOURCES = ("companion_manual", "ble_sim", "ble_hband", "ble_standard", "http")
+FILTER_TYPES = ("BMO", "Wavelet", "Butterworth", "Raw", "Adaptive")
+# Apelido legível do aparelho que envia (ex.: "iPhone de LFM").
+DEVICE_LABEL_MAX_LENGTH = 64
+
+
+def normalize_device_label(value: Any) -> Optional[str]:
+    """Normaliza ``device_label``: trim, espaços colapsados, sem controle.
+
+    Vazio vira ``None``. Acima de ``DEVICE_LABEL_MAX_LENGTH`` caracteres é
+    **truncado** (não rejeitado): o rótulo é cosmético e não pode derrubar a
+    leitura clínica que vem junto.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("device_label deve ser texto.")
+    cleaned = "".join(ch if ch.isprintable() else " " for ch in value)
+    cleaned = " ".join(cleaned.split())
+    if not cleaned:
+        return None
+    return cleaned[:DEVICE_LABEL_MAX_LENGTH].rstrip()
+
+
+def _string_enum(values: tuple[str, ...]):
+    """Expõe o enum no ramo string de Optional[str] sem alterar a validação."""
+
+    def extra(schema: Dict[str, Any]) -> None:
+        enum_values = list(values)
+        for item in schema.get("anyOf") or ():
+            if item.get("type") == "string":
+                item["enum"] = enum_values
+                return
+        schema["enum"] = enum_values
+
+    return extra
+
 
 class WearableTelemetryRequest(BaseModel):
     model_config = {"extra": "allow"}
@@ -14,12 +52,18 @@ class WearableTelemetryRequest(BaseModel):
     device_id: Optional[str] = Field("wrist_wearable", max_length=64)
     timestamp: Optional[str] = Field(None, max_length=64)
     heart_rate: float = Field(..., ge=20.0, le=250.0)
-    hrv_rmssd: Optional[float] = Field(40.0, ge=0.0, le=300.0)
-    skin_temp: Optional[float] = Field(33.0, ge=25.0, le=45.0)
-    spo2: Optional[float] = Field(98.0, ge=50.0, le=100.0)
-    activity_level: Optional[float] = Field(0.0, ge=0.0, le=100.0)
+    # Ausência fica ausente. 98 / 40 / 33 / 0 não são medição.
+    hrv_rmssd: Optional[float] = Field(None, ge=0.0, le=300.0)
+    skin_temp: Optional[float] = Field(None, ge=25.0, le=45.0)
+    spo2: Optional[float] = Field(None, ge=50.0, le=100.0)
+    activity_level: Optional[float] = Field(None, ge=0.0, le=100.0)
+    steps: Optional[int] = Field(None, ge=0)
     ppg_signal: Optional[List[float]] = None
-    filter_type: Optional[str] = Field("BMO", max_length=32)
+    filter_type: Optional[str] = Field(
+        "BMO",
+        max_length=32,
+        json_schema_extra=_string_enum(FILTER_TYPES),
+    )
     # Opcionais matriz de alertas / HBand
     blood_pressure_sys: Optional[float] = Field(None, ge=50.0, le=300.0)
     blood_pressure_dia: Optional[float] = Field(None, ge=20.0, le=200.0)
@@ -46,34 +90,63 @@ class WearableTelemetryRequest(BaseModel):
     abrupt_steps_stop: Optional[bool] = None
     inactivity_rest_of_active_period: Optional[bool] = None
     consciousness_altered: Optional[bool] = None
+    wear_status: Optional[bool] = None
     # Origem do ingest: HTTP manual, simulador BLE ou HBand SDK
-    ingest_source: Optional[str] = Field("companion_manual", max_length=32)
+    ingest_source: Optional[str] = Field(
+        "companion_manual",
+        max_length=32,
+        json_schema_extra=_string_enum(INGEST_SOURCES),
+    )
+    # Idempotência (opcional — clients antigos sem estes campos continuam válidos)
+    client_reading_id: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._:\-]+$",
+        description="Identificador estável gerado no client (ex.: UUID da linha Room).",
+    )
+    metric_type: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_\-]+$",
+        description="Tipo da métrica quando a leitura não é um snapshot multi-vital.",
+    )
+    device_label: Optional[str] = Field(
+        None,
+        description=(
+            "Apelido legível do aparelho que envia (ex.: \"iPhone de LFM\"). "
+            "Opcional. Espaços nas pontas são removidos; vazio vira null; "
+            f"acima de {DEVICE_LABEL_MAX_LENGTH} caracteres é truncado."
+        ),
+        json_schema_extra={"maxLength": DEVICE_LABEL_MAX_LENGTH, "examples": ["iPhone de LFM"]},
+    )
+
+    @field_validator("device_label", mode="before")
+    @classmethod
+    def validate_device_label(cls, v: Any) -> Optional[str]:
+        return normalize_device_label(v)
 
     @field_validator("ingest_source")
     @classmethod
     def validate_ingest_source(cls, v: Optional[str]) -> Optional[str]:
-        allowed = {
-            "companion_manual",
-            "ble_sim",
-            "ble_hband",
-            "http",
-        }
         if v is None or v == "":
             return "companion_manual"
-        if v not in allowed:
+        if v not in INGEST_SOURCES:
             raise ValueError(
                 "ingest_source inválido. Valores aceitos: "
-                + ", ".join(sorted(allowed))
+                + ", ".join(sorted(INGEST_SOURCES))
             )
         return v
 
     @field_validator("filter_type")
     @classmethod
     def validate_filter_type(cls, v: Optional[str]) -> Optional[str]:
-        if v and v not in {"BMO", "Wavelet", "Butterworth", "Raw", "Adaptive"}:
+        if v and v not in FILTER_TYPES:
             raise ValueError(
                 "filter_type inválido. Valores aceitos: "
-                "BMO, Wavelet, Butterworth, Raw, Adaptive."
+                + ", ".join(FILTER_TYPES)
+                + "."
             )
         return v
 

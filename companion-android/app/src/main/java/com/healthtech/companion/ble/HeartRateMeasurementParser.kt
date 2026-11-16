@@ -17,6 +17,8 @@ object HeartRateMeasurementParser {
     fun parseBpm(value: ByteArray?): Int? {
         if (value == null || value.isEmpty()) return null
         val flags = value[0].toInt() and 0xFF
+        // Bits 1–2: 2 = contato existe e o pulso não foi detectado.
+        if (flags and 0x06 == 0x02) return null
         val hr16 = flags and 0x01 != 0
         val bpm = if (hr16) {
             if (value.size < 3) return null

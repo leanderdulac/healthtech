@@ -11,7 +11,7 @@ enum class OutboxStatus {
 }
 
 /**
- * Item da fila offline. Persista com Room no app real.
+ * Item da fila offline. O app grava a lista em arquivo com [FileOutboxStore].
  */
 data class OutboxItem(
     val id: String = UUID.randomUUID().toString(),

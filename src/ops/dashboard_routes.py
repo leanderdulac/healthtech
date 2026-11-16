@@ -1,0 +1,88 @@
+"""Rotas públicas do painel ops (sem chave privilegiada no browser)."""
+
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Query
+
+router = APIRouter(prefix="/api/v1/ops", tags=["ops-dashboard"])
+
+_PUBLIC_DEVICE_FIELDS = (
+    "device_id",
+    "patient_id",
+    "last_seen",
+    "received_at",
+    "last_seen_local",
+    "device_time_local",
+    "online",
+    "age_seconds",
+    "heart_rate",
+    "spo2",
+    "steps",
+    "blood_pressure_sys",
+    "blood_pressure_dia",
+    "device_model",
+    "last_steps_at",
+    "last_bp_at",
+    "last_spo2_at",
+    "synthetic",
+)
+
+
+def _public_device_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: row.get(key) for key in _PUBLIC_DEVICE_FIELDS if key in row}
+
+
+@router.get("/dashboard-bootstrap")
+def dashboard_bootstrap() -> Dict[str, Any]:
+    """Config pública do painel. Nunca inclui chave de API."""
+    return {
+        "ok": True,
+        "fleet_poll_ms": 2000,
+        "page_size": 50,
+        "max_devices": 500,
+        "fleet_summary_path": "/api/v1/ops/fleet-summary",
+        "device_details_path": "/api/v1/ops/devices/{device_id}",
+        "auth_required_for": ["websocket", "ingest", "patient_history", "device_details"],
+    }
+
+
+@router.get("/fleet-summary")
+def fleet_summary(
+    q: str = Query(default=""),
+    online: Optional[bool] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=10000),
+    include_synthetic: bool = Query(
+        default=False,
+        description="Se true, inclui devices de smoke/probe/timecheck. Padrão: ocultos.",
+    ),
+) -> Dict[str, Any]:
+    """Resumo somente-leitura da frota para o dashboard público.
+
+    Expõe no máximo os campos compactos já mostrados na tabela (sem `latest`,
+    sem histórico, sem chave, sem município/UBS). Devices sintéticos ficam
+    de fora por padrão.
+    """
+    from src.ops.dashboard_fleet import present_fleet
+
+    payload = present_fleet(
+        q=q,
+        online=online,
+        limit=limit,
+        offset=offset,
+        include_latest=False,
+        include_synthetic=include_synthetic,
+    )
+    return {
+        "ok": True,
+        "public": True,
+        "source": payload.get("source"),
+        "counts": payload.get("counts") or {},
+        "limit": payload.get("limit"),
+        "offset": payload.get("offset"),
+        "coverage": payload.get("coverage"),
+        "include_synthetic": bool(payload.get("include_synthetic")),
+        "devices": [_public_device_row(row) for row in (payload.get("devices") or [])],
+    }
