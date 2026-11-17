@@ -373,6 +373,12 @@ components:
           type: number
           minimum: 25
           maximum: 45
+          description: Temperatura da pele; não substitui temperatura corporal na matriz.
+        body_temp_c:
+          type: number
+          minimum: 30
+          maximum: 45
+          description: Temperatura corporal medida explicitamente. Não derivar de skin_temp.
         hrv_rmssd:
           type: number
           minimum: 0

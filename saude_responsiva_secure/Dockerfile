@@ -33,6 +33,9 @@ COPY --chown=appuser:appuser requirements.txt /app/
 #   ops — timestamps, patients_routes, operational_patients, live_devices, device_registry, device_detail
 # Fonte local: _vendor_src/ (evita sombrear monorepo `src/` no PYTHONPATH do host)
 COPY --chown=appuser:appuser _vendor_src/ /app/src/
+# Rule severities and profiles require the complete catalog at runtime.
+COPY --chown=appuser:appuser data/models/ /app/data/models/
+RUN python -c "from src.clinical_intelligence.alert_matrix_rules import AlertMatrixEngine, VitalSnapshot; r=AlertMatrixEngine().evaluate(VitalSnapshot(hr=72, spo2=88)); assert r.primary_rule_id == 'n2u_034' and r.max_severity == 'critico' and r.stars == 3"
 
 # appuser (uid 10001) grava a frota local aqui. Sem este diretório,
 # o mkdir de data/ops estoura Permission denied e a cópia no GCS não roda.

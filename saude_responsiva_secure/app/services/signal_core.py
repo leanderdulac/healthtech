@@ -329,7 +329,7 @@ def process_ingest_frame(payload: Dict[str, Any]) -> Dict[str, Any]:
         clinical_alerts = assess_ingest_alerts(
             heart_rate=hr,
             spo2=float(spo2) if spo2 is not None else None,
-            skin_temp=float(body_temp) if body_temp is not None else skin_measured,
+            skin_temp=skin_measured,
             hrv_rmssd=hrv_rmssd,
             activity_level=activity,
             phantom=phantom_data,

@@ -22,7 +22,7 @@ from src.clinical_intelligence.alert_matrix_rules import (
 logger = logging.getLogger(__name__)
 
 _MODEL_DIR = Path(os.getenv("ALERT_MATRIX_MODEL_DIR", "data/models"))
-_MATRIX_VERSION = "next2u-158-971-2026-08-16"
+_MATRIX_VERSION = "next2u-158-1057-2026-11-16-catalog-completion-r2"
 _PILOT_SOURCES = frozenset({"ble_hband", "ble_standard"})
 _KNOWN_SOURCES = frozenset(
     {"companion_manual", "ble_sim", "ble_hband", "ble_standard", "http"}
@@ -351,13 +351,12 @@ def vitals_from_ingest_context(
             meta["glucose_source"] = "phantom"
             meta["glucose_reliable"] = glu_rel
 
-    temp = _accept(skin_temp, 25, 45, "temp_c", rejected)
-    if temp is not None and temp < 35.0:
-        body = _accept(hband.get("body_temp_c"), 30, 45, "body_temp_c", rejected)
-        if body is None and "body_temp_c" not in hband:
-            body = _accept(raw.get("body_temp_c"), 30, 45, "body_temp_c", rejected)
-        if body is not None:
-            temp = body
+    skin = _accept(skin_temp, 25, 45, "skin_temp", rejected)
+    temp = _accept(hband.get("body_temp_c"), 30, 45, "body_temp_c", rejected)
+    if temp is None and "body_temp_c" not in hband:
+        temp = _accept(raw.get("body_temp_c"), 30, 45, "body_temp_c", rejected)
+    meta["temperature_source"] = "body_measured" if temp is not None else "absent_body_temperature"
+    meta["skin_temperature_preserved"] = skin
 
     steps_drop = _num(hband.get("steps_drop_pct")) or _num(raw.get("steps_drop_pct"))
     sleep_worsen = _num(hband.get("sleep_worsen_pct")) or _num(raw.get("sleep_worsen_pct"))
