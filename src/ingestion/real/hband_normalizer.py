@@ -84,21 +84,37 @@ class HBandNormalizer:
             payload = HBandRealtimeIngest.model_validate(payload)
 
         hr = payload.heart_rate
-        if hr is None:
-            # API exige heart_rate — usar placeholder neutro se só SpO2/temp
-            hr = 0.0
+        if hr is None or not 20 <= hr <= 250:
+            raise ValueError("MEASURED_HEART_RATE_REQUIRED_FOR_INGEST; preserve partial reading in Bronze")
+
+        measured_at = None
+        if payload.timestamp is not None:
+            try:
+                measured_at = datetime.fromisoformat(payload.timestamp.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError("VALID_MEASUREMENT_TIMESTAMP_REQUIRED") from exc
+            if measured_at.tzinfo is None or measured_at.utcoffset() is None:
+                raise ValueError("MEASUREMENT_TIMEZONE_REQUIRED")
 
         body: Dict[str, Any] = {
             "patient_id": payload.patient_id,
             "device_id": payload.device.device_id,
-            "timestamp": payload.timestamp or datetime.now(timezone.utc).isoformat(),
-            "heart_rate": float(hr) if hr and hr >= 20 else 70.0,
+            "heart_rate": float(hr),
             "filter_type": payload.filter_type or "BMO",
         }
+        # Missing measurement time remains absent. The API may stamp reception,
+        # but a retry must not acquire a fabricated new measurement timestamp.
+        if measured_at is not None:
+            body["timestamp"] = measured_at.astimezone(timezone.utc).isoformat()
+        if payload.client_reading_id is not None:
+            body["client_reading_id"] = payload.client_reading_id
+        body["ingest_source"] = payload.ingest_source
         if payload.spo2 is not None:
             body["spo2"] = payload.spo2
         if payload.skin_temp is not None:
             body["skin_temp"] = payload.skin_temp
+        if payload.body_temp_c is not None:
+            body["body_temp_c"] = payload.body_temp_c
         if payload.hrv_rmssd is not None:
             body["hrv_rmssd"] = payload.hrv_rmssd
         if payload.activity_level is not None:
@@ -119,8 +135,6 @@ class HBandNormalizer:
             "sdk_source": payload.sdk_source,
             "raw": payload.raw or {},
         }
-        if hr is None or (payload.heart_rate is not None and payload.heart_rate < 20):
-            body["_hband"]["hr_placeholder"] = True
         return body
 
     # ------------------------------------------------------------------
@@ -462,7 +476,7 @@ class HBandNormalizer:
             patient_id=chunk.patient_id,
             device=chunk.device,
             timestamp=ts,
-            heart_rate=70.0,  # placeholder; servidor usa mean PPG se filter BMO
+            heart_rate=None,  # PPG não prova frequência cardíaca medida
             ppg_signal=chunk.green_light,
             filter_type="BMO",
             sdk_source="ppg_realtime",
@@ -501,7 +515,8 @@ class HBandNormalizer:
             mtype is None and "heart_rate" in payload
         ):
             model = HBandRealtimeIngest.model_validate(payload)
-            return self.from_realtime(model), self.to_wearable_ingest(model)
+            records = self.from_realtime(model)
+            return records, self.to_wearable_ingest(model) if model.heart_rate is not None else None
 
         if mtype == HBandMessageType.ORIGIN_BATCH or "samples" in payload:
             return self.from_origin_batch(payload), None

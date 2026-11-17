@@ -128,6 +128,7 @@ def test_secure_image_pythonpath_imports_ops_and_registers_patients(tmp_path):
     app_root = tmp_path / "app"
     shutil.copytree(VENDOR, app_root / "src")
     shutil.copytree(SECURE_APP, app_root / "app")
+    shutil.copytree(ROOT / "saude_responsiva_secure/data/models", app_root / "data/models")
     env = os.environ.copy()
     env["PYTHONPATH"] = str(app_root)
     env["ENVIRONMENT"] = "development"

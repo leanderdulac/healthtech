@@ -55,14 +55,14 @@ CARE_PATHWAY = {
     },
 }
 
-DEFAULT_CATALOG = Path("data/models/next2u_expanded_matrix.json")
+DEFAULT_CATALOG = Path(__file__).resolve().parents[2] / "data/models/next2u_expanded_matrix.json"
 
 
 @lru_cache(maxsize=1)
 def load_catalog(path: Optional[str] = None) -> Dict[str, Any]:
     p = Path(path) if path else DEFAULT_CATALOG
     if not p.exists():
-        return {"patterns": [], "n_expanded_patterns": 0}
+        raise FileNotFoundError(f"NEXT2U_CATALOG_REQUIRED: {p}")
     return json.loads(p.read_text(encoding="utf-8"))
 
 
@@ -111,23 +111,17 @@ def lookup_pattern(
     stars: int,
     catalog: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
-    cat = catalog or load_catalog()
-    cands = [
-        p
-        for p in cat.get("patterns", [])
-        if p.get("base_id") == base_id
-        and p.get("risk_band") == band
-        and int(p.get("stars") or 0) == stars
-    ]
-    if cands:
-        return cands[0]
-    # fallback: mesmo base_id e mesmas estrelas
-    cands = [
-        p
-        for p in cat.get("patterns", [])
-        if p.get("base_id") == base_id and int(p.get("stars") or 0) == stars
-    ]
-    return cands[0] if cands else None
+    # Falha fechada: faixa e estrelas precisam casar; ambiguidade bloqueia.
+    if type(base_id) is not int or type(stars) is not int:
+        return None
+    if not 1 <= base_id <= 158 or band not in {"baixo", "moderado", "alto", "critico"} or stars not in {1, 2, 3}:
+        return None
+    cat = load_catalog() if catalog is None else catalog
+    exact = [p for p in cat.get("patterns", [])
+             if type(p.get("base_id")) is int and p["base_id"] == base_id
+             and p.get("risk_band") == band
+             and type(p.get("stars")) is int and p["stars"] == stars]
+    return exact[0] if len(exact) == 1 else None
 
 
 def apply_next2u(
@@ -179,7 +173,7 @@ def apply_next2u(
         )
         result.explanation = (getattr(result, "explanation", "") or "") + extra
     else:
-        result.next2u_id = f"{base_id:03d}.x"
+        result.next2u_id = None
         result.explanation = (
             (getattr(result, "explanation", "") or "")
             + f" | Next2U base={base_id} ★{stars} risco={band} escore={score}"

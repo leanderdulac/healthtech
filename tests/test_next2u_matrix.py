@@ -11,13 +11,13 @@ from src.clinical_intelligence.next2u_context import (
 from src.clinical_intelligence.next2u_promotion import load_catalog, promote_stars
 
 
-def test_catalog_has_971_patterns():
+def test_catalog_has_expected_patterns():
     cat = load_catalog()
     assert cat.get("n_expanded_patterns", 0) >= 971
     ids = {p["id"] for p in cat["patterns"]}
     assert "001.1" in ids
     assert "158.4" in ids
-    assert len(ids) == 971
+    assert len(ids) == cat["n_expanded_patterns"] == 1057
 
 
 def test_hospitalization_score_bands():

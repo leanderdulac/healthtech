@@ -8,7 +8,7 @@ Espelha OpenAPI em docs/openapi/hband-wearable.yaml e os modelos do SDK
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -58,9 +58,12 @@ class HBandRealtimeIngest(BaseModel):
     timestamp: Optional[str] = Field(
         None, description="ISO-8601 UTC; se omitido, servidor usa now()"
     )
+    client_reading_id: Optional[str] = Field(None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+    ingest_source: Literal["companion_manual", "ble_sim", "ble_hband", "ble_standard", "http"] = "companion_manual"
     heart_rate: Optional[float] = Field(None, ge=20.0, le=250.0)
     spo2: Optional[float] = Field(None, ge=50.0, le=100.0)
     skin_temp: Optional[float] = Field(None, ge=25.0, le=45.0)
+    body_temp_c: Optional[float] = Field(None, ge=30.0, le=45.0, description="Explicit measured body temperature; not skin temperature")
     hrv_rmssd: Optional[float] = Field(None, ge=0.0, le=300.0)
     activity_level: Optional[float] = Field(None, ge=0.0, le=100.0)
     blood_pressure_sys: Optional[float] = Field(None, ge=60.0, le=300.0)

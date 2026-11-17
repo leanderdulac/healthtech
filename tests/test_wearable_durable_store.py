@@ -471,3 +471,55 @@ def test_anonymize_removes_durable_rows(durable_engine):
     )
     assert durable_readings.anonymize_patient("PAT-DUR-LGPD") is True
     assert durable_readings.get_latest("PAT-DUR-LGPD") is None
+
+
+@pytest.mark.critical
+def test_hband_retry_and_measured_fields_survive_a_fresh_process(durable_client, durable_engine):
+    import json
+    import subprocess
+
+    from src.ingestion.real.hband_normalizer import HBandNormalizer
+
+    payload = HBandNormalizer().to_wearable_ingest({
+        "patient_id": "SIM-DURABLE-HBAND-R2",
+        "device": {"device_id": "SIM-DEVICE-R2"},
+        "heart_rate": 78, "spo2": 97, "skin_temp": 38.5,
+        "timestamp": "2026-11-16T09:00:00-03:00",
+        "client_reading_id": "sim-durable-reading-r2",
+        "ingest_source": "ble_sim",
+    })
+    first = durable_client.post('/api/v1/wearables/ingest', headers=INGEST_HEADERS, json=payload)
+    assert first.status_code == 200, first.text
+    assert first.json()['ingest_status'] == 'accepted'
+    assert first.json()['clinical_alerts']['vitals_used']['temp_c'] is None
+    code = '''
+import json, os
+from fastapi.testclient import TestClient
+from app.main import create_app
+payload=json.loads(os.environ['SIM_RESTART_PAYLOAD'])
+headers={'X-API-Key':os.environ['SIM_TEST_INGEST_KEY']}
+read_headers={'X-API-Key':os.environ['SIM_TEST_READ_KEY']}
+with TestClient(create_app()) as client:
+    latest=client.get('/api/v1/wearables/patient/SIM-DURABLE-HBAND-R2/latest',headers=read_headers)
+    assert latest.status_code==200,latest.text
+    assert latest.json()['reading_id']==os.environ['SIM_EXPECTED_READING_ID']
+    assert latest.json()['client_reading_id']=='sim-durable-reading-r2'
+    assert latest.json()['clinical_alerts']['vitals_used']['temp_c'] is None
+    duplicate=client.post('/api/v1/wearables/ingest',headers=headers,json=payload)
+    assert duplicate.status_code==200,duplicate.text
+    assert duplicate.json()['ingest_status']=='duplicate'
+    assert duplicate.json()['reading_id']==latest.json()['reading_id']
+    history=client.get('/api/v1/wearables/patient/SIM-DURABLE-HBAND-R2/history',headers=read_headers)
+    assert history.status_code==200 and history.json()['total_records']==1
+print('sim-durable-restart-and-retry-ok')
+'''
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(SECURE), str(ROOT)]),
+        DATABASE_URL=durable_engine.url.render_as_string(hide_password=False),
+        OPERATIONAL_DATABASE_URL='', GCS_STAGING_BUCKET='', ENVIRONMENT='development',
+        AUTH_DISABLED='false', APP_MODE='secure', PYTHONDONTWRITEBYTECODE='1',
+        SIM_RESTART_PAYLOAD=json.dumps(payload), SIM_TEST_INGEST_KEY=INGEST_KEY,
+        SIM_TEST_READ_KEY=READ_KEY, SIM_EXPECTED_READING_ID=first.json()['reading_id'])
+    result = subprocess.run([sys.executable, '-c', code], cwd=ROOT, env=env,
+        capture_output=True, text=True, timeout=40)
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert 'sim-durable-restart-and-retry-ok' in result.stdout

@@ -207,7 +207,7 @@ def _build_preds() -> Dict[int, Pred]:
         lambda v: _in(v.glucose_mgdl, 250, 399) and _ge(v.temp_c, 38.1) and _ge(v.hr, 111),
     )
     add(77, lambda v: _in(v.glucose_mgdl, 250, 399) and _ge(v.hr, 111) and _le(v.pas, 100))
-    add(78, lambda v: _ge(v.glucose_mgdl, 400) and (v.glucose_mgdl is None or v.glucose_mgdl < 600))
+    add(78, lambda v: _ge(v.glucose_mgdl, 400))
     add(79, lambda v: _ge(v.glucose_mgdl, 600))
     add(
         80,
@@ -463,8 +463,10 @@ def _short_name(suggested: str) -> str:
 
 
 def load_base_meta(catalog_path: Optional[Path] = None) -> Dict[int, Dict[str, Any]]:
-    path = catalog_path or Path("data/models/next2u_expanded_matrix.json")
-    cat = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"patterns": []}
+    path = catalog_path or (Path(__file__).resolve().parents[2] / "data/models/next2u_expanded_matrix.json")
+    if not path.is_file():
+        raise FileNotFoundError(f"NEXT2U_CATALOG_REQUIRED: {path}")
+    cat = json.loads(path.read_text(encoding="utf-8"))
     meta: Dict[int, Dict[str, Any]] = {}
     for p in cat.get("patterns", []):
         b = int(p["base_id"])
@@ -481,6 +483,8 @@ def load_base_meta(catalog_path: Optional[Path] = None) -> Dict[int, Dict[str, A
             if p.get("variant") == 1:
                 meta[b]["name"] = _short_name(p["suggested_name"])
                 meta[b]["pattern"] = p["original_pattern"]
+    if set(meta) != set(range(1, 159)):
+        raise ValueError("NEXT2U_CATALOG_INCOMPLETE: expected all 158 bases")
     return meta
 
 

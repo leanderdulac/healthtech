@@ -138,21 +138,15 @@ def test_sleep_batch_and_sport():
     assert MetricType.CALORIES in stypes
 
 
-def test_ppg_stream_ingest_body():
-    n = HBandNormalizer()
-    body, recs = n.from_ppg_stream(
-        {
-            "patient_id": "PAT-HBAND-001",
-            "device": DEVICE.model_dump(),
-            "green_light": [100 + i for i in range(50)],
-            "sample_rate_hz": 25.0,
-            "mode": "realtime",
-        }
-    )
-    assert "ppg_signal" in body
-    assert len(body["ppg_signal"]) == 50
-    assert body["filter_type"] == "BMO"
+def test_ppg_stream_without_measured_hr_does_not_fabricate_ingest_body():
+    import pytest
 
+    with pytest.raises(ValueError, match="MEASURED_HEART_RATE_REQUIRED"):
+        HBandNormalizer().from_ppg_stream({
+            "patient_id": "PAT-HBAND-001", "device": DEVICE.model_dump(),
+            "green_light": [100 + i for i in range(50)],
+            "sample_rate_hz": 25.0, "mode": "realtime",
+        })
 
 def test_envelope_router_origin():
     n = HBandNormalizer()
