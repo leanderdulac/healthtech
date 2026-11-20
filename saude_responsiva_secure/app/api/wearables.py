@@ -102,6 +102,9 @@ def _ingest_one(
     app_version: Optional[str] = None,
 ) -> Tuple[Optional[Dict[str, Any]], str, Optional[str]]:
     """Processa uma leitura. Retorna (frame, status, error)."""
+    from src.ops.device_patient_overrides import resolve_for_ingest
+
+    patient_id, reported_patient_id = resolve_for_ingest(payload.device_id, patient_id)
     client_ts = payload.timestamp
     fields_set = set(payload.model_fields_set)
     identity = resolve_dedup_identity(
@@ -121,6 +124,8 @@ def _ingest_one(
     try:
         data = _with_timestamp(payload)
         data["patient_id"] = patient_id
+        if reported_patient_id:
+            data["reported_patient_id"] = reported_patient_id
         frame = process_ingest_frame(data)
         if payload.client_reading_id:
             frame["client_reading_id"] = payload.client_reading_id
@@ -139,6 +144,8 @@ def _ingest_one(
             pass
         if extra:
             frame["extra"] = extra
+        if reported_patient_id:
+            frame["reported_patient_id"] = reported_patient_id
         stored, status = telemetry_store.upsert_reading(
             patient_id,
             frame,
@@ -149,6 +156,7 @@ def _ingest_one(
             measured_at=client_ts,
             metric_type=payload.metric_type or (identity.natural.metric_type if identity.natural else None),
             device_label=payload.device_label,
+            reported_patient_id=reported_patient_id,
         )
         return stored, status, None
     except DurableStoreUnavailable:

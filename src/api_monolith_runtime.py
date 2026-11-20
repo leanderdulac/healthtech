@@ -183,9 +183,12 @@ from src.ops.dashboard_routes import router as dashboard_ops_router
 from src.ops.device_detail_routes import router as device_detail_router
 from src.ops.patients_routes import router as patients_router
 
+from app.api.device_patient_overrides import router as device_patient_overrides_router
+
 app.include_router(patients_router)
 app.include_router(dashboard_ops_router)
 app.include_router(device_detail_router)
+app.include_router(device_patient_overrides_router)
 
 
 @app.get("/api/health")
@@ -382,6 +385,12 @@ def ingest_wearable_reading(
     if req.heart_rate <= 0 or req.heart_rate > 300:
         raise HTTPException(status_code=400, detail="Frequência cardíaca fora dos limites fisiológicos válidos (1-300 BPM).")
 
+    from src.ops.device_patient_overrides import resolve_for_ingest
+
+    _canonical, _reported = resolve_for_ingest(req.device_id, req.patient_id)
+    if _reported:
+        req.patient_id = _canonical
+
     # 1. A FC medida não é a média da onda PPG. A onda segue só para o perfil BMO.
     from src.clinical_intelligence.alert_ingest import resolve_heart_rate
 
@@ -573,6 +582,8 @@ def ingest_wearable_reading(
     except Exception:
         pass
 
+    if _reported:
+        processed_frame["reported_patient_id"] = _reported
     if req.patient_id not in patient_history:
         patient_history[req.patient_id] = []
     patient_history[req.patient_id].append(processed_frame)

@@ -33,6 +33,7 @@ MIGRATION_NAMES = (
     "001_wearable_readings.sql",
     "002_wearable_device_label.sql",
     "003_wearable_device_last_vitals.sql",
+    "004_device_patient_overrides.sql",
 )
 
 
@@ -121,6 +122,7 @@ def _sqlite_ddl() -> List[str]:
             patient_id TEXT NOT NULL,
             device_id TEXT NOT NULL,
             device_label TEXT,
+            reported_patient_id TEXT,
             metric_type TEXT NOT NULL,
             value DOUBLE PRECISION,
             unit TEXT,
@@ -181,6 +183,20 @@ def _sqlite_ddl() -> List[str]:
             updated_at DATETIME NOT NULL
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS device_patient_overrides (
+            device_id TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL,
+            created_by TEXT NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            motivo TEXT
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS ix_device_patient_overrides_patient
+            ON device_patient_overrides (patient_id)
+        """,
     ]
 
 
@@ -189,10 +205,12 @@ def _sqlite_add_missing_columns(conn) -> None:
     cols = {row[1] for row in conn.execute(text("PRAGMA table_info(wearable_readings)"))}
     if "device_label" not in cols:
         conn.execute(text("ALTER TABLE wearable_readings ADD COLUMN device_label TEXT"))
+    if "reported_patient_id" not in cols:
+        conn.execute(text("ALTER TABLE wearable_readings ADD COLUMN reported_patient_id TEXT"))
 
 
 def apply_schema(engine: Optional[Engine] = None) -> str:
-    """Aplica as migrações (001 tabela, 002 device_label, 003 last vitals).
+    """Aplica as migrações (001–004: leituras, rótulo, last vitals, overrides).
 
     Tudo idempotente e aditivo. Retorna o dialeto.
     """
@@ -302,6 +320,8 @@ def _row_frame(row: Any) -> Dict[str, Any]:
     out.setdefault("reading_id", mapping.get("reading_id"))
     out.setdefault("patient_id", mapping.get("patient_id"))
     out.setdefault("device_id", mapping.get("device_id"))
+    if mapping.get("reported_patient_id"):
+        out.setdefault("reported_patient_id", mapping.get("reported_patient_id"))
     if mapping.get("client_reading_id"):
         out.setdefault("client_reading_id", mapping.get("client_reading_id"))
     if mapping.get("metric_type"):
@@ -472,6 +492,7 @@ def upsert_reading(
     measured_at: Optional[str] = None,
     metric_type: Optional[str] = None,
     device_label: Optional[str] = None,
+    reported_patient_id: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], str]:
     """INSERT ... ON CONFLICT DO NOTHING; duplicate devolve o registro original."""
     from app.models.schemas import normalize_device_label
@@ -483,6 +504,9 @@ def upsert_reading(
         stored["device_label"] = label
     stored.setdefault("reading_id", uuid4().hex)
     stored["patient_id"] = patient_id
+    reported = (reported_patient_id or stored.get("reported_patient_id") or "").strip() or None
+    if reported:
+        stored["reported_patient_id"] = reported
     _ = dedup_keys  # legado: não parsear strings com ':'
     nat = identity.natural if identity else None
     cid = (
@@ -510,6 +534,7 @@ def upsert_reading(
         "patient_id": patient_id,
         "device_id": device_id,
         "device_label": label,
+        "reported_patient_id": reported,
         "metric_type": metric,
         "value": value,
         "unit": unit,
@@ -533,13 +558,15 @@ def upsert_reading(
         frame_sql = "CAST(:frame AS jsonb)" if dialect == "postgresql" else ":frame"
         insert_sql = f"""
             INSERT INTO wearable_readings (
-                reading_id, patient_id, device_id, device_label, metric_type,
+                reading_id, patient_id, device_id, device_label, reported_patient_id,
+                metric_type,
                 value, unit,
                 measured_at, received_at, client_reading_id, idempotency_key,
                 natural_patient_id, natural_device_id, natural_measured_at,
                 natural_metric_type, extra, frame, created_at
             ) VALUES (
-                :reading_id, :patient_id, :device_id, :device_label, :metric_type,
+                :reading_id, :patient_id, :device_id, :device_label, :reported_patient_id,
+                :metric_type,
                 :value, :unit,
                 :measured_at, :received_at, :client_reading_id, :idempotency_key,
                 :natural_patient_id, :natural_device_id, :natural_measured_at,

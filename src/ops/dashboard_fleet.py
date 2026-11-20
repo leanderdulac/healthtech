@@ -46,6 +46,12 @@ def _normalize(row: Dict[str, Any], now: datetime) -> Optional[Dict[str, Any]]:
     }
     if is_synthetic_device(row) or is_synthetic_device(item):
         item["synthetic"] = True
+    try:
+        from src.ops.device_patient_overrides import apply_to_row
+
+        item = apply_to_row(item)
+    except Exception:
+        pass
     return item
 
 

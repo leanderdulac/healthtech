@@ -22,6 +22,7 @@ VENDORED_OPS = (
     "device_registry.py",
     "device_detail.py",
     "device_detail_routes.py",
+    "device_patient_overrides.py",
 )
 EXCLUDED_OPS = (
     "live_watch_bridge.py",
