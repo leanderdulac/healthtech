@@ -176,6 +176,12 @@ def enrollment_region(patient_id: Optional[str]) -> Dict[str, Any]:
 
 
 def build_device_detail(row: Mapping[str, Any]) -> Dict[str, Any]:
+    try:
+        from src.ops.device_patient_overrides import apply_to_row
+
+        row = apply_to_row(row)
+    except Exception:
+        pass
     latest = row.get("latest") if isinstance(row.get("latest"), dict) else {}
     extra = latest.get("extra") if isinstance(latest.get("extra"), dict) else {}
     if not extra and isinstance(row.get("extra"), dict):
@@ -206,6 +212,9 @@ def build_device_detail(row: Mapping[str, Any]) -> Dict[str, Any]:
         },
         "region": enrollment_region(str(patient_id) if patient_id is not None else None),
     }
+    reported = row.get("reported_patient_id") or latest.get("reported_patient_id")
+    if reported and reported != payload.get("patient_id"):
+        payload["reported_patient_id"] = reported
     return _strip_location(payload)
 
 

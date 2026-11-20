@@ -141,6 +141,7 @@ def upsert_reading(
     measured_at: Optional[str] = None,
     metric_type: Optional[str] = None,
     device_label: Optional[str] = None,
+    reported_patient_id: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], str]:
     """Persiste a leitura se nenhuma das chaves ainda existir.
 
@@ -161,6 +162,7 @@ def upsert_reading(
             measured_at=measured_at,
             metric_type=metric_type,
             device_label=device_label,
+            reported_patient_id=reported_patient_id,
         )
         if status == "accepted":
             _register_device(stored)
@@ -174,6 +176,9 @@ def upsert_reading(
                 return dict(existing), "duplicate"
         stored = dict(frame)
         stored.setdefault("reading_id", uuid4().hex)
+        stored["patient_id"] = patient_id
+        if reported_patient_id:
+            stored["reported_patient_id"] = reported_patient_id
         if device_label and not stored.get("device_label"):
             stored["device_label"] = device_label
         if patient_id not in _patient_history:
@@ -474,5 +479,11 @@ def clear_all() -> None:
         from src.ops.device_registry import clear_all as clear_fleet
 
         clear_fleet()
+    except Exception:
+        pass
+    try:
+        from src.ops.device_patient_overrides import clear_memory
+
+        clear_memory()
     except Exception:
         pass

@@ -34,6 +34,7 @@ COMPACT_FIELDS = (
     "ingest_source",
     "device_label",
     "app_version",
+    "reported_patient_id",
 )
 
 
@@ -147,7 +148,7 @@ def summarize_frame(frame: Mapping[str, Any], now: Optional[datetime] = None) ->
     sys_val = raw.get("blood_pressure_sys")
     dia_val = raw.get("blood_pressure_dia")
     valid_sys, valid_dia = valid_blood_pressure(sys_val, dia_val)
-    return {
+    summary = {
         "device_id": frame.get("device_id") or "unknown",
         "patient_id": frame.get("patient_id"),
         "last_seen": utc_iso(live_ref) if live_ref else frame.get("timestamp"),
@@ -177,8 +178,15 @@ def summarize_frame(frame: Mapping[str, Any], now: Optional[datetime] = None) ->
             frame.get("app_version") or extra.get("app_version"),
             64,
         ),
+        "reported_patient_id": frame.get("reported_patient_id") or extra.get("reported_patient_id"),
         "latest": dict(frame),
     }
+    try:
+        from src.ops.device_patient_overrides import apply_to_row
+
+        return apply_to_row(summary)
+    except Exception:
+        return summary
 
 
 def carry_last_activity(

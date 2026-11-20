@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aplica migrations/001_wearable_readings.sql no Postgres operacional.
+"""Aplica as migrações de telemetria (001–004) no Postgres operacional.
 
 Reusa DATABASE_URL / OPERATIONAL_DATABASE_URL (mesmo Cloud SQL de enrollments).
 Não imprime o valor da URL.
