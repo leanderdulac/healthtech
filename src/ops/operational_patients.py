@@ -64,6 +64,15 @@ def _database_url() -> str:
     return (os.getenv("DATABASE_URL") or os.getenv("OPERATIONAL_DATABASE_URL") or "").strip()
 
 
+def _pool_int(name: str, default: int, lo: int, hi: int) -> int:
+    raw = (os.getenv(name) or "").strip()
+    try:
+        value = int(raw) if raw else default
+    except ValueError:
+        value = default
+    return max(lo, min(hi, value))
+
+
 def get_engine():
     global _engine
     if _engine is not None:
@@ -82,11 +91,16 @@ def get_engine():
         and "127.0.0.1" not in url
     ):
         connect_args["sslmode"] = "require"
+    # db-f1-micro do Cloud SQL aceita ~25 conexões no total. Dois serviços
+    # Cloud Run (min 1) cabem com 2+2 cada; o teto evita estourar se o env
+    # for definido alto demais. Ajuste fino: DB_POOL_SIZE / DB_MAX_OVERFLOW /
+    # DB_POOL_TIMEOUT. Não abra um connect() por item da frota.
     _engine = create_engine(
         url,
         pool_pre_ping=True,
-        pool_size=2,
-        max_overflow=2,
+        pool_size=_pool_int("DB_POOL_SIZE", 2, 1, 8),
+        max_overflow=_pool_int("DB_MAX_OVERFLOW", 2, 0, 8),
+        pool_timeout=_pool_int("DB_POOL_TIMEOUT", 10, 1, 30),
         connect_args=connect_args,
     )
     return _engine

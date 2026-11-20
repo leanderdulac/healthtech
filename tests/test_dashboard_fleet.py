@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from src.api_server import app
 from src.ops.device_registry import clear_all, is_synthetic_device, list_devices, upsert_frame
+from src.ops.device_patient_overrides import clear_memory, upsert_override
 from src.ops.fleet_online import resolve_fleet_online
 from src.ops.timestamps import ONLINE_WITHIN_SECONDS
 
@@ -28,10 +29,12 @@ def _fresh_iso() -> str:
 
 def setup_function() -> None:
     clear_all()
+    clear_memory()
 
 
 def teardown_function() -> None:
     clear_all()
+    clear_memory()
 
 
 def test_online_window_covers_the_half_hour_cycle_and_not_a_two_hour_gap():
@@ -399,3 +402,30 @@ def test_fleet_logic_js_focus_does_not_fake_online():
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+
+def test_fleet_summary_local_fallback_applies_override(monkeypatch):
+    upsert_override(
+        device_id="59:75:FA:45:21:2E",
+        patient_id="PAT-TEST-FRED1",
+        created_by="test",
+        motivo="fallback local deve aplicar o vínculo",
+    )
+    upsert_frame(
+        {
+            "patient_id": "PAT-TEST-ALEX1",
+            "device_id": "59:75:FA:45:21:2E",
+            "timestamp": _stale_iso(),
+            "raw_telemetry": {"heart_rate_bpm": 70, "spo2_percent": 97},
+        }
+    )
+    monkeypatch.setattr("src.ops.dashboard_fleet.fetch_secure_fleet", lambda timeout=8.0: None)
+    res = client.get("/api/v1/ops/fleet-summary?limit=500")
+    body = res.json()
+    assert body["source"] == "local"
+    match = next(row for row in body["devices"] if row["device_id"] == "59:75:FA:45:21:2E")
+    assert match["patient_id"] == "PAT-TEST-FRED1"
+    # A resposta pública do fleet-summary omite reported_patient_id
+    # (whitelist em _PUBLIC_DEVICE_FIELDS); o patient_id canônico é o que
+    # o painel exibe.

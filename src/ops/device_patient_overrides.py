@@ -245,15 +245,20 @@ def delete_override(device_id: str) -> bool:
         return _memory.pop(key, None) is not None
 
 
-def resolve_for_ingest(
-    device_id: Optional[str], reported_patient_id: Optional[str]
-) -> Tuple[str, Optional[str]]:
-    """Devolve (patient_id a gravar, reported_patient_id se houve override).
+def load_override_map() -> Dict[str, Dict[str, Any]]:
+    """Todos os vínculos, numa consulta só. Chave: device_id normalizado."""
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in list_overrides():
+        key = normalize_device_id(row.get("device_id"))
+        if key:
+            out[key] = row
+    return out
 
-    Sem override, retorna (reported, None) — comportamento atual.
-    """
+
+def _resolve_with_override(
+    reported_patient_id: Optional[str], override: Optional[Mapping[str, Any]]
+) -> Tuple[str, Optional[str]]:
     reported = normalize_patient_id(reported_patient_id)
-    override = get_override(device_id)
     if not override:
         return reported, None
     canonical = normalize_patient_id(override.get("patient_id"))
@@ -263,14 +268,35 @@ def resolve_for_ingest(
     return canonical, reported or None
 
 
-def apply_to_row(row: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
-    """Cópia da linha da frota/detalhe com patient_id canônico, se houver vínculo."""
+def resolve_for_ingest(
+    device_id: Optional[str], reported_patient_id: Optional[str]
+) -> Tuple[str, Optional[str]]:
+    """Devolve (patient_id a gravar, reported_patient_id se houve override).
+
+    Sem override, retorna (reported, None) — comportamento atual.
+    Uma leitura (detalhe/ingest). A frota deve usar apply_to_rows.
+    """
+    return _resolve_with_override(reported_patient_id, get_override(device_id))
+
+
+def apply_to_row(
+    row: Optional[Mapping[str, Any]],
+    overrides: Optional[Mapping[str, Mapping[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Cópia da linha da frota/detalhe com patient_id canônico, se houver vínculo.
+
+    Se `overrides` for um mapa pré-carregado, não consulta o banco de novo.
+    """
     if not row:
         return {}
     out = dict(row)
     device_id = out.get("device_id")
     reported = out.get("reported_patient_id") or out.get("patient_id")
-    canonical, stored_reported = resolve_for_ingest(device_id, reported)
+    if overrides is None:
+        override: Optional[Mapping[str, Any]] = get_override(device_id)
+    else:
+        override = overrides.get(normalize_device_id(device_id))
+    canonical, stored_reported = _resolve_with_override(reported, override)
     if stored_reported:
         out["patient_id"] = canonical
         out["reported_patient_id"] = stored_reported
@@ -281,3 +307,14 @@ def apply_to_row(row: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
             patched["reported_patient_id"] = stored_reported
             out["latest"] = patched
     return out
+
+
+def apply_to_rows(rows: Optional[List[Mapping[str, Any]]]) -> List[Dict[str, Any]]:
+    """Aplica os vínculos a uma lista com uma única leitura da tabela."""
+    if not rows:
+        return []
+    try:
+        overrides = load_override_map()
+    except Exception:
+        overrides = {}
+    return [apply_to_row(row, overrides=overrides) for row in rows]
