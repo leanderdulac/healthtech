@@ -212,3 +212,98 @@ def test_apply_schema_004_is_idempotent(tmp_path):
             assert "reported_patient_id" in cols
     finally:
         deactivate_engine(engine, restore=previous)
+
+
+
+def test_apply_to_rows_loads_overrides_once(monkeypatch):
+    from src.ops import device_patient_overrides as dpo
+
+    dpo.clear_memory()
+    dpo.upsert_override(
+        device_id=DEVICE,
+        patient_id=CANONICAL,
+        created_by="test",
+        motivo="lote",
+    )
+    calls = {"get": 0, "list": 0}
+    real_get = dpo.get_override
+    real_list = dpo.list_overrides
+
+    def counting_get(*args, **kwargs):
+        calls["get"] += 1
+        return real_get(*args, **kwargs)
+
+    def counting_list(*args, **kwargs):
+        calls["list"] += 1
+        return real_list(*args, **kwargs)
+
+    monkeypatch.setattr(dpo, "get_override", counting_get)
+    monkeypatch.setattr(dpo, "list_overrides", counting_list)
+
+    rows = [
+        {"device_id": f"10:20:30:40:50:{i:02X}", "patient_id": "PAT-TEST-XXXX"}
+        for i in range(20)
+    ]
+    rows[0]["device_id"] = DEVICE
+    rows[0]["patient_id"] = REPORTED
+    out = dpo.apply_to_rows(rows)
+    assert calls["list"] == 1
+    assert calls["get"] == 0
+    assert out[0]["patient_id"] == CANONICAL
+    assert out[0]["reported_patient_id"] == REPORTED
+    assert out[1]["patient_id"] == "PAT-TEST-XXXX"
+    assert not out[1].get("reported_patient_id")
+    dpo.clear_memory()
+
+
+def test_compact_devices_from_frames_does_not_query_override_per_device(monkeypatch):
+    from src.ops import device_patient_overrides as dpo
+    from src.ops.live_devices import compact_devices_from_frames
+
+    dpo.clear_memory()
+    dpo.upsert_override(
+        device_id=DEVICE,
+        patient_id=CANONICAL,
+        created_by="test",
+        motivo="frota",
+    )
+    calls = {"get": 0, "list": 0}
+    real_get = dpo.get_override
+    real_list = dpo.list_overrides
+    monkeypatch.setattr(dpo, "get_override", lambda *a, **k: calls.__setitem__("get", calls["get"] + 1) or real_get(*a, **k))
+    monkeypatch.setattr(dpo, "list_overrides", lambda *a, **k: calls.__setitem__("list", calls["list"] + 1) or real_list(*a, **k))
+
+    frames = []
+    for i in range(12):
+        frames.append(
+            {
+                "device_id": f"10:20:30:40:50:{i:02X}",
+                "patient_id": "PAT-TEST-XXXX",
+                "timestamp": "2026-11-20T12:00:00+00:00",
+                "raw_telemetry": {"heart_rate_bpm": 70},
+            }
+        )
+    frames[0]["device_id"] = DEVICE
+    frames[0]["patient_id"] = REPORTED
+    rows = compact_devices_from_frames(frames)
+    assert calls["list"] == 1
+    assert calls["get"] == 0
+    match = next(row for row in rows if row["device_id"] == DEVICE)
+    assert match["patient_id"] == CANONICAL
+    assert match["reported_patient_id"] == REPORTED
+    dpo.clear_memory()
+
+
+def test_pool_int_clamps_and_defaults(monkeypatch):
+    from src.ops.operational_patients import _pool_int
+
+    monkeypatch.delenv("DB_POOL_SIZE", raising=False)
+    assert _pool_int("DB_POOL_SIZE", 2, 1, 8) == 2
+    monkeypatch.setenv("DB_POOL_SIZE", "5")
+    assert _pool_int("DB_POOL_SIZE", 2, 1, 8) == 5
+    monkeypatch.setenv("DB_POOL_SIZE", "99")
+    assert _pool_int("DB_POOL_SIZE", 2, 1, 8) == 8
+    monkeypatch.setenv("DB_POOL_SIZE", "0")
+    assert _pool_int("DB_POOL_SIZE", 2, 1, 8) == 1
+    monkeypatch.setenv("DB_POOL_SIZE", "nope")
+    assert _pool_int("DB_POOL_SIZE", 2, 1, 8) == 2

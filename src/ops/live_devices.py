@@ -136,7 +136,12 @@ def compact_row(summary: Mapping[str, Any]) -> Dict[str, Any]:
     return item
 
 
-def summarize_frame(frame: Mapping[str, Any], now: Optional[datetime] = None) -> Dict[str, Any]:
+def summarize_frame(
+    frame: Mapping[str, Any],
+    now: Optional[datetime] = None,
+    *,
+    apply_override: bool = True,
+) -> Dict[str, Any]:
     now = now or datetime.now(timezone.utc)
     raw = frame.get("raw_telemetry") or {}
     received = parse_timestamp(frame.get("received_at")) or parse_timestamp(frame.get("timestamp"))
@@ -181,6 +186,8 @@ def summarize_frame(frame: Mapping[str, Any], now: Optional[datetime] = None) ->
         "reported_patient_id": frame.get("reported_patient_id") or extra.get("reported_patient_id"),
         "latest": dict(frame),
     }
+    if not apply_override:
+        return summary
     try:
         from src.ops.device_patient_overrides import apply_to_row
 
@@ -269,7 +276,7 @@ def compact_devices_from_frames(
         return str(frame.get("received_at") or frame.get("timestamp") or "")
 
     for frame in sorted(frames, key=_sort_key):
-        compact = compact_row(summarize_frame(frame, now=now))
+        compact = compact_row(summarize_frame(frame, now=now, apply_override=False))
         device_id = str(compact.get("device_id") or "unknown")
         compact["device_id"] = device_id
         by_device[device_id] = carry_last_activity(by_device.get(device_id), compact)
@@ -280,7 +287,12 @@ def compact_devices_from_frames(
             frame = latest.get(str(row.get("device_id")))
             if frame is not None:
                 row["latest"] = dict(frame)
-    return rows
+    try:
+        from src.ops.device_patient_overrides import apply_to_rows
+
+        return apply_to_rows(rows)
+    except Exception:
+        return rows
 
 
 def devices_from_patient_history(

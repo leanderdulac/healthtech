@@ -43,15 +43,10 @@ def _normalize(row: Dict[str, Any], now: datetime) -> Optional[Dict[str, Any]]:
         "ingest_source": row.get("ingest_source"),
         "device_label": row.get("device_label"),
         "app_version": row.get("app_version"),
+        "reported_patient_id": row.get("reported_patient_id"),
     }
     if is_synthetic_device(row) or is_synthetic_device(item):
         item["synthetic"] = True
-    try:
-        from src.ops.device_patient_overrides import apply_to_row
-
-        item = apply_to_row(item)
-    except Exception:
-        pass
     return item
 
 
@@ -127,6 +122,12 @@ def present_fleet(
             item = _normalize(raw, now)
             if item is not None:
                 rows.append(item)
+        try:
+            from src.ops.device_patient_overrides import apply_to_rows
+
+            rows = apply_to_rows(rows)
+        except Exception:
+            pass
         return _page(
             rows,
             q=q,
@@ -147,4 +148,11 @@ def present_fleet(
         include_synthetic=include_synthetic,
     )
     payload["source"] = "local"
+    # Fallback local não passava pelo apply do _normalize; aplica em lote.
+    try:
+        from src.ops.device_patient_overrides import apply_to_rows
+
+        payload["devices"] = apply_to_rows(payload.get("devices") or [])
+    except Exception:
+        pass
     return payload

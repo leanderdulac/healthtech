@@ -234,6 +234,12 @@ def list_devices(
         now = _now()
         rows = [_refresh_online(row, now=now) for row in _devices.values()]
         _flush_unlocked()
+    try:
+        from src.ops.device_patient_overrides import apply_to_rows
+
+        rows = apply_to_rows(rows)
+    except Exception:
+        pass
     if wanted_patient:
         rows = [row for row in rows if str(row.get("patient_id") or "") == wanted_patient]
     if not include_synthetic:
