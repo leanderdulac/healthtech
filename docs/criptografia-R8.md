@@ -5,10 +5,10 @@ Documento para o go-live Next2U (30/11/2026). Descreve o que o serviço
 Postgres no Cloud SQL `healthtech-pg`) faz com dados em trânsito e em
 repouso. Não é certificado, laudo ou política de privacidade.
 
-A cifra de campos **nasce desligada**. Sem `FIELD_ENCRYPTION_KEY`, a API
-grava e lê como hoje. Ligar a chave, aplicar a migração `005` e rodar o
-backfill são passos separados e precisam do OK do Leandro. Este PR não
-faz deploy e não escreve em produção.
+Sem `FIELD_ENCRYPTION_KEY`, a API grava e lê como antes. Na revisão
+`00074-qol` a chave `v1` já está ligada e a migração `005` já foi
+aplicada. O backfill do histórico ainda precisa ser retomado em lotes
+(seção 6). Este PR não faz deploy e não escreve em produção.
 
 ## 1. O que a auditoria encontrou
 
@@ -74,7 +74,7 @@ etc.). Trocar o blob de coluna não abre.
 | `patient_id`, `device_id`, `reported_patient_id` e a chave natural | coluna vira índice cego `bi1.` + HMAC-SHA256 | `WHERE coluna = :claro OR coluna = :bi1` acha legado e novo. |
 | Nome, telefone, telefone do cuidador, doenças | `enrollments` (após o backfill) | Leitura decripta. `patient_id` da tabela continua em claro: é a chave do `WHERE` de autorização. Quem grava o cadastro fora deste serviço precisa passar a usar a mesma cifra, senão linhas novas voltam em claro. |
 | SpO₂, passos, pressão do snapshot | colunas `*_enc` **depois** da migração 005 | Sem a 005, o snapshot segue em claro (cache derivado). Com a 005, o `DOUBLE` fica `NULL` e a leitura decripta. |
-| MAC e paciente do vínculo device→paciente | `device_id_enc` / `patient_id_enc` **depois** da 005; a PK vira `bi1.` | Sem a 005, o vínculo segue em claro para não perder o id reversível. |
+| MAC e paciente do vínculo device→paciente | **em claro**, de propósito | O painel `healthtech-responsive` lê `device_patient_overrides` direto e faz o join pelo MAC. `bi1.` não seria aplicado. A API também grava em claro. Linha que já saiu `bi1.` é reaberta pelo `--backfill`. O painel **não** precisa de deploy. |
 
 Ficam em claro de propósito, mesmo com a chave ligada:
 
@@ -83,6 +83,7 @@ Ficam em claro de propósito, mesmo com a chave ligada:
 - `device_label` (rótulo operacional do aparelho, não o nome da pessoa).
 - `metric_type` e `unit` (`heart_rate`, `bpm`).
 - `patient_id` em `enrollments` (chave de autorização e de join).
+- `device_id` e `patient_id` em `device_patient_overrides` (o painel lê a tabela sem passar pela API; cifrar a chave quebraria o vínculo na frota).
 - API keys (ambiente, não coluna).
 
 Linha antiga sem prefixo `enc1` / `bi1` é lida como está. A resposta da API
@@ -136,61 +137,71 @@ ingest devolve erro ao abrir o campo.
 3. Só então remover `FIELD_ENCRYPTION_KEY` (e o anel) e fazer deploy.
 4. As colunas `*_enc` da 005 podem ficar vazias. Não há `DROP COLUMN` neste PR.
 
-## 6. Passos que o Leandro precisa aprovar
+## 6. Lotes, boot e o comando para retomar
 
-Nada disso roda neste PR.
+A revisão `00074-qol` já subiu com a cifra ligada (key id `v1`) e a
+migração `005` aplicada. O `--apply-schema` antigo cifrava as 45.629
+leituras numa transação só (~2 min) e segurava a tabela. Uma instância
+nova do Cloud Run, no boot, rodava `ALTER TABLE wearable_readings
+ADD COLUMN IF NOT EXISTS device_label`, que no Postgres pede
+`ACCESS EXCLUSIVE` mesmo com a coluna já existente. A fila dessa trava
+fez `/api/v1/wearables/devices` responder 503.
 
-1. **Revisar o diff** e o texto que vai para a ficha da loja (seção 7).
-2. **Criar os segredos** no Secret Manager do projeto `healthtech-gcp-2026`
-   (`FIELD_ENCRYPTION_KEY` e `FIELD_BLIND_INDEX_KEY`). Não commitar.
-3. **Decidir se o KMS entra agora.** O código aceita. Criar a key ring é
-   outra mudança, fora deste PR. Dá para ligar só com Secret Manager.
-4. **Deploy da revisão** com as envs ainda vazias. O boot loga
-   `Criptografia de campos: desligada`. A ingest segue igual. O `sslmode`
-   de TCP remoto passa a `require` — o socket `/cloudsql/` do serviço atual
-   não muda.
-5. **Aplicar a 005 e o backfill** numa janela combinada, com backup do
-   Cloud SQL antes:
+O que muda:
+
+- O backfill grava em lotes de 500 (um commit por lote). `lock_timeout`
+  de 3s e `statement_timeout` de 15s valem só dentro do lote. Deadlock
+  (`40P01`) e lock não obtido (`55P03`) tentam de novo, com espera de
+  0,5s, 1s, 2s, 4s. Linha já cifrada é pulada. Dá para interromper e
+  rodar de novo.
+- `--apply-schema` só aplica a `005`. Não reescreve linha.
+- `--backfill` só reescreve. Não mexe no schema.
+- No boot, `CREATE TABLE`, `ADD COLUMN` e `CREATE INDEX` que já existem
+  não são reemitidos. Se algum DDL ainda precisar de trava, `lock_timeout`
+  de 2s faz o boot desistir em vez de segurar o tráfego.
+
+A `005` já está aplicada. Não rode `--apply-schema` de novo para cifrar
+o histórico. O comando do backfill, com a mesma DEK `v1` e a mesma chave
+do índice que estão na revisão `00074-qol`:
 
 ```bash
-# Conferir volume, sem gravar. Não cria coluna.
+BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \
+FIELD_ENCRYPTION_KEY="$DEK" \
+FIELD_BLIND_INDEX_KEY="$BIK" \
+FIELD_ENCRYPTION_KEY_ID=v1 \
+DATABASE_URL="$DATABASE_URL" \
+python scripts/backfill_field_encryption.py --backfill --batch-size 500
+```
+
+Antes, se quiser só contar:
+
+```bash
 BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \
 FIELD_ENCRYPTION_KEY="$DEK" \
 FIELD_BLIND_INDEX_KEY="$BIK" \
 FIELD_ENCRYPTION_KEY_ID=v1 \
 DATABASE_URL="$DATABASE_URL" \
 python scripts/backfill_field_encryption.py --dry-run
-
-# Colunas aditivas + reescrita idempotente. Exige o confirm acima.
-BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \
-FIELD_ENCRYPTION_KEY="$DEK" \
-FIELD_BLIND_INDEX_KEY="$BIK" \
-FIELD_ENCRYPTION_KEY_ID=v1 \
-DATABASE_URL="$DATABASE_URL" \
-python scripts/backfill_field_encryption.py --apply-schema
 ```
 
-6. **Ligar a env na revisão do Cloud Run** (`FIELD_ENCRYPTION_KEY`,
-   `FIELD_ENCRYPTION_KEY_ID`, `FIELD_BLIND_INDEX_KEY`) e subir tráfego.
-   Escritas novas já saem cifradas mesmo antes do backfill; o backfill
-   cobre o histórico. Os dois podem conviver.
-7. **Smoke sintético** (não usar paciente real): um `POST /api/v1/wearables/ingest`
-   e o mesmo `client_reading_id` de novo (esperado `duplicate`). A resposta
-   traz `patient_id` e o vital em claro. No SQL, `patient_id` começa com
-   `bi1.` e `frame` contém `_enc`.
-8. **Rollback**, se preciso, é o modo decrypt da seção 5 — ainda com a chave
-   presente:
+`--dry-run` não dá `UPDATE` e não aplica schema. O script recusa rodar
+se `BACKFILL_FIELD_ENCRYPTION_CONFIRM` não for `yes`. A migração `005`
+não está na lista que o boot aplica (`001`–`004`).
+
+Esse comando também reabre vínculo device→paciente que tenha sido
+gravado como `bi1.`, devolvendo `device_id` e `patient_id` ao claro.
+Vínculo novo já nasce em claro. O painel não precisa de deploy.
+
+**Rollback** das leituras, se preciso, ainda com a chave presente:
 
 ```bash
 BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \
 FIELD_ENCRYPTION_KEY="$DEK" \
 FIELD_BLIND_INDEX_KEY="$BIK" \
+FIELD_ENCRYPTION_KEY_ID=v1 \
 DATABASE_URL="$DATABASE_URL" \
-python scripts/backfill_field_encryption.py --decrypt
+python scripts/backfill_field_encryption.py --decrypt --batch-size 500
 ```
-
-O script recusa rodar se `BACKFILL_FIELD_ENCRYPTION_CONFIRM` não for `yes`.
-A migração `005` não está na lista que o boot aplica (`001`–`004`).
 
 ## 7. Texto utilizável na ficha das lojas
 
@@ -199,12 +210,15 @@ Fatos deste serviço, sem adjetivo de certificação:
 - O tráfego do app até a API usa HTTPS. A resposta envia HSTS.
 - A conexão da API com o Cloud SQL por IP usa TLS (`sslmode=require` ou
   mais forte). O caminho padrão do Cloud Run é o socket do conector.
-- Com a chave de campo ligada, telemetria de wearable (valores vitais e
+- Com a chave de campo ligada, telemetria de wearable nova (valores vitais e
   identificadores de paciente e de aparelho no registro da leitura), nome,
   telefone e condições do cadastro ficam cifrados no Postgres com AES-256-GCM.
   A chave fica no Secret Manager, não no repositório.
+- O vínculo aparelho→paciente (`device_patient_overrides`) fica em claro:
+  o painel lê essa tabela direto.
 - A API key do app não é gravada no banco.
 
-Enquanto a env não estiver ligada e o backfill não tiver rodado, o banco
-ainda tem o histórico em claro. A ficha não deve dizer que o acervo antigo
-já está cifrado antes desses dois passos.
+A chave da revisão `00074-qol` já está ligada, então leitura nova sai
+cifrada. O backfill do histórico de `wearable_readings` ainda não
+concluiu. A ficha não deve dizer que o acervo antigo já está cifrado
+antes desse comando.

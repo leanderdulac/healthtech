@@ -62,17 +62,29 @@ def _iso(value: Any) -> Optional[str]:
 
 
 def _public_row(row: Mapping[str, Any]) -> Dict[str, Any]:
+    """device_id e patient_id em claro são a fonte do painel.
+
+    Só abre ``*_enc`` quando a coluna operacional ainda está como ``bi1.``
+    (linha gravada antes desta exceção). O painel não vê esse fallback.
+    """
     device_id = row.get("device_id")
     patient_id = row.get("patient_id")
-    enc_device = row.get("device_id_enc")
-    enc_patient = row.get("patient_id_enc")
-    if enc_device or enc_patient:
-        from app.security.field_crypto import open_text
+    if _is_blind_value(device_id) or _is_blind_value(patient_id):
+        from app.security.field_crypto import is_ciphertext, open_text
 
-        if isinstance(enc_device, str) and enc_device:
-            device_id = open_text(enc_device, aad="override.device_id")
-        if isinstance(enc_patient, str) and enc_patient:
-            patient_id = open_text(enc_patient, aad="override.patient_id")
+        enc_device = row.get("device_id_enc")
+        enc_patient = row.get("patient_id_enc")
+        try:
+            if _is_blind_value(device_id) and isinstance(enc_device, str) and is_ciphertext(enc_device):
+                device_id = open_text(enc_device, aad="override.device_id")
+            if (
+                _is_blind_value(patient_id)
+                and isinstance(enc_patient, str)
+                and is_ciphertext(enc_patient)
+            ):
+                patient_id = open_text(enc_patient, aad="override.patient_id")
+        except Exception:
+            logger.warning("Overrides: vínculo cifrado não pôde ser aberto")
     return {
         "device_id": device_id,
         "patient_id": patient_id,
@@ -81,6 +93,14 @@ def _public_row(row: Mapping[str, Any]) -> Dict[str, Any]:
         "updated_at": _iso(row.get("updated_at")),
         "motivo": row.get("motivo"),
     }
+
+
+def _is_blind_value(value: Any) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    from app.security.field_crypto import is_blind_index
+
+    return is_blind_index(value)
 
 
 def _encryption_on() -> bool:
@@ -113,57 +133,70 @@ _OVERRIDE_SQL = """
 """
 
 
-def _upsert_sealed(conn, row: Dict[str, Any]):
-    """Índice cego na PK e ciphertext nas colunas da migração 005."""
-    from app.security.field_crypto import blind_index, seal_text
+def _upsert_operational(conn, row: Dict[str, Any]):
+    """Grava device_id e patient_id em claro.
 
-    plain_device = row["device_id"]
-    plain_patient = row["patient_id"]
-    blind_device = blind_index(plain_device, context="device_id")
-    payload = {
-        **row,
-        "device_id": blind_device,
-        "patient_id": blind_index(plain_patient, context="patient_id"),
-        "device_id_enc": seal_text(plain_device, aad="override.device_id"),
-        "patient_id_enc": seal_text(plain_patient, aad="override.patient_id"),
-    }
-    existing = conn.execute(
-        text(
-            "SELECT device_id FROM device_patient_overrides "
-            "WHERE device_id = :plain OR device_id = :blind"
-        ),
-        {"plain": plain_device, "blind": blind_device},
-    ).fetchone()
-    returning = (
-        "device_id, patient_id, created_by, created_at, updated_at, motivo, "
-        "device_id_enc, patient_id_enc"
-    )
-    if existing is not None:
-        payload["stored_device_id"] = existing[0]
+    O painel healthtech-responsive lê a tabela direto e faz o join pelo
+    MAC. ``bi1.`` não seria aplicado. Se a linha antiga ainda está cega,
+    o UPDATE devolve a PK ao MAC em claro e esvazia ``*_enc``.
+    """
+    has_enc = _override_columns(conn).endswith("patient_id_enc")
+    stored_id = None
+    if _encryption_on():
+        from app.security.field_crypto import blind_index
+
+        found = conn.execute(
+            text(
+                "SELECT device_id FROM device_patient_overrides "
+                "WHERE device_id = :plain OR device_id = :blind"
+            ),
+            {
+                "plain": row["device_id"],
+                "blind": blind_index(row["device_id"], context="device_id"),
+            },
+        ).fetchone()
+        if found is not None:
+            stored_id = found[0]
+    if stored_id and _is_blind_value(str(stored_id)):
+        clear = ""
+        returning = "device_id, patient_id, created_by, created_at, updated_at, motivo"
+        if has_enc:
+            clear = ", device_id_enc = NULL, patient_id_enc = NULL"
+            returning += ", device_id_enc, patient_id_enc"
         sql = f"""
             UPDATE device_patient_overrides SET
                 device_id = :device_id,
                 patient_id = :patient_id,
                 created_by = :created_by,
                 updated_at = :updated_at,
-                motivo = :motivo,
-                device_id_enc = :device_id_enc,
-                patient_id_enc = :patient_id_enc
+                motivo = :motivo
+                {clear}
             WHERE device_id = :stored_device_id
             RETURNING {returning}
         """
-    else:
-        sql = f"""
+        payload = {**row, "stored_device_id": stored_id}
+        return conn.execute(text(sql), payload).fetchone()
+    if has_enc:
+        sql = """
             INSERT INTO device_patient_overrides (
                 device_id, patient_id, created_by, created_at, updated_at, motivo,
                 device_id_enc, patient_id_enc
             ) VALUES (
                 :device_id, :patient_id, :created_by, :created_at, :updated_at, :motivo,
-                :device_id_enc, :patient_id_enc
+                NULL, NULL
             )
-            RETURNING {returning}
+            ON CONFLICT (device_id) DO UPDATE SET
+                patient_id = EXCLUDED.patient_id,
+                created_by = EXCLUDED.created_by,
+                updated_at = EXCLUDED.updated_at,
+                motivo = EXCLUDED.motivo,
+                device_id_enc = NULL,
+                patient_id_enc = NULL
+            RETURNING device_id, patient_id, created_by, created_at, updated_at, motivo,
+                      device_id_enc, patient_id_enc
         """
-    return conn.execute(text(sql), payload).fetchone()
+        return conn.execute(text(sql), row).fetchone()
+    return conn.execute(text(_OVERRIDE_SQL), row).fetchone()
 
 
 def clear_memory() -> None:
@@ -302,10 +335,7 @@ def upsert_override(
         engine = _engine()
         try:
             with engine.begin() as conn:
-                if _encryption_on() and _override_columns(conn).endswith("patient_id_enc"):
-                    fetched = _upsert_sealed(conn, row)
-                else:
-                    fetched = conn.execute(text(_OVERRIDE_SQL), row).fetchone()
+                fetched = _upsert_operational(conn, row)
             mapping = (
                 dict(fetched._mapping)
                 if fetched is not None and hasattr(fetched, "_mapping")

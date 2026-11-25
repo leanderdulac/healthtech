@@ -6,19 +6,25 @@ Não roda no boot e não é chamado pelo deploy. Recusa executar sem
 
 Exemplos (valores de chave só no ambiente, nunca neste arquivo):
 
-    # conta o que mudaria, sem gravar
+    # conta o que mudaria, sem gravar e sem aplicar schema
     BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \\
     FIELD_ENCRYPTION_KEY="$DEK" FIELD_BLIND_INDEX_KEY="$BIK" \\
     DATABASE_URL="$DATABASE_URL" \\
     python scripts/backfill_field_encryption.py --dry-run
 
-    # aplica colunas 005 e reescreve linhas ainda em claro
+    # só as colunas da 005. Não reescreve linhas.
     BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \\
-    FIELD_ENCRYPTION_KEY="$DEK" FIELD_BLIND_INDEX_KEY="$BIK" \\
     DATABASE_URL="$DATABASE_URL" \\
     python scripts/backfill_field_encryption.py --apply-schema
 
-    # rollback: volta ao claro enquanto a chave ainda está no ambiente
+    # reescreve em lotes (padrão 500, um commit por lote). Não mexe no schema.
+    BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \\
+    FIELD_ENCRYPTION_KEY="$DEK" FIELD_BLIND_INDEX_KEY="$BIK" \\
+    FIELD_ENCRYPTION_KEY_ID=v1 \\
+    DATABASE_URL="$DATABASE_URL" \\
+    python scripts/backfill_field_encryption.py --backfill --batch-size 500
+
+    # rollback das leituras: volta ao claro enquanto a chave ainda está no ambiente
     BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \\
     FIELD_ENCRYPTION_KEY="$DEK" FIELD_BLIND_INDEX_KEY="$BIK" \\
     DATABASE_URL="$DATABASE_URL" \\
@@ -62,12 +68,26 @@ def _apply_schema(engine) -> None:
             conn.execute(text(statement))
 
 
+def selected_actions(args) -> tuple[bool, bool]:
+    """(aplicar 005, reescrever linhas). As duas coisas não compartilham transação.
+
+    ``--apply-schema`` sozinho não cifra. ``--backfill`` / ``--decrypt`` /
+    ``--dry-run`` não aplicam schema. Sem nenhum dos dois, o padrão é o
+    backfill (retomável). ``--dry-run`` nunca aplica schema.
+    """
+    schema = bool(args.apply_schema) and not bool(args.dry_run)
+    explicit_data = bool(args.backfill or args.decrypt or args.dry_run)
+    if args.apply_schema and not explicit_data:
+        return schema, False
+    return schema, True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Backfill da criptografia R8 (não roda sozinho).")
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Conta o que seria reescrito, sem UPDATE.",
+        help="Conta o que seria reescrito, sem UPDATE e sem aplicar schema.",
     )
     parser.add_argument(
         "--decrypt",
@@ -75,16 +95,29 @@ def main(argv: list[str] | None = None) -> int:
         help="Rollback: restaura colunas em claro. A chave precisa continuar definida.",
     )
     parser.add_argument(
+        "--backfill",
+        action="store_true",
+        help="Reescreve linhas em lotes. Não aplica o schema 005.",
+    )
+    parser.add_argument(
         "--apply-schema",
         action="store_true",
-        help="Aplica migrations/005_field_encryption.sql antes do backfill.",
+        help="Aplica migrations/005_field_encryption.sql e para. Não reescreve linhas.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=500,
+        help="Linhas por commit (padrão 500).",
     )
     args = parser.parse_args(argv)
     _confirm_or_exit()
+    apply_schema, run_backfill = selected_actions(args)
 
     from app.security.field_backfill import (
         backfill_enrollments,
         backfill_last_vitals,
+        backfill_overrides,
         backfill_wearable_readings,
     )
     from app.security.field_crypto import FieldCryptoError, describe_status
@@ -93,11 +126,12 @@ def main(argv: list[str] | None = None) -> int:
     if not database_url():
         print("DATABASE_URL / OPERATIONAL_DATABASE_URL ausente. Nada feito.", file=sys.stderr)
         return 2
-    try:
-        print(describe_status())
-    except FieldCryptoError as exc:
-        print(f"Chave inválida: {exc}", file=sys.stderr)
-        return 2
+    if run_backfill:
+        try:
+            print(describe_status())
+        except FieldCryptoError as exc:
+            print(f"Chave inválida: {exc}", file=sys.stderr)
+            return 2
 
     engine = get_engine()
     if engine is None:
@@ -108,24 +142,29 @@ def main(argv: list[str] | None = None) -> int:
         print("--dry-run não aplica o schema 005.", file=sys.stderr)
 
     try:
-        if args.apply_schema and not args.dry_run:
+        if apply_schema:
             _apply_schema(engine)
             print(f"Schema aplicado: {SCHEMA.name}")
-        readings = backfill_wearable_readings(
-            engine, decrypt=args.decrypt, dry_run=args.dry_run
-        )
-        enrollments = backfill_enrollments(
-            engine, decrypt=args.decrypt, dry_run=args.dry_run
-        )
-        vitals = backfill_last_vitals(engine, decrypt=args.decrypt, dry_run=args.dry_run)
+        if not run_backfill:
+            return 0
+        common = {
+            "decrypt": args.decrypt,
+            "dry_run": args.dry_run,
+            "batch_size": args.batch_size,
+        }
+        readings = backfill_wearable_readings(engine, **common)
+        enrollments = backfill_enrollments(engine, **common)
+        vitals = backfill_last_vitals(engine, **common)
+        overrides = backfill_overrides(engine, **common)
     except FieldCryptoError as exc:
         print(f"Backfill interrompido: {exc}", file=sys.stderr)
         return 1
     mode = "dry-run" if args.dry_run else ("decrypt" if args.decrypt else "encrypt")
-    print(f"modo={mode}")
+    print(f"modo={mode} batch_size={args.batch_size}")
     print(f"wearable_readings: {readings}")
     print(f"enrollments: {enrollments}")
     print(f"last_vitals: {vitals}")
+    print(f"device_patient_overrides: {overrides}")
     return 0
 
 

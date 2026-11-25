@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import base64
+import importlib.util
+import inspect
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 ROOT = Path(__file__).resolve().parents[1]
 SECURE = ROOT / "saude_responsiva_secure"
@@ -30,7 +34,9 @@ from app.security import field_crypto  # noqa: E402
 from app.security.field_backfill import (  # noqa: E402
     backfill_enrollments,
     backfill_last_vitals,
+    backfill_overrides,
     backfill_wearable_readings,
+    commit_work,
 )
 from app.security.field_crypto import FieldCryptoError  # noqa: E402
 from app.services import durable_readings  # noqa: E402
@@ -526,16 +532,73 @@ def test_last_vitals_and_override_use_enc_columns_when_present(tmp_path, encrypt
         assert saved["patient_id"] == "PAT-R8-OVR"
         with engine.connect() as conn:
             raw = conn.execute(
-                text("SELECT device_id, patient_id, device_id_enc FROM device_patient_overrides")
+                text(
+                    "SELECT device_id, patient_id, device_id_enc "
+                    "FROM device_patient_overrides WHERE motivo = 'vinculo sintetico'"
+                )
             ).fetchone()
-        assert str(raw[0]).startswith("bi1.")
-        assert str(raw[1]).startswith("bi1.")
-        assert str(raw[2]).startswith("enc1:")
-        assert "AA:BB:CC:DD:EE:22" not in str(raw[0])
+            panel = conn.execute(
+                text(
+                    "SELECT patient_id FROM device_patient_overrides "
+                    "WHERE device_id = 'AA:BB:CC:DD:EE:22'"
+                )
+            ).fetchone()
+        assert raw[0] == "AA:BB:CC:DD:EE:22"
+        assert raw[1] == "PAT-R8-OVR"
+        assert raw[2] is None
+        assert panel[0] == "PAT-R8-OVR"
         loaded = get_override("aa:bb:cc:dd:ee:22")
         assert loaded is not None
         assert loaded["device_id"] == "AA:BB:CC:DD:EE:22"
         assert loaded["patient_id"] == "PAT-R8-OVR"
+
+        from app.security.field_crypto import blind_index, seal_text
+
+        legacy_mac = "AA:BB:CC:DD:EE:44"
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO device_patient_overrides ("
+                    "device_id, patient_id, created_by, created_at, updated_at, motivo, "
+                    "device_id_enc, patient_id_enc"
+                    ") VALUES ("
+                    ":device_id, :patient_id, 'teste', "
+                    "'2026-11-25T00:00:00Z', '2026-11-25T00:00:00Z', 'legado', "
+                    ":device_id_enc, :patient_id_enc)"
+                ),
+                {
+                    "device_id": blind_index(legacy_mac, context="device_id"),
+                    "patient_id": blind_index("PAT-R8-OLD", context="patient_id"),
+                    "device_id_enc": seal_text(legacy_mac, aad="override.device_id"),
+                    "patient_id_enc": seal_text("PAT-R8-OLD", aad="override.patient_id"),
+                },
+            )
+            hidden = conn.execute(
+                text(
+                    "SELECT patient_id FROM device_patient_overrides "
+                    "WHERE device_id = :mac"
+                ),
+                {"mac": legacy_mac},
+            ).fetchone()
+        assert hidden is None
+        opened = get_override(legacy_mac.lower())
+        assert opened is not None
+        assert opened["patient_id"] == "PAT-R8-OLD"
+        restored = backfill_overrides(engine, batch_size=1)
+        assert restored["updated"] == 1
+        with engine.connect() as conn:
+            visible = conn.execute(
+                text(
+                    "SELECT device_id, patient_id, device_id_enc, patient_id_enc "
+                    "FROM device_patient_overrides WHERE motivo = 'legado'"
+                )
+            ).fetchone()
+        assert visible[0] == legacy_mac
+        assert visible[1] == "PAT-R8-OLD"
+        assert visible[2] is None
+        assert visible[3] is None
+        again = backfill_overrides(engine)
+        assert again["updated"] == 0
 
         vitals_pass = backfill_last_vitals(engine)
         assert vitals_pass["updated"] == 0
@@ -557,3 +620,198 @@ def test_backfill_cli_refuses_without_explicit_confirm():
     assert result.returncode == 2
     assert "BACKFILL_FIELD_ENCRYPTION_CONFIRM" in result.stderr
     assert "FIELD_ENCRYPTION_KEY=" not in result.stderr
+
+
+def _load_backfill_cli():
+    spec = importlib.util.spec_from_file_location("backfill_cli_r8", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_schema_flag_stays_separate_from_backfill():
+    module = _load_backfill_cli()
+
+    def args(**kwargs):
+        base = {"apply_schema": False, "backfill": False, "decrypt": False, "dry_run": False}
+        base.update(kwargs)
+        return SimpleNamespace(**base)
+
+    assert module.selected_actions(args()) == (False, True)
+    assert module.selected_actions(args(apply_schema=True)) == (True, False)
+    assert module.selected_actions(args(backfill=True)) == (False, True)
+    assert module.selected_actions(args(apply_schema=True, backfill=True)) == (True, True)
+    assert module.selected_actions(args(apply_schema=True, dry_run=True)) == (False, True)
+    assert module.selected_actions(args(decrypt=True)) == (False, True)
+
+
+def test_apply_schema_main_does_not_rewrite_rows(monkeypatch):
+    module = _load_backfill_cli()
+    monkeypatch.setenv("BACKFILL_FIELD_ENCRYPTION_CONFIRM", "yes")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:senha@127.0.0.1:9/none")
+    monkeypatch.setenv("FIELD_ENCRYPTION_KEY", _raw_key())
+    monkeypatch.setenv("FIELD_ENCRYPTION_KEY_ID", "v1")
+    monkeypatch.setenv("FIELD_BLIND_INDEX_KEY", _raw_key())
+    field_crypto.reset_cache()
+    called = {"schema": 0, "rows": 0}
+    monkeypatch.setattr(module, "_apply_schema", lambda engine: called.__setitem__("schema", 1))
+    monkeypatch.setattr(
+        "app.services.durable_readings.database_url",
+        lambda: "postgresql://user:senha@127.0.0.1:9/none",
+    )
+    monkeypatch.setattr("app.services.durable_readings.get_engine", lambda: object())
+    monkeypatch.setattr(
+        "app.services.durable_readings.redact_database_url", lambda url: "redacted"
+    )
+
+    def rows(*_args, **_kwargs):
+        called["rows"] += 1
+        return {"scanned": 0, "updated": 0, "skipped": 0, "batches": 0}
+
+    monkeypatch.setattr("app.security.field_backfill.backfill_wearable_readings", rows)
+    monkeypatch.setattr("app.security.field_backfill.backfill_enrollments", rows)
+    monkeypatch.setattr("app.security.field_backfill.backfill_last_vitals", rows)
+    monkeypatch.setattr("app.security.field_backfill.backfill_overrides", rows)
+    try:
+        assert module.main(["--apply-schema"]) == 0
+        assert called == {"schema": 1, "rows": 0}
+        assert module.main(["--backfill", "--batch-size", "500"]) == 0
+        assert called["schema"] == 1
+        assert called["rows"] == 4
+    finally:
+        field_crypto.reset_cache()
+
+
+def test_backfill_commits_each_batch_and_resumes(tmp_path, encryption_on):
+    engine = make_sqlite_engine(tmp_path / "batches.db")
+    durable_readings.apply_schema(engine)
+
+    def insert(reading_id: str, patient: str) -> None:
+        frame = json.dumps(
+            {
+                "patient_id": patient,
+                "device_id": "DEV-SYN-BATCH",
+                "metric_type": "heart_rate",
+                "raw_telemetry": {"heart_rate_bpm": 70},
+            }
+        )
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO wearable_readings ("
+                    "reading_id, patient_id, device_id, metric_type, value, unit, "
+                    "received_at, extra, frame, created_at"
+                    ") VALUES ("
+                    ":reading_id, :patient_id, 'DEV-SYN-BATCH', 'heart_rate', 70, 'bpm', "
+                    "'2026-11-25T12:00:00', :extra, :frame, '2026-11-25T12:00:00')"
+                ),
+                {
+                    "reading_id": reading_id,
+                    "patient_id": patient,
+                    "extra": json.dumps({"heart_rate": 70}),
+                    "frame": frame,
+                },
+            )
+
+    insert("r1", "PAT-R8-B1")
+    insert("r2", "PAT-R8-B2")
+    insert("r3", "PAT-R8-B3")
+    seen = []
+
+    def on_batch(_stats):
+        with engine.connect() as conn:
+            seen.append(
+                conn.execute(
+                    text("SELECT COUNT(*) FROM wearable_readings WHERE patient_id LIKE 'bi1.%'")
+                ).scalar()
+            )
+
+    class _Stop(RuntimeError):
+        pass
+
+    def stop_early(stats):
+        on_batch(stats)
+        if stats["batches"] >= 1:
+            raise _Stop()
+
+    with pytest.raises(_Stop):
+        backfill_wearable_readings(engine, batch_size=1, on_batch=stop_early)
+    assert seen == [1]
+    rest = backfill_wearable_readings(engine, batch_size=1, on_batch=on_batch)
+    assert rest["updated"] == 2
+    assert rest["skipped"] == 1
+    assert rest["batches"] == 2
+    assert seen == [1, 2, 3]
+    second = backfill_wearable_readings(engine, batch_size=500)
+    assert second["updated"] == 0
+    assert second["skipped"] == 3
+
+
+def test_commit_work_retries_deadlock_and_lock_timeout(tmp_path):
+    engine = make_sqlite_engine(tmp_path / "retry.db")
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE t (n INTEGER)"))
+        conn.execute(text("INSERT INTO t (n) VALUES (0)"))
+
+    for sqlstate in ("40P01", "55P03"):
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE t SET n = 0"))
+        state = {"n": 0}
+        delays = []
+
+        def work(conn, _sqlstate=sqlstate):
+            state["n"] += 1
+            if state["n"] < 3:
+                err = SQLAlchemyError("lock")
+                err.orig = SimpleNamespace(pgcode=_sqlstate)
+                raise err
+            conn.execute(text("UPDATE t SET n = 1"))
+
+        commit_work(engine, "sqlite", work, sleeper=delays.append)
+        assert state["n"] == 3
+        assert delays == [0.5, 1.0]
+        with engine.connect() as conn:
+            assert conn.execute(text("SELECT n FROM t")).scalar() == 1
+
+    state = {"n": 0}
+
+    def other(conn):
+        state["n"] += 1
+        err = SQLAlchemyError("unique")
+        err.orig = SimpleNamespace(pgcode="23505")
+        raise err
+
+    with pytest.raises(FieldCryptoError, match="23505"):
+        commit_work(engine, "sqlite", other, sleeper=lambda _delay: None)
+    assert state["n"] == 1
+
+
+def test_boot_migration_skips_ddl_that_already_exists(tmp_path):
+    engine = make_sqlite_engine(tmp_path / "ddl.db")
+    durable_readings.apply_schema(engine)
+    durable_readings.apply_schema(engine)
+    with engine.connect() as conn:
+        assert durable_readings.migration_statement_skippable(
+            conn,
+            "ALTER TABLE wearable_readings ADD COLUMN IF NOT EXISTS device_label TEXT",
+        )
+        assert not durable_readings.migration_statement_skippable(
+            conn,
+            "ALTER TABLE wearable_readings ADD COLUMN IF NOT EXISTS ainda_nao TEXT",
+        )
+        assert durable_readings.migration_statement_skippable(
+            conn,
+            "CREATE INDEX IF NOT EXISTS ix_wearable_readings_patient_time "
+            "ON wearable_readings (patient_id, received_at DESC)",
+        )
+        assert durable_readings.migration_statement_skippable(
+            conn,
+            "CREATE TABLE IF NOT EXISTS wearable_readings (reading_id TEXT PRIMARY KEY)",
+        )
+        assert not durable_readings.migration_statement_skippable(
+            conn,
+            "COMMENT ON COLUMN wearable_readings.device_label IS 'rotulo'",
+        )
+    source = inspect.getsource(durable_readings.apply_schema)
+    assert "SET LOCAL lock_timeout" in source
+    assert "migration_statement_skippable" in source

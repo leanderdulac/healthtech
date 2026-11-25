@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -270,10 +271,104 @@ def _sqlite_add_missing_columns(conn) -> None:
         conn.execute(text("ALTER TABLE wearable_readings ADD COLUMN reported_patient_id TEXT"))
 
 
+# No Postgres, ADD COLUMN IF NOT EXISTS e CREATE INDEX IF NOT EXISTS
+# tomam trava mesmo quando o objeto já existe. O boot só emite o DDL
+# se o catálogo ainda não tem a coluna, o índice ou a tabela.
+# lock_timeout curto: se ainda assim precisar da trava, desiste em vez
+# de enfileirar o tráfego atrás de um ACCESS EXCLUSIVE.
+_BOOT_LOCK_TIMEOUT = "2s"
+_CREATE_TABLE_RE = re.compile(
+    r"^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?P<table>[A-Za-z_][A-Za-z0-9_]*)\b",
+    re.IGNORECASE,
+)
+_ADD_COLUMN_RE = re.compile(
+    r"^ALTER\s+TABLE\s+(?:ONLY\s+)?(?P<table>[A-Za-z_][A-Za-z0-9_]*)\s+"
+    r"ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?(?P<column>[A-Za-z_][A-Za-z0-9_]*)\b",
+    re.IGNORECASE,
+)
+_CREATE_INDEX_RE = re.compile(
+    r"^CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?"
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b",
+    re.IGNORECASE,
+)
+
+
+def _sql_one_line(statement: str) -> str:
+    return " ".join(statement.split())
+
+
+def _column_exists(conn, table: str, column: str) -> bool:
+    dialect = (getattr(getattr(conn, "dialect", None), "name", "") or "").lower()
+    if dialect == "sqlite":
+        rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+        return any(row[1] == column for row in rows)
+    found = conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema = current_schema() "
+            "AND table_name = :table AND column_name = :column"
+        ),
+        {"table": table, "column": column},
+    ).fetchone()
+    return found is not None
+
+
+def _table_exists(conn, table: str) -> bool:
+    dialect = (getattr(getattr(conn, "dialect", None), "name", "") or "").lower()
+    if dialect == "sqlite":
+        row = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name"),
+            {"name": table},
+        ).fetchone()
+        return row is not None
+    row = conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :name"
+        ),
+        {"name": table},
+    ).fetchone()
+    return row is not None
+
+
+def _index_exists(conn, name: str) -> bool:
+    dialect = (getattr(getattr(conn, "dialect", None), "name", "") or "").lower()
+    if dialect == "sqlite":
+        row = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = :name"),
+            {"name": name},
+        ).fetchone()
+        return row is not None
+    row = conn.execute(
+        text(
+            "SELECT 1 FROM pg_indexes "
+            "WHERE schemaname = current_schema() AND indexname = :name"
+        ),
+        {"name": name},
+    ).fetchone()
+    return row is not None
+
+
+def migration_statement_skippable(conn, statement: str) -> bool:
+    """True quando o DDL já está aplicado e reemitir pediria trava à toa."""
+    normalized = _sql_one_line(statement)
+    created = _CREATE_TABLE_RE.match(normalized)
+    if created:
+        return _table_exists(conn, created.group("table"))
+    added = _ADD_COLUMN_RE.match(normalized)
+    if added:
+        return _column_exists(conn, added.group("table"), added.group("column"))
+    index = _CREATE_INDEX_RE.match(normalized)
+    if index:
+        return _index_exists(conn, index.group("name"))
+    return False
+
+
 def apply_schema(engine: Optional[Engine] = None) -> str:
     """Aplica as migrações (001–004: leituras, rótulo, last vitals, overrides).
 
-    Tudo idempotente e aditivo. Retorna o dialeto.
+    Tudo idempotente e aditivo. No Postgres, coluna/índice/tabela que já
+    existem não são reemitidos (evita ACCESS EXCLUSIVE no boot). Retorna o dialeto.
     """
     engine = engine or _require_engine()
     dialect = _dialect_name(engine)
@@ -284,9 +379,12 @@ def apply_schema(engine: Optional[Engine] = None) -> str:
                     conn.execute(text(stmt))
                 _sqlite_add_missing_columns(conn)
             else:
+                conn.execute(text(f"SET LOCAL lock_timeout = '{_BOOT_LOCK_TIMEOUT}'"))
                 for name in MIGRATION_NAMES:
                     sql = migration_sql_path(name).read_text(encoding="utf-8")
                     for chunk in _split_sql(sql):
+                        if migration_statement_skippable(conn, chunk):
+                            continue
                         conn.execute(text(chunk))
     except DurableStoreUnavailable:
         raise

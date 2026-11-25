@@ -5,11 +5,15 @@
 -- Aplicar só com o OK do Leandro, via:
 --   BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \
 --   python scripts/backfill_field_encryption.py --apply-schema
+-- Isso NÃO reescreve linhas. O backfill é outro comando:
+--   python scripts/backfill_field_encryption.py --backfill
 --
 -- Aditiva e idempotente. Não apaga leitura nem cadastro.
 -- O frame/extra de wearable_readings e o índice cego usam as colunas
--- que já existem. Este arquivo só acrescenta o ciphertext dos vitais
--- de snapshot e dos vínculos device→paciente.
+-- que já existem. Este arquivo acrescenta o ciphertext dos vitais
+-- de snapshot. As colunas *_enc de device_patient_overrides existem
+-- para reabrir linha antiga; device_id e patient_id dessa tabela
+-- ficam em claro (o painel lê a tabela direto).
 
 ALTER TABLE wearable_device_last_vitals ADD COLUMN IF NOT EXISTS spo2_enc TEXT;
 ALTER TABLE wearable_device_last_vitals ADD COLUMN IF NOT EXISTS steps_enc TEXT;
@@ -29,6 +33,6 @@ ALTER TABLE device_patient_overrides ADD COLUMN IF NOT EXISTS device_id_enc TEXT
 ALTER TABLE device_patient_overrides ADD COLUMN IF NOT EXISTS patient_id_enc TEXT;
 
 COMMENT ON COLUMN device_patient_overrides.device_id_enc IS
-    'device_id reversível (enc1). A PK passa a ser o índice cego bi1.';
+    'Cópia antiga (enc1), se a PK chegou a ser bi1. A PK operacional fica em claro.';
 COMMENT ON COLUMN device_patient_overrides.patient_id_enc IS
-    'patient_id reversível (enc1). A coluna patient_id passa a ser o índice cego bi1.';
+    'Cópia antiga (enc1). patient_id operacional fica em claro: o painel lê a coluna direto.';
