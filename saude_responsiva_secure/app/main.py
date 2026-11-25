@@ -54,6 +54,10 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     validate_secret_salt(settings)
     validate_api_keys_on_startup(settings)
+    from app.security.field_crypto import describe_status, validate_startup
+
+    validate_startup()
+    logger.info("Criptografia de campos: %s", describe_status())
     logger.info(
         "Iniciando %s v%s (env=%s mode=%s)",
         settings.app_name,

@@ -36,6 +36,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         response: Response = await call_next(request)
 
+        # HSTS em toda resposta. O TLS em si termina no Cloud Run (HTTPS).
         response.headers["Strict-Transport-Security"] = (
             "max-age=31536000; includeSubDomains; preload"
         )

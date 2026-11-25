@@ -62,14 +62,108 @@ def _iso(value: Any) -> Optional[str]:
 
 
 def _public_row(row: Mapping[str, Any]) -> Dict[str, Any]:
+    device_id = row.get("device_id")
+    patient_id = row.get("patient_id")
+    enc_device = row.get("device_id_enc")
+    enc_patient = row.get("patient_id_enc")
+    if enc_device or enc_patient:
+        from app.security.field_crypto import open_text
+
+        if isinstance(enc_device, str) and enc_device:
+            device_id = open_text(enc_device, aad="override.device_id")
+        if isinstance(enc_patient, str) and enc_patient:
+            patient_id = open_text(enc_patient, aad="override.patient_id")
     return {
-        "device_id": row.get("device_id"),
-        "patient_id": row.get("patient_id"),
+        "device_id": device_id,
+        "patient_id": patient_id,
         "created_by": row.get("created_by"),
         "created_at": _iso(row.get("created_at")),
         "updated_at": _iso(row.get("updated_at")),
         "motivo": row.get("motivo"),
     }
+
+
+def _encryption_on() -> bool:
+    from app.security.field_crypto import is_enabled
+
+    return is_enabled()
+
+
+def _override_columns(conn) -> str:
+    base = "device_id, patient_id, created_by, created_at, updated_at, motivo"
+    from app.services.durable_readings import table_has_column
+
+    if table_has_column(conn, "device_patient_overrides", "device_id_enc"):
+        return base + ", device_id_enc, patient_id_enc"
+    return base
+
+
+_OVERRIDE_SQL = """
+            INSERT INTO device_patient_overrides (
+                device_id, patient_id, created_by, created_at, updated_at, motivo
+            ) VALUES (
+                :device_id, :patient_id, :created_by, :created_at, :updated_at, :motivo
+            )
+            ON CONFLICT (device_id) DO UPDATE SET
+                patient_id = EXCLUDED.patient_id,
+                created_by = EXCLUDED.created_by,
+                updated_at = EXCLUDED.updated_at,
+                motivo = EXCLUDED.motivo
+            RETURNING device_id, patient_id, created_by, created_at, updated_at, motivo
+"""
+
+
+def _upsert_sealed(conn, row: Dict[str, Any]):
+    """Índice cego na PK e ciphertext nas colunas da migração 005."""
+    from app.security.field_crypto import blind_index, seal_text
+
+    plain_device = row["device_id"]
+    plain_patient = row["patient_id"]
+    blind_device = blind_index(plain_device, context="device_id")
+    payload = {
+        **row,
+        "device_id": blind_device,
+        "patient_id": blind_index(plain_patient, context="patient_id"),
+        "device_id_enc": seal_text(plain_device, aad="override.device_id"),
+        "patient_id_enc": seal_text(plain_patient, aad="override.patient_id"),
+    }
+    existing = conn.execute(
+        text(
+            "SELECT device_id FROM device_patient_overrides "
+            "WHERE device_id = :plain OR device_id = :blind"
+        ),
+        {"plain": plain_device, "blind": blind_device},
+    ).fetchone()
+    returning = (
+        "device_id, patient_id, created_by, created_at, updated_at, motivo, "
+        "device_id_enc, patient_id_enc"
+    )
+    if existing is not None:
+        payload["stored_device_id"] = existing[0]
+        sql = f"""
+            UPDATE device_patient_overrides SET
+                device_id = :device_id,
+                patient_id = :patient_id,
+                created_by = :created_by,
+                updated_at = :updated_at,
+                motivo = :motivo,
+                device_id_enc = :device_id_enc,
+                patient_id_enc = :patient_id_enc
+            WHERE device_id = :stored_device_id
+            RETURNING {returning}
+        """
+    else:
+        sql = f"""
+            INSERT INTO device_patient_overrides (
+                device_id, patient_id, created_by, created_at, updated_at, motivo,
+                device_id_enc, patient_id_enc
+            ) VALUES (
+                :device_id, :patient_id, :created_by, :created_at, :updated_at, :motivo,
+                :device_id_enc, :patient_id_enc
+            )
+            RETURNING {returning}
+        """
+    return conn.execute(text(sql), payload).fetchone()
 
 
 def clear_memory() -> None:
@@ -114,14 +208,28 @@ def get_override(device_id: Optional[str]) -> Optional[Dict[str, Any]]:
         try:
             engine = _engine()
             with engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        "SELECT device_id, patient_id, created_by, created_at, "
-                        "updated_at, motivo FROM device_patient_overrides "
-                        "WHERE device_id = :device_id"
-                    ),
-                    {"device_id": key},
-                ).fetchone()
+                columns = _override_columns(conn)
+                if _encryption_on():
+                    from app.security.field_crypto import blind_index
+
+                    row = conn.execute(
+                        text(
+                            f"SELECT {columns} FROM device_patient_overrides "
+                            "WHERE device_id = :plain OR device_id = :blind"
+                        ),
+                        {
+                            "plain": key,
+                            "blind": blind_index(key, context="device_id"),
+                        },
+                    ).fetchone()
+                else:
+                    row = conn.execute(
+                        text(
+                            f"SELECT {columns} FROM device_patient_overrides "
+                            "WHERE device_id = :device_id"
+                        ),
+                        {"device_id": key},
+                    ).fetchone()
             if row is None:
                 return None
             mapping = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
@@ -139,10 +247,10 @@ def list_overrides() -> List[Dict[str, Any]]:
         try:
             engine = _engine()
             with engine.connect() as conn:
+                columns = _override_columns(conn)
                 rows = conn.execute(
                     text(
-                        "SELECT device_id, patient_id, created_by, created_at, "
-                        "updated_at, motivo FROM device_patient_overrides "
+                        f"SELECT {columns} FROM device_patient_overrides "
                         "ORDER BY updated_at DESC"
                     )
                 ).fetchall()
@@ -192,22 +300,12 @@ def upsert_override(
     }
     if _use_durable():
         engine = _engine()
-        sql = """
-            INSERT INTO device_patient_overrides (
-                device_id, patient_id, created_by, created_at, updated_at, motivo
-            ) VALUES (
-                :device_id, :patient_id, :created_by, :created_at, :updated_at, :motivo
-            )
-            ON CONFLICT (device_id) DO UPDATE SET
-                patient_id = EXCLUDED.patient_id,
-                created_by = EXCLUDED.created_by,
-                updated_at = EXCLUDED.updated_at,
-                motivo = EXCLUDED.motivo
-            RETURNING device_id, patient_id, created_by, created_at, updated_at, motivo
-        """
         try:
             with engine.begin() as conn:
-                fetched = conn.execute(text(sql), row).fetchone()
+                if _encryption_on() and _override_columns(conn).endswith("patient_id_enc"):
+                    fetched = _upsert_sealed(conn, row)
+                else:
+                    fetched = conn.execute(text(_OVERRIDE_SQL), row).fetchone()
             mapping = (
                 dict(fetched._mapping)
                 if fetched is not None and hasattr(fetched, "_mapping")
@@ -232,12 +330,26 @@ def delete_override(device_id: str) -> bool:
         engine = _engine()
         try:
             with engine.begin() as conn:
-                result = conn.execute(
-                    text(
-                        "DELETE FROM device_patient_overrides WHERE device_id = :device_id"
-                    ),
-                    {"device_id": key},
-                )
+                if _encryption_on():
+                    from app.security.field_crypto import blind_index
+
+                    result = conn.execute(
+                        text(
+                            "DELETE FROM device_patient_overrides "
+                            "WHERE device_id = :plain OR device_id = :blind"
+                        ),
+                        {
+                            "plain": key,
+                            "blind": blind_index(key, context="device_id"),
+                        },
+                    )
+                else:
+                    result = conn.execute(
+                        text(
+                            "DELETE FROM device_patient_overrides WHERE device_id = :device_id"
+                        ),
+                        {"device_id": key},
+                    )
             return int(result.rowcount or 0) > 0
         except SQLAlchemyError as exc:
             raise RuntimeError(f"Não foi possível remover o vínculo: {exc}") from exc
