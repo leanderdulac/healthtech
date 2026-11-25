@@ -192,6 +192,24 @@ Esse comando também reabre vínculo device→paciente que tenha sido
 gravado como `bi1.`, devolvendo `device_id` e `patient_id` ao claro.
 Vínculo novo já nasce em claro. O painel não precisa de deploy.
 
+### Frota sem varrer o frame
+
+`GET /api/v1/wearables/devices` (e o `fleet-summary` do painel, que chama
+esse endpoint) não abre `frame`/`extra` da tabela inteira. Primeiro pega
+o `reading_id` mais recente por `device_id`; o frame só entra na segunda
+consulta, restrita a esses ids. O rótulo usa a coluna `device_label`,
+não `extra`.
+
+O índice que torna isso uma varredura estreita **não** sobe no boot
+(`CREATE INDEX CONCURRENTLY`). Criar no Cloud SQL, com a URL do banco,
+sem deploy de código:
+
+```bash
+CREATE_DEVICE_LATEST_INDEX_CONFIRM=yes \
+DATABASE_URL="$DATABASE_URL" \
+python scripts/create_device_latest_index.py
+```
+
 **Rollback** das leituras, se preciso, ainda com a chave presente:
 
 ```bash

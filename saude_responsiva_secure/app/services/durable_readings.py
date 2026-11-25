@@ -20,7 +20,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
-from sqlalchemy import text
+from sqlalchemy import String, bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -383,6 +384,8 @@ def apply_schema(engine: Optional[Engine] = None) -> str:
                 for name in MIGRATION_NAMES:
                     sql = migration_sql_path(name).read_text(encoding="utf-8")
                     for chunk in _split_sql(sql):
+                        if "CONCURRENTLY" in chunk.upper():
+                            continue
                         if migration_statement_skippable(conn, chunk):
                             continue
                         conn.execute(text(chunk))
@@ -1208,29 +1211,56 @@ def list_frames() -> List[Dict[str, Any]]:
         raise DurableStoreUnavailable(str(exc)) from exc
 
 
-_PG_LATEST_BY_DEVICE = """
+# Só o id da última leitura por device. Não lista frame nem extra:
+# o ciphertext está em TOAST e detoastar a tabela inteira derruba o f1-micro.
+# A ordem casa com ix_wearable_readings_device_latest (migração 006, fora do boot).
+_PG_LATEST_IDS_BY_DEVICE = """
     SELECT DISTINCT ON (device_id)
-        reading_id, patient_id, device_id, device_label, metric_type,
-        client_reading_id, extra, frame
+        reading_id, device_id
     FROM wearable_readings
     ORDER BY device_id, COALESCE(measured_at, received_at) DESC, received_at DESC
 """
 
+_PG_FRAMES_BY_IDS = """
+    SELECT reading_id, patient_id, device_id, device_label, metric_type,
+           client_reading_id, extra, frame
+    FROM wearable_readings
+    WHERE reading_id = ANY(:reading_ids)
+"""
+
+# Rótulo só da coluna. extra->>'device_label' obrigaria a abrir o TOAST de todas as linhas.
 _PG_LATEST_LABEL_BY_DEVICE = """
     SELECT DISTINCT ON (device_id)
-        device_id, COALESCE(device_label, extra->>'device_label') AS device_label
+        device_id, device_label
     FROM wearable_readings
-    WHERE device_label IS NOT NULL OR extra->>'device_label' IS NOT NULL
+    WHERE device_label IS NOT NULL
     ORDER BY device_id, COALESCE(measured_at, received_at) DESC, received_at DESC
 """
+
+
+def _frames_by_ids_statement():
+    return text(_PG_FRAMES_BY_IDS).bindparams(
+        bindparam("reading_ids", type_=ARRAY(String()))
+    )
 
 
 def _pg_latest_frames_by_device(engine: Engine) -> List[Dict[str, Any]]:
-    """Uma linha por device no próprio Postgres (sem trazer a tabela inteira)."""
+    """Uma linha por device: ids pelo índice, frame só desses ids."""
     from app.models.schemas import normalize_device_label
 
     with engine.connect() as conn:
-        rows = conn.execute(text(_PG_LATEST_BY_DEVICE)).fetchall()
+        id_rows = conn.execute(text(_PG_LATEST_IDS_BY_DEVICE)).fetchall()
+        ids = []
+        for row in id_rows:
+            mapping = dict(row._mapping)
+            reading_id = mapping.get("reading_id")
+            if reading_id:
+                ids.append(reading_id)
+        if not ids:
+            return []
+        rows = conn.execute(
+            _frames_by_ids_statement(), {"reading_ids": ids}
+        ).fetchall()
         label_rows = conn.execute(text(_PG_LATEST_LABEL_BY_DEVICE)).fetchall()
     # A chave do mapa é o device_id da COLUNA (claro ou índice cego).
     # O frame aberto devolve o id original; casar os dois quebraria o rótulo.
