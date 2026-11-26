@@ -32,6 +32,7 @@ os.environ.setdefault("SECRET_SALT", "test-salt-not-for-production-use-32c")
 from app.config import get_settings  # noqa: E402
 from app.security import field_crypto  # noqa: E402
 from app.security.field_backfill import (  # noqa: E402
+    _enrollment_update,
     backfill_enrollments,
     backfill_last_vitals,
     backfill_overrides,
@@ -45,6 +46,7 @@ from src.ops.device_patient_overrides import (  # noqa: E402
     upsert_override,
 )
 from src.ops.operational_patients import (  # noqa: E402
+    _row_to_patient,
     ensure_database_sslmode,
     get_patient,
     set_engine,
@@ -815,3 +817,271 @@ def test_boot_migration_skips_ddl_that_already_exists(tmp_path):
     source = inspect.getsource(durable_readings.apply_schema)
     assert "SET LOCAL lock_timeout" in source
     assert "migration_statement_skippable" in source
+
+
+def test_diseases_text_array_encrypts_each_element(encryption_on):
+    plain = ["hipertensao", "diabetes"]
+    mixed_token = field_crypto.protect("diabetes", aad="enrollment.diseases")
+    first = _enrollment_update(
+        {
+            "patient_id": "PAT-R8-ARR",
+            "display_name": "Pessoa sintetica",
+            "phone": None,
+            "caregiver_phone": None,
+            "diseases": plain,
+        },
+        decrypt=False,
+    )
+    assert first is not None
+    assert isinstance(first["diseases"], list)
+    assert all(isinstance(item, str) and item.startswith("enc1:") for item in first["diseases"])
+    assert not any(item.startswith("[") or item.startswith("{") for item in first["diseases"])
+    assert "hipertensao" not in "".join(first["diseases"])
+    again = _enrollment_update(
+        {
+            "patient_id": "PAT-R8-ARR",
+            "display_name": first["display_name"],
+            "phone": None,
+            "caregiver_phone": None,
+            "diseases": first["diseases"],
+        },
+        decrypt=False,
+    )
+    assert again is None
+
+    mixed = _enrollment_update(
+        {
+            "patient_id": "PAT-R8-ARR",
+            "display_name": first["display_name"],
+            "phone": None,
+            "caregiver_phone": None,
+            "diseases": ["hipertensao", mixed_token],
+        },
+        decrypt=False,
+    )
+    assert mixed is not None
+    assert mixed["diseases"][1] == mixed_token
+    assert mixed["diseases"][0].startswith("enc1:")
+    assert mixed["diseases"][0] != mixed_token
+
+    opened = _enrollment_update(
+        {
+            "patient_id": "PAT-R8-ARR",
+            "display_name": first["display_name"],
+            "phone": None,
+            "caregiver_phone": None,
+            "diseases": first["diseases"],
+        },
+        decrypt=True,
+    )
+    assert opened is not None
+    assert opened["diseases"] == plain
+    assert opened["display_name"] == "Pessoa sintetica"
+    assert (
+        _enrollment_update(
+            {
+                "patient_id": "PAT-R8-ARR",
+                "display_name": "Pessoa sintetica",
+                "phone": None,
+                "caregiver_phone": None,
+                "diseases": plain,
+            },
+            decrypt=True,
+        )
+        is None
+    )
+
+    class _Row:
+        def __init__(self, **kwargs):
+            self._mapping = kwargs
+
+    legacy = _row_to_patient(_Row(patient_id="PAT-R8-ARR", diseases=plain))
+    assert legacy["diseases"] == plain
+    sealed = _row_to_patient(
+        _Row(patient_id="PAT-R8-ARR", diseases=[mixed["diseases"][0], mixed_token])
+    )
+    assert sealed["diseases"] == plain
+
+
+def test_backfill_enrollments_writes_text_array_not_a_single_token(encryption_on):
+    state = {
+        "patient_id": "PAT-R8-ARR",
+        "display_name": "Pessoa sintetica",
+        "phone": "5500000000000",
+        "caregiver_phone": None,
+        "diseases": ["hipertensao", "diabetes"],
+    }
+    writes = []
+
+    class _Row:
+        def __init__(self, mapping):
+            self._mapping = mapping
+
+        def __getitem__(self, index):
+            return "enrollments"
+
+    class _Result:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def fetchone(self):
+            return self._rows[0] if self._rows else None
+
+        def fetchall(self):
+            return self._rows
+
+    class _Conn:
+        def execute(self, statement, params=None):
+            sql = " ".join(str(statement).split())
+            if sql.upper().startswith("SET"):
+                return _Result([])
+            if "to_regclass" in sql:
+                return _Result([_Row(state)])
+            if sql.upper().startswith("SELECT"):
+                after = (params or {}).get("after") or ""
+                if after:
+                    return _Result([])
+                return _Result([_Row(dict(state))])
+            assert sql.upper().startswith("UPDATE")
+            assert isinstance(params["diseases"], list)
+            writes.append(list(params["diseases"]))
+            state["diseases"] = list(params["diseases"])
+            state["display_name"] = params["display_name"]
+            state["phone"] = params["phone"]
+            state["caregiver_phone"] = params["caregiver_phone"]
+            return _Result([])
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    class _Engine:
+        dialect = SimpleNamespace(name="postgresql")
+
+        def connect(self):
+            return _Conn()
+
+        def begin(self):
+            return _Conn()
+
+    engine = _Engine()
+    first = backfill_enrollments(engine, batch_size=1)
+    assert first["updated"] == 1
+    assert first["batches"] == 1
+    assert len(writes) == 1
+    assert len(writes[0]) == 2
+    assert all(item.startswith("enc1:") for item in writes[0])
+    second = backfill_enrollments(engine, batch_size=1)
+    assert second["updated"] == 0
+    assert second["skipped"] == 1
+    assert len(writes) == 1
+    rolled = backfill_enrollments(engine, decrypt=True, batch_size=1)
+    assert rolled["updated"] == 1
+    assert state["diseases"] == ["hipertensao", "diabetes"]
+    assert state["display_name"] == "Pessoa sintetica"
+    again = backfill_enrollments(engine, decrypt=True, batch_size=1)
+    assert again["updated"] == 0
+
+
+def test_last_vitals_resumes_partial_row_and_decrypts(tmp_path, encryption_on):
+    engine = make_sqlite_engine(tmp_path / "vitals-partial.db")
+    durable_readings.apply_schema(engine)
+    spo2_token = field_crypto.protect("98", aad="vitals.spo2")
+    with engine.begin() as conn:
+        for column in (
+            "spo2_enc",
+            "steps_enc",
+            "blood_pressure_sys_enc",
+            "blood_pressure_dia_enc",
+        ):
+            conn.execute(
+                text(f"ALTER TABLE wearable_device_last_vitals ADD COLUMN {column} TEXT")
+            )
+        conn.execute(
+            text(
+                "INSERT INTO wearable_device_last_vitals ("
+                "device_id, spo2, steps, blood_pressure_sys, blood_pressure_dia, "
+                "spo2_enc, updated_at"
+                ") VALUES ("
+                "'DEV-SYN-V', NULL, 1200, 120, NULL, :spo2_enc, '2026-11-25T00:00:00')"
+            ),
+            {"spo2_enc": spo2_token},
+        )
+    first = backfill_last_vitals(engine, batch_size=1)
+    assert first["updated"] == 1
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                "SELECT spo2, spo2_enc, steps, steps_enc, blood_pressure_sys, "
+                "blood_pressure_sys_enc FROM wearable_device_last_vitals"
+            )
+        ).fetchone()
+    assert row[0] is None
+    assert row[1] == spo2_token
+    assert row[2] is None
+    assert str(row[3]).startswith("enc1:")
+    assert row[4] is None
+    assert str(row[5]).startswith("enc1:")
+    second = backfill_last_vitals(engine)
+    assert second["updated"] == 0
+    assert second["skipped"] == 1
+    rolled = backfill_last_vitals(engine, decrypt=True)
+    assert rolled["updated"] == 1
+    with engine.connect() as conn:
+        plain = conn.execute(
+            text(
+                "SELECT spo2, steps, blood_pressure_sys, blood_pressure_dia, "
+                "spo2_enc, steps_enc FROM wearable_device_last_vitals"
+            )
+        ).fetchone()
+    assert plain[0] == 98.0
+    assert plain[1] == 1200.0
+    assert plain[2] == 120.0
+    assert plain[3] is None
+    assert plain[4] is None
+    assert plain[5] is None
+    assert backfill_last_vitals(engine, decrypt=True)["updated"] == 0
+
+
+def test_backfill_only_limits_tables_and_keeps_going(monkeypatch):
+    module = _load_backfill_cli()
+    monkeypatch.setenv("BACKFILL_FIELD_ENCRYPTION_CONFIRM", "yes")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:senha@127.0.0.1:9/none")
+    monkeypatch.setenv("FIELD_ENCRYPTION_KEY", _raw_key())
+    monkeypatch.setenv("FIELD_ENCRYPTION_KEY_ID", "v1")
+    monkeypatch.setenv("FIELD_BLIND_INDEX_KEY", _raw_key())
+    field_crypto.reset_cache()
+    monkeypatch.setattr(
+        "app.services.durable_readings.database_url",
+        lambda: "postgresql://user:senha@127.0.0.1:9/none",
+    )
+    monkeypatch.setattr("app.services.durable_readings.get_engine", lambda: object())
+    monkeypatch.setattr(
+        "app.services.durable_readings.redact_database_url", lambda url: "redacted"
+    )
+    called = []
+
+    def ok(name):
+        def _run(*_args, **_kwargs):
+            called.append(name)
+            if name == "enrollments":
+                raise FieldCryptoError("lote interrompido (22P02)")
+            return {"scanned": 0, "updated": 0, "skipped": 0, "batches": 0}
+
+        return _run
+
+    monkeypatch.setattr(
+        "app.security.field_backfill.backfill_wearable_readings", ok("wearable_readings")
+    )
+    monkeypatch.setattr("app.security.field_backfill.backfill_enrollments", ok("enrollments"))
+    monkeypatch.setattr("app.security.field_backfill.backfill_last_vitals", ok("last_vitals"))
+    monkeypatch.setattr("app.security.field_backfill.backfill_overrides", ok("overrides"))
+    try:
+        assert module.main(["--backfill", "--only", "pacientes"]) == 2
+        assert called == []
+        assert module.main(["--backfill", "--only", "enrollments,last_vitals"]) == 1
+        assert called == ["enrollments", "last_vitals"]
+    finally:
+        field_crypto.reset_cache()

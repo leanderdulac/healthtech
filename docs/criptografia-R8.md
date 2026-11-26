@@ -72,7 +72,8 @@ etc.). Trocar o blob de coluna não abre.
 | Frame e extra da leitura (vitais, ids, telemetria) | `wearable_readings.frame` / `.extra` | A resposta decripta. O contrato de ingest não muda. |
 | Vital numérico solto | `value` vai a `NULL` | O número continua dentro do frame cifrado. |
 | `patient_id`, `device_id`, `reported_patient_id` e a chave natural | coluna vira índice cego `bi1.` + HMAC-SHA256 | `WHERE coluna = :claro OR coluna = :bi1` acha legado e novo. |
-| Nome, telefone, telefone do cuidador, doenças | `enrollments` (após o backfill) | Leitura decripta. `patient_id` da tabela continua em claro: é a chave do `WHERE` de autorização. Quem grava o cadastro fora deste serviço precisa passar a usar a mesma cifra, senão linhas novas voltam em claro. |
+| Nome, telefone e telefone do cuidador | `enrollments`, um `enc1:` por coluna texto | Leitura decripta. `patient_id` continua a chave do `WHERE`. |
+| Doenças | `enrollments.diseases` continua `text[]`. Cada doença vira um `enc1:`; elemento em claro no meio do array segue legível | Sem migração de tipo. A API devolve a lista em claro. `programs` não é cifrado. |
 | SpO₂, passos, pressão do snapshot | colunas `*_enc` **depois** da migração 005 | Sem a 005, o snapshot segue em claro (cache derivado). Com a 005, o `DOUBLE` fica `NULL` e a leitura decripta. |
 | MAC e paciente do vínculo device→paciente | **em claro**, de propósito | O painel `healthtech-responsive` lê `device_patient_overrides` direto e faz o join pelo MAC. `bi1.` não seria aplicado. A API também grava em claro. Linha que já saiu `bi1.` é reaberta pelo `--backfill`. O painel **não** precisa de deploy. |
 
@@ -171,6 +172,19 @@ FIELD_BLIND_INDEX_KEY="$BIK" \
 FIELD_ENCRYPTION_KEY_ID=v1 \
 DATABASE_URL="$DATABASE_URL" \
 python scripts/backfill_field_encryption.py --backfill --batch-size 500
+```
+
+As leituras já cifradas são puladas. Para não varrê-las de novo e só
+cobrir o cadastro (`diseases` é `text[]`: um `enc1:` por doença, sem
+mudar o tipo) e o snapshot de vitais:
+
+```bash
+BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \
+FIELD_ENCRYPTION_KEY="$DEK" \
+FIELD_BLIND_INDEX_KEY="$BIK" \
+FIELD_ENCRYPTION_KEY_ID=v1 \
+DATABASE_URL="$DATABASE_URL" \
+python scripts/backfill_field_encryption.py --backfill --only enrollments,last_vitals --batch-size 100
 ```
 
 Antes, se quiser só contar:

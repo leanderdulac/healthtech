@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-from sqlalchemy import text
+from sqlalchemy import String, bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -33,10 +34,14 @@ from app.security.field_crypto import (
     seal_json,
 )
 
-_ENROLLMENT_FIELDS = (
+_ENROLLMENT_TEXT_FIELDS = (
     ("display_name", "enrollment.display_name"),
     ("phone", "enrollment.phone"),
     ("caregiver_phone", "enrollment.caregiver_phone"),
+)
+# text[] no Postgres. Cada elemento vira enc1:; a coluna continua array.
+# Um único enc1: no lugar do array gera 22P02 (invalid_text_representation).
+_ENROLLMENT_ARRAY_FIELDS = (
     ("diseases", "enrollment.diseases"),
 )
 
@@ -383,14 +388,7 @@ def backfill_enrollments(
         ORDER BY patient_id ASC
         LIMIT :limit
     """
-    update_sql = """
-        UPDATE enrollments SET
-            display_name = :display_name,
-            phone = :phone,
-            caregiver_phone = :caregiver_phone,
-            diseases = :diseases
-        WHERE patient_id = :patient_id
-    """
+    update_sql = _enrollment_update_statement(dialect)
     after = ""
     try:
         with engine.connect() as conn:
@@ -418,7 +416,7 @@ def backfill_enrollments(
 
             def work(conn, rows=pending):
                 for params in rows:
-                    conn.execute(text(update_sql), params)
+                    conn.execute(update_sql, params)
 
             commit_work(
                 engine,
@@ -436,13 +434,79 @@ def backfill_enrollments(
     return stats
 
 
-def _enrollment_update(mapping: Dict[str, Any], *, decrypt: bool) -> Optional[Dict[str, Any]]:
-    updates: Dict[str, Optional[str]] = {}
+def _enrollment_update_statement(dialect: str):
+    statement = text(
+        """
+        UPDATE enrollments SET
+            display_name = :display_name,
+            phone = :phone,
+            caregiver_phone = :caregiver_phone,
+            diseases = :diseases
+        WHERE patient_id = :patient_id
+        """
+    )
+    if dialect == "postgresql":
+        return statement.bindparams(bindparam("diseases", type_=ARRAY(String())))
+    return statement
+
+
+def _is_text_array(value: Any) -> bool:
+    return isinstance(value, (list, tuple)) and not isinstance(value, (str, bytes))
+
+
+def _seal_text_array(values: Sequence[Any], *, aad: str, decrypt: bool) -> Tuple[list, bool]:
+    """Cifra ou abre cada elemento. O token que já é enc1: não é reescrito."""
+    opened: list = []
     changed = False
-    for column, aad in _ENROLLMENT_FIELDS:
+    for item in values:
+        if not isinstance(item, str) or item == "":
+            opened.append(item)
+            continue
+        if decrypt:
+            if is_ciphertext(item):
+                opened.append(open_text(item, aad=aad))
+                changed = True
+            else:
+                opened.append(item)
+            continue
+        if is_ciphertext(item):
+            opened.append(item)
+            continue
+        opened.append(protect(item, aad=aad))
+        changed = True
+    return opened, changed
+
+
+def _enrollment_update(mapping: Dict[str, Any], *, decrypt: bool) -> Optional[Dict[str, Any]]:
+    updates: Dict[str, Any] = {}
+    changed = False
+    for column, aad in _ENROLLMENT_TEXT_FIELDS:
         current = mapping.get(column)
         if current is None:
             updates[column] = None
+            continue
+        text_value = current if isinstance(current, str) else json.dumps(current, default=str)
+        if decrypt:
+            if not is_ciphertext(text_value):
+                updates[column] = text_value
+                continue
+            updates[column] = open_text(text_value, aad=aad)
+            changed = True
+            continue
+        if is_ciphertext(text_value):
+            updates[column] = text_value
+            continue
+        updates[column] = protect(text_value, aad=aad)
+        changed = True
+    for column, aad in _ENROLLMENT_ARRAY_FIELDS:
+        current = mapping.get(column)
+        if current is None:
+            updates[column] = None
+            continue
+        if _is_text_array(current):
+            sealed, field_changed = _seal_text_array(current, aad=aad, decrypt=decrypt)
+            updates[column] = sealed
+            changed = changed or field_changed
             continue
         text_value = current if isinstance(current, str) else json.dumps(current, default=str)
         if decrypt:

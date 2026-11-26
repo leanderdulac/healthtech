@@ -24,6 +24,13 @@ Exemplos (valores de chave só no ambiente, nunca neste arquivo):
     DATABASE_URL="$DATABASE_URL" \\
     python scripts/backfill_field_encryption.py --backfill --batch-size 500
 
+    # só cadastro e snapshot de vitais (não relê wearable_readings)
+    BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \\
+    FIELD_ENCRYPTION_KEY="$DEK" FIELD_BLIND_INDEX_KEY="$BIK" \\
+    FIELD_ENCRYPTION_KEY_ID=v1 \\
+    DATABASE_URL="$DATABASE_URL" \\
+    python scripts/backfill_field_encryption.py --backfill --only enrollments,last_vitals --batch-size 100
+
     # rollback das leituras: volta ao claro enquanto a chave ainda está no ambiente
     BACKFILL_FIELD_ENCRYPTION_CONFIRM=yes \\
     FIELD_ENCRYPTION_KEY="$DEK" FIELD_BLIND_INDEX_KEY="$BIK" \\
@@ -68,6 +75,49 @@ def _apply_schema(engine) -> None:
             conn.execute(text(statement))
 
 
+_TABLE_ALIASES = {
+    "wearable_readings": "wearable_readings",
+    "enrollments": "enrollments",
+    "last_vitals": "last_vitals",
+    "wearable_device_last_vitals": "last_vitals",
+    "overrides": "overrides",
+    "device_patient_overrides": "overrides",
+}
+_DEFAULT_TABLES = (
+    "wearable_readings",
+    "enrollments",
+    "last_vitals",
+    "overrides",
+)
+
+
+def selected_tables(raw: str | None) -> list[str]:
+    """Tabelas do backfill. Vazio = todas, na ordem padrão."""
+    text = (raw or "").strip()
+    if not text:
+        return list(_DEFAULT_TABLES)
+    chosen: list[str] = []
+    unknown: list[str] = []
+    for part in text.split(","):
+        key = part.strip()
+        if not key:
+            continue
+        canon = _TABLE_ALIASES.get(key)
+        if canon is None:
+            unknown.append(key)
+            continue
+        if canon not in chosen:
+            chosen.append(canon)
+    if unknown:
+        known = ", ".join(sorted(_TABLE_ALIASES))
+        raise ValueError(
+            "Tabela desconhecida: " + ", ".join(unknown) + f". Use: {known}."
+        )
+    if not chosen:
+        raise ValueError("Nenhuma tabela em --only.")
+    return chosen
+
+
 def selected_actions(args) -> tuple[bool, bool]:
     """(aplicar 005, reescrever linhas). As duas coisas não compartilham transação.
 
@@ -110,9 +160,22 @@ def main(argv: list[str] | None = None) -> int:
         default=500,
         help="Linhas por commit (padrão 500).",
     )
+    parser.add_argument(
+        "--only",
+        default="",
+        help=(
+            "Tabelas separadas por vírgula: wearable_readings, enrollments, "
+            "last_vitals, overrides. Vazio reescreve todas."
+        ),
+    )
     args = parser.parse_args(argv)
     _confirm_or_exit()
     apply_schema, run_backfill = selected_actions(args)
+    try:
+        tables = selected_tables(args.only) if run_backfill else []
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
 
     from app.security.field_backfill import (
         backfill_enrollments,
@@ -152,20 +215,30 @@ def main(argv: list[str] | None = None) -> int:
             "dry_run": args.dry_run,
             "batch_size": args.batch_size,
         }
-        readings = backfill_wearable_readings(engine, **common)
-        enrollments = backfill_enrollments(engine, **common)
-        vitals = backfill_last_vitals(engine, **common)
-        overrides = backfill_overrides(engine, **common)
+        runners = {
+            "wearable_readings": backfill_wearable_readings,
+            "enrollments": backfill_enrollments,
+            "last_vitals": backfill_last_vitals,
+            "overrides": backfill_overrides,
+        }
+        failed = False
+        results = {}
+        for name in tables:
+            try:
+                results[name] = runners[name](engine, **common)
+            except FieldCryptoError as exc:
+                failed = True
+                print(f"{name}: Backfill interrompido: {exc}", file=sys.stderr)
+        if failed:
+            return 1
+        mode = "dry-run" if args.dry_run else ("decrypt" if args.decrypt else "encrypt")
+        print(f"modo={mode} batch_size={args.batch_size} tabelas={','.join(tables)}")
+        for name in tables:
+            print(f"{name}: {results[name]}")
+        return 0
     except FieldCryptoError as exc:
         print(f"Backfill interrompido: {exc}", file=sys.stderr)
         return 1
-    mode = "dry-run" if args.dry_run else ("decrypt" if args.decrypt else "encrypt")
-    print(f"modo={mode} batch_size={args.batch_size}")
-    print(f"wearable_readings: {readings}")
-    print(f"enrollments: {enrollments}")
-    print(f"last_vitals: {vitals}")
-    print(f"device_patient_overrides: {overrides}")
-    return 0
 
 
 if __name__ == "__main__":

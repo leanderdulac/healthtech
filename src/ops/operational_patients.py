@@ -250,8 +250,8 @@ def _as_list(value: Any) -> List[Any]:
         return []
 
 
-def _open_enrollment_field(value: Any, field: str) -> Any:
-    """Abre ciphertext ``enc1``. Texto legado volta igual. Sem chave, falha fechado."""
+def _open_enrollment_scalar(value: Any, field: str) -> Any:
+    """Abre um enc1:. Texto legado volta igual. Sem chave, falha fechado."""
     if not isinstance(value, str) or not value.startswith("enc1:"):
         return value
     try:
@@ -266,6 +266,16 @@ def _open_enrollment_field(value: Any, field: str) -> Any:
         raise OperationalDbUnavailable(
             "Falha ao abrir campo cifrado do cadastro"
         ) from exc
+
+
+def _open_enrollment_field(value: Any, field: str) -> Any:
+    """Abre escalar ou cada elemento de um text[] (doenças).
+
+    Elemento em claro no meio de elementos enc1: continua legível.
+    """
+    if isinstance(value, (list, tuple)) and not isinstance(value, (str, bytes)):
+        return [_open_enrollment_scalar(item, field) for item in value]
+    return _open_enrollment_scalar(value, field)
 
 
 def _row_to_patient(row: Any) -> Dict[str, Any]:
