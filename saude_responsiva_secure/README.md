@@ -43,7 +43,8 @@ saude_responsiva_secure/
 | Rate limit | janela deslizante por path/chave (`RATE_LIMIT_INGEST` default 300/min) |
 | Clinical alerts | subset `clinical_intelligence` via `scripts/sync_secure_vendor.py` (`_vendor_src/`) |
 | Cadastro operacional | subset `ops`: `timestamps`, `patients_routes`, `operational_patients`, `live_devices`, `device_registry`, `device_detail`  |
-| Headers | HSTS, CSP, nosniff, X-Frame-Options, Referrer-Policy |
+| Headers | HSTS (`max-age=31536000; includeSubDomains; preload`), CSP, nosniff, X-Frame-Options, Referrer-Policy |
+| Criptografia em repouso | AES-256-GCM opcional (`FIELD_ENCRYPTION_KEY`); ver `docs/criptografia-R8.md` |
 | Auditoria | Middleware JSON com `X-Request-ID` e chave mascarada |
 | Validação | Pydantic v2 (limites fisiológicos, patient_id sanitizado) |
 | LGPD | `DELETE /api/v1/patient/{id}/anonymize` (admin) |

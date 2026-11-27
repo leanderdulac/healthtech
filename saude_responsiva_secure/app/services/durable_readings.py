@@ -13,13 +13,15 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
-from sqlalchemy import text
+from sqlalchemy import String, bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -39,6 +41,67 @@ MIGRATION_NAMES = (
 
 class DurableStoreUnavailable(RuntimeError):
     """DATABASE_URL configurada mas o Postgres está inacessível / schema ausente."""
+
+
+_COLUMN_PROBE = {
+    ("wearable_device_last_vitals", "spo2_enc"),
+    ("device_patient_overrides", "device_id_enc"),
+    ("device_patient_overrides", "patient_id_enc"),
+}
+
+
+def table_has_column(conn, table: str, column: str) -> bool:
+    """True se a coluna aditiva da migração 005 já existe. Nomes são fixos."""
+    if (table, column) not in _COLUMN_PROBE:
+        raise ValueError("consulta de coluna não permitida")
+    dialect = (getattr(getattr(conn, "dialect", None), "name", "") or "").lower()
+    if dialect == "sqlite":
+        rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+        return any(row[1] == column for row in rows)
+    found = conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = :table AND column_name = :column"
+        ),
+        {"table": table, "column": column},
+    ).fetchone()
+    return found is not None
+
+
+def _crypto():
+    from app.security import field_crypto
+
+    return field_crypto
+
+
+def _stored_id(value: Optional[str], context: str) -> Optional[str]:
+    """Identificador como está na coluna: claro, ou índice cego se a chave existe."""
+    if value is None or value == "":
+        return None
+    crypto = _crypto()
+    if not crypto.is_enabled() or crypto.is_blind_index(value):
+        return value
+    return crypto.blind_index(value, context=context)
+
+
+def _id_pair(value: Optional[str], context: str) -> Tuple[Optional[str], Optional[str]]:
+    """(valor legado em claro, forma gravada). Iguais quando a cifra está desligada.
+
+    Se ``value`` já é índice cego, os dois lados batem na coluna — não re-hash.
+    """
+    if value is None:
+        return None, None
+    crypto = _crypto()
+    if not crypto.is_enabled() or crypto.is_blind_index(value):
+        return value, value
+    return value, crypto.blind_index(value, context=context)
+
+
+def _open_stored_json(value: Any, *, aad: str) -> Dict[str, Any]:
+    opened = _crypto().open_json_value(_load_json(value), aad=aad)
+    if isinstance(opened, dict):
+        return opened
+    return {}
 
 
 def database_url() -> str:
@@ -209,10 +272,104 @@ def _sqlite_add_missing_columns(conn) -> None:
         conn.execute(text("ALTER TABLE wearable_readings ADD COLUMN reported_patient_id TEXT"))
 
 
+# No Postgres, ADD COLUMN IF NOT EXISTS e CREATE INDEX IF NOT EXISTS
+# tomam trava mesmo quando o objeto já existe. O boot só emite o DDL
+# se o catálogo ainda não tem a coluna, o índice ou a tabela.
+# lock_timeout curto: se ainda assim precisar da trava, desiste em vez
+# de enfileirar o tráfego atrás de um ACCESS EXCLUSIVE.
+_BOOT_LOCK_TIMEOUT = "2s"
+_CREATE_TABLE_RE = re.compile(
+    r"^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?P<table>[A-Za-z_][A-Za-z0-9_]*)\b",
+    re.IGNORECASE,
+)
+_ADD_COLUMN_RE = re.compile(
+    r"^ALTER\s+TABLE\s+(?:ONLY\s+)?(?P<table>[A-Za-z_][A-Za-z0-9_]*)\s+"
+    r"ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?(?P<column>[A-Za-z_][A-Za-z0-9_]*)\b",
+    re.IGNORECASE,
+)
+_CREATE_INDEX_RE = re.compile(
+    r"^CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?"
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b",
+    re.IGNORECASE,
+)
+
+
+def _sql_one_line(statement: str) -> str:
+    return " ".join(statement.split())
+
+
+def _column_exists(conn, table: str, column: str) -> bool:
+    dialect = (getattr(getattr(conn, "dialect", None), "name", "") or "").lower()
+    if dialect == "sqlite":
+        rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+        return any(row[1] == column for row in rows)
+    found = conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema = current_schema() "
+            "AND table_name = :table AND column_name = :column"
+        ),
+        {"table": table, "column": column},
+    ).fetchone()
+    return found is not None
+
+
+def _table_exists(conn, table: str) -> bool:
+    dialect = (getattr(getattr(conn, "dialect", None), "name", "") or "").lower()
+    if dialect == "sqlite":
+        row = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name"),
+            {"name": table},
+        ).fetchone()
+        return row is not None
+    row = conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :name"
+        ),
+        {"name": table},
+    ).fetchone()
+    return row is not None
+
+
+def _index_exists(conn, name: str) -> bool:
+    dialect = (getattr(getattr(conn, "dialect", None), "name", "") or "").lower()
+    if dialect == "sqlite":
+        row = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = :name"),
+            {"name": name},
+        ).fetchone()
+        return row is not None
+    row = conn.execute(
+        text(
+            "SELECT 1 FROM pg_indexes "
+            "WHERE schemaname = current_schema() AND indexname = :name"
+        ),
+        {"name": name},
+    ).fetchone()
+    return row is not None
+
+
+def migration_statement_skippable(conn, statement: str) -> bool:
+    """True quando o DDL já está aplicado e reemitir pediria trava à toa."""
+    normalized = _sql_one_line(statement)
+    created = _CREATE_TABLE_RE.match(normalized)
+    if created:
+        return _table_exists(conn, created.group("table"))
+    added = _ADD_COLUMN_RE.match(normalized)
+    if added:
+        return _column_exists(conn, added.group("table"), added.group("column"))
+    index = _CREATE_INDEX_RE.match(normalized)
+    if index:
+        return _index_exists(conn, index.group("name"))
+    return False
+
+
 def apply_schema(engine: Optional[Engine] = None) -> str:
     """Aplica as migrações (001–004: leituras, rótulo, last vitals, overrides).
 
-    Tudo idempotente e aditivo. Retorna o dialeto.
+    Tudo idempotente e aditivo. No Postgres, coluna/índice/tabela que já
+    existem não são reemitidos (evita ACCESS EXCLUSIVE no boot). Retorna o dialeto.
     """
     engine = engine or _require_engine()
     dialect = _dialect_name(engine)
@@ -223,9 +380,14 @@ def apply_schema(engine: Optional[Engine] = None) -> str:
                     conn.execute(text(stmt))
                 _sqlite_add_missing_columns(conn)
             else:
+                conn.execute(text(f"SET LOCAL lock_timeout = '{_BOOT_LOCK_TIMEOUT}'"))
                 for name in MIGRATION_NAMES:
                     sql = migration_sql_path(name).read_text(encoding="utf-8")
                     for chunk in _split_sql(sql):
+                        if "CONCURRENTLY" in chunk.upper():
+                            continue
+                        if migration_statement_skippable(conn, chunk):
+                            continue
                         conn.execute(text(chunk))
     except DurableStoreUnavailable:
         raise
@@ -313,9 +475,7 @@ def _load_json(value: Any) -> Any:
 
 def _row_frame(row: Any) -> Dict[str, Any]:
     mapping = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
-    frame = _load_json(mapping.get("frame"))
-    if not isinstance(frame, dict):
-        frame = {}
+    frame = _open_stored_json(mapping.get("frame"), aad="wearable.frame")
     out = dict(frame)
     out.setdefault("reading_id", mapping.get("reading_id"))
     out.setdefault("patient_id", mapping.get("patient_id"))
@@ -326,7 +486,7 @@ def _row_frame(row: Any) -> Dict[str, Any]:
         out.setdefault("client_reading_id", mapping.get("client_reading_id"))
     if mapping.get("metric_type"):
         out.setdefault("metric_type", mapping.get("metric_type"))
-    extra = _load_json(mapping.get("extra"))
+    extra = _open_stored_json(mapping.get("extra"), aad="wearable.extra")
     if extra and "extra" not in out:
         out["extra"] = extra
     label = _row_device_label(mapping, frame, extra)
@@ -393,29 +553,35 @@ def _select_by_keys(
     natural_measured_at: Optional[datetime],
     natural_metric_type: Optional[str],
 ) -> Optional[Dict[str, Any]]:
+    plain_pid, blind_pid = _id_pair(patient_id, "patient_id")
+    plain_npid, blind_npid = _id_pair(natural_patient_id, "patient_id")
+    plain_ndid, blind_ndid = _id_pair(natural_device_id, "device_id")
     params: Dict[str, Any] = {
-        "patient_id": patient_id,
+        "patient_id": plain_pid,
+        "patient_id_bidx": blind_pid,
         "client_reading_id": client_reading_id,
         "idempotency_key": idempotency_key,
-        "natural_patient_id": natural_patient_id,
-        "natural_device_id": natural_device_id,
+        "natural_patient_id": plain_npid,
+        "natural_patient_id_bidx": blind_npid,
+        "natural_device_id": plain_ndid,
+        "natural_device_id_bidx": blind_ndid,
         "natural_measured_at": natural_measured_at,
         "natural_metric_type": natural_metric_type,
     }
+    # OR cobre linha legada (id em claro) e linha nova (índice cego).
+    patient_match = "(patient_id = :patient_id OR patient_id = :patient_id_bidx)"
     where = []
     if client_reading_id:
-        where.append(
-            "(patient_id = :patient_id AND client_reading_id = :client_reading_id)"
-        )
+        where.append(f"({patient_match} AND client_reading_id = :client_reading_id)")
     if idempotency_key:
-        where.append(
-            "(patient_id = :patient_id AND idempotency_key = :idempotency_key)"
-        )
+        where.append(f"({patient_match} AND idempotency_key = :idempotency_key)")
     if natural_measured_at and natural_patient_id and natural_device_id and natural_metric_type:
         where.append(
             "("
-            "natural_patient_id = :natural_patient_id "
-            "AND natural_device_id = :natural_device_id "
+            "(natural_patient_id = :natural_patient_id "
+            "OR natural_patient_id = :natural_patient_id_bidx) "
+            "AND (natural_device_id = :natural_device_id "
+            "OR natural_device_id = :natural_device_id_bidx) "
             "AND natural_measured_at = :natural_measured_at "
             "AND natural_metric_type = :natural_metric_type"
             ")"
@@ -529,25 +695,27 @@ def upsert_reading(
     stored["metric_type"] = metric
     value, unit = _value_and_unit(stored, extra, metric)
     now = datetime.now(timezone.utc)
+    crypto = _crypto()
+    encrypting = crypto.is_enabled()
     params = {
         "reading_id": stored["reading_id"],
-        "patient_id": patient_id,
-        "device_id": device_id,
+        "patient_id": _stored_id(patient_id, "patient_id"),
+        "device_id": _stored_id(device_id, "device_id"),
         "device_label": label,
-        "reported_patient_id": reported,
+        "reported_patient_id": _stored_id(reported, "patient_id") if reported else None,
         "metric_type": metric,
-        "value": value,
+        "value": None if encrypting else value,
         "unit": unit,
         "measured_at": measured,
         "received_at": received,
         "client_reading_id": cid,
         "idempotency_key": hid,
-        "natural_patient_id": patient_id if measured else None,
-        "natural_device_id": device_id if measured else None,
+        "natural_patient_id": _stored_id(patient_id, "patient_id") if measured else None,
+        "natural_device_id": _stored_id(device_id, "device_id") if measured else None,
         "natural_measured_at": measured,
         "natural_metric_type": metric if measured else None,
-        "extra": json.dumps(extra, default=str),
-        "frame": json.dumps(stored, default=str),
+        "extra": crypto.seal_json(extra, aad="wearable.extra"),
+        "frame": crypto.seal_json(stored, aad="wearable.frame"),
         "created_at": now,
     }
     try:
@@ -576,6 +744,21 @@ def upsert_reading(
             RETURNING reading_id
         """
         with engine.begin() as conn:
+            if encrypting:
+                # O índice único não casa id em claro com índice cego.
+                # A busca OR evita duplicar a leitura legada na virada da chave.
+                existing = _select_by_keys(
+                    conn,
+                    patient_id,
+                    client_reading_id=cid,
+                    idempotency_key=hid,
+                    natural_patient_id=patient_id if measured else None,
+                    natural_device_id=device_id if measured else None,
+                    natural_measured_at=measured,
+                    natural_metric_type=metric if measured else None,
+                )
+                if existing is not None:
+                    return existing, "duplicate"
             inserted = conn.execute(text(insert_sql), params).fetchone()
             if inserted is None:
                 existing = _select_by_keys(
@@ -605,14 +788,17 @@ def get_latest(patient_id: str) -> Optional[Dict[str, Any]]:
     sql = """
         SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
-        WHERE patient_id = :patient_id
+        WHERE patient_id = :patient_id OR patient_id = :patient_id_bidx
         ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC, created_at DESC
         LIMIT 1
     """
+    plain, blind = _id_pair(patient_id, "patient_id")
     try:
         engine = _require_engine()
         with engine.connect() as conn:
-            row = conn.execute(text(sql), {"patient_id": patient_id}).fetchone()
+            row = conn.execute(
+                text(sql), {"patient_id": plain, "patient_id_bidx": blind}
+            ).fetchone()
         return _row_frame(row) if row else None
     except DurableStoreUnavailable:
         raise
@@ -624,15 +810,17 @@ def get_history(patient_id: str, limit: int = 20) -> List[Dict[str, Any]]:
     sql = """
         SELECT reading_id, patient_id, device_id, device_label, metric_type, client_reading_id, extra, frame
         FROM wearable_readings
-        WHERE patient_id = :patient_id
+        WHERE patient_id = :patient_id OR patient_id = :patient_id_bidx
         ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC, created_at DESC
         LIMIT :limit
     """
+    plain, blind = _id_pair(patient_id, "patient_id")
     try:
         engine = _require_engine()
         with engine.connect() as conn:
             rows = conn.execute(
-                text(sql), {"patient_id": patient_id, "limit": int(limit)}
+                text(sql),
+                {"patient_id": plain, "patient_id_bidx": blind, "limit": int(limit)},
             ).fetchall()
         frames = [_row_frame(row) for row in rows]
         frames.reverse()
@@ -666,9 +854,107 @@ def _frame_last_vitals(frame: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _seal_optional_vital(value: Any, aad: str) -> Optional[str]:
+    if value is None:
+        return None
+    return _crypto().protect(str(value), aad=aad)
+
+
+def _open_optional_vital(enc: Any, plain: Any, aad: str) -> Any:
+    if enc and _crypto().is_enabled():
+        opened = _crypto().open_text(str(enc), aad=aad)
+        try:
+            return float(opened)
+        except (TypeError, ValueError):
+            return None
+    return plain
+
+
+def _upsert_device_last_vitals_sealed(conn, device_id: str, frame: Dict[str, Any]) -> None:
+    """Grava vitais em ``*_enc`` e zera o DOUBLE quando a migração 005 existe."""
+    vitals = _frame_last_vitals(frame)
+    if not device_id:
+        return
+    params = {
+        "device_id": device_id,
+        "updated_at": datetime.now(timezone.utc),
+        "last_spo2_at": vitals["last_spo2_at"],
+        "last_steps_at": vitals["last_steps_at"],
+        "last_bp_at": vitals["last_bp_at"],
+        "spo2_enc": _seal_optional_vital(vitals["spo2"], "vitals.spo2"),
+        "steps_enc": _seal_optional_vital(vitals["steps"], "vitals.steps"),
+        "blood_pressure_sys_enc": _seal_optional_vital(
+            vitals["blood_pressure_sys"], "vitals.blood_pressure_sys"
+        ),
+        "blood_pressure_dia_enc": _seal_optional_vital(
+            vitals["blood_pressure_dia"], "vitals.blood_pressure_dia"
+        ),
+    }
+    conn.execute(
+        text(
+            """
+            INSERT INTO wearable_device_last_vitals (
+                device_id, spo2, last_spo2_at, steps, last_steps_at,
+                blood_pressure_sys, blood_pressure_dia, last_bp_at, updated_at,
+                spo2_enc, steps_enc, blood_pressure_sys_enc, blood_pressure_dia_enc
+            ) VALUES (
+                :device_id, NULL, :last_spo2_at, NULL, :last_steps_at,
+                NULL, NULL, :last_bp_at, :updated_at,
+                :spo2_enc, :steps_enc, :blood_pressure_sys_enc, :blood_pressure_dia_enc
+            )
+            ON CONFLICT (device_id) DO UPDATE SET
+                spo2_enc = COALESCE(EXCLUDED.spo2_enc, wearable_device_last_vitals.spo2_enc),
+                spo2 = CASE
+                    WHEN COALESCE(EXCLUDED.spo2_enc, wearable_device_last_vitals.spo2_enc) IS NOT NULL
+                    THEN NULL ELSE wearable_device_last_vitals.spo2 END,
+                last_spo2_at = CASE
+                    WHEN EXCLUDED.spo2_enc IS NOT NULL THEN EXCLUDED.last_spo2_at
+                    ELSE wearable_device_last_vitals.last_spo2_at END,
+                steps_enc = COALESCE(EXCLUDED.steps_enc, wearable_device_last_vitals.steps_enc),
+                steps = CASE
+                    WHEN COALESCE(EXCLUDED.steps_enc, wearable_device_last_vitals.steps_enc) IS NOT NULL
+                    THEN NULL ELSE wearable_device_last_vitals.steps END,
+                last_steps_at = CASE
+                    WHEN EXCLUDED.steps_enc IS NOT NULL THEN EXCLUDED.last_steps_at
+                    ELSE wearable_device_last_vitals.last_steps_at END,
+                blood_pressure_sys_enc = COALESCE(
+                    EXCLUDED.blood_pressure_sys_enc, wearable_device_last_vitals.blood_pressure_sys_enc
+                ),
+                blood_pressure_dia_enc = COALESCE(
+                    EXCLUDED.blood_pressure_dia_enc, wearable_device_last_vitals.blood_pressure_dia_enc
+                ),
+                blood_pressure_sys = CASE
+                    WHEN COALESCE(
+                        EXCLUDED.blood_pressure_sys_enc,
+                        wearable_device_last_vitals.blood_pressure_sys_enc
+                    ) IS NOT NULL THEN NULL
+                    ELSE wearable_device_last_vitals.blood_pressure_sys END,
+                blood_pressure_dia = CASE
+                    WHEN COALESCE(
+                        EXCLUDED.blood_pressure_dia_enc,
+                        wearable_device_last_vitals.blood_pressure_dia_enc
+                    ) IS NOT NULL THEN NULL
+                    ELSE wearable_device_last_vitals.blood_pressure_dia END,
+                last_bp_at = CASE
+                    WHEN EXCLUDED.blood_pressure_sys_enc IS NOT NULL
+                     AND EXCLUDED.blood_pressure_dia_enc IS NOT NULL
+                    THEN EXCLUDED.last_bp_at
+                    ELSE wearable_device_last_vitals.last_bp_at END,
+                updated_at = EXCLUDED.updated_at
+            """
+        ),
+        params,
+    )
+
+
 def _upsert_device_last_vitals(
     conn, device_id: str, frame: Dict[str, Any], dialect: str
 ) -> None:
+    if _crypto().is_enabled() and table_has_column(
+        conn, "wearable_device_last_vitals", "spo2_enc"
+    ):
+        _upsert_device_last_vitals_sealed(conn, device_id, frame)
+        return
     vitals = _frame_last_vitals(frame)
     if not device_id:
         return
@@ -719,15 +1005,22 @@ def _upsert_device_last_vitals(
 
 def list_device_last_vitals() -> Dict[str, Dict[str, Any]]:
     """Snapshot compacto (uma linha por device) para merge na frota."""
-    sql = """
-        SELECT device_id, spo2, last_spo2_at, steps, last_steps_at,
-               blood_pressure_sys, blood_pressure_dia, last_bp_at
-        FROM wearable_device_last_vitals
-    """
+    base = (
+        "device_id, spo2, last_spo2_at, steps, last_steps_at, "
+        "blood_pressure_sys, blood_pressure_dia, last_bp_at"
+    )
     try:
         engine = _require_engine()
         with engine.connect() as conn:
-            rows = conn.execute(text(sql)).fetchall()
+            sealed = table_has_column(conn, "wearable_device_last_vitals", "spo2_enc")
+            columns = base
+            if sealed:
+                columns += (
+                    ", spo2_enc, steps_enc, blood_pressure_sys_enc, blood_pressure_dia_enc"
+                )
+            rows = conn.execute(
+                text(f"SELECT {columns} FROM wearable_device_last_vitals")
+            ).fetchall()
     except DurableStoreUnavailable:
         raise
     except SQLAlchemyError as exc:
@@ -740,12 +1033,24 @@ def list_device_last_vitals() -> Dict[str, Dict[str, Any]]:
             continue
         out[device_id] = {
             "device_id": device_id,
-            "spo2": mapping.get("spo2"),
+            "spo2": _open_optional_vital(
+                mapping.get("spo2_enc"), mapping.get("spo2"), "vitals.spo2"
+            ),
             "last_spo2_at": mapping.get("last_spo2_at"),
-            "steps": mapping.get("steps"),
+            "steps": _open_optional_vital(
+                mapping.get("steps_enc"), mapping.get("steps"), "vitals.steps"
+            ),
             "last_steps_at": mapping.get("last_steps_at"),
-            "blood_pressure_sys": mapping.get("blood_pressure_sys"),
-            "blood_pressure_dia": mapping.get("blood_pressure_dia"),
+            "blood_pressure_sys": _open_optional_vital(
+                mapping.get("blood_pressure_sys_enc"),
+                mapping.get("blood_pressure_sys"),
+                "vitals.blood_pressure_sys",
+            ),
+            "blood_pressure_dia": _open_optional_vital(
+                mapping.get("blood_pressure_dia_enc"),
+                mapping.get("blood_pressure_dia"),
+                "vitals.blood_pressure_dia",
+            ),
             "last_bp_at": mapping.get("last_bp_at"),
         }
     return out
@@ -761,6 +1066,8 @@ def _latest_valid_vital_frame(conn, device_id: str, raw_key: str) -> Optional[Di
     allowed = {"spo2_percent", "steps", "blood_pressure_sys", "blood_pressure_dia"}
     if raw_key not in allowed:
         return None
+    if _crypto().is_enabled():
+        return _latest_vital_opened(conn, device_id, raw_key)
     dialect = _dialect_name(_require_engine())
     if dialect == "sqlite":
         path = "$.raw_telemetry." + raw_key
@@ -790,6 +1097,32 @@ def _latest_valid_vital_frame(conn, device_id: str, raw_key: str) -> Optional[Di
         )
         row = conn.execute(sql, {"device_id": device_id, "raw_key": raw_key}).fetchone()
     return _row_frame(row) if row else None
+
+
+def _latest_vital_opened(conn, device_id: str, raw_key: str) -> Optional[Dict[str, Any]]:
+    """Último frame com o vital, abrindo ciphertext. O JSON path não enxerga ``_enc``."""
+    plain, blind = _id_pair(device_id, "device_id")
+    rows = conn.execute(
+        text(
+            """
+            SELECT reading_id, patient_id, device_id, device_label, metric_type,
+                   client_reading_id, extra, frame, received_at, measured_at
+            FROM wearable_readings
+            WHERE device_id = :plain OR device_id = :blind
+            ORDER BY COALESCE(measured_at, received_at) DESC, received_at DESC
+            LIMIT 400
+            """
+        ),
+        {"plain": plain, "blind": blind},
+    ).fetchall()
+    for row in rows:
+        frame = _row_frame(row)
+        raw = frame.get("raw_telemetry") if isinstance(frame.get("raw_telemetry"), dict) else {}
+        val = raw.get(raw_key)
+        if val is None or (isinstance(val, str) and not str(val).strip()):
+            continue
+        return frame
+    return None
 
 
 def backfill_device_last_vitals(*, force: bool = False) -> int:
@@ -878,31 +1211,63 @@ def list_frames() -> List[Dict[str, Any]]:
         raise DurableStoreUnavailable(str(exc)) from exc
 
 
-_PG_LATEST_BY_DEVICE = """
+# Só o id da última leitura por device. Não lista frame nem extra:
+# o ciphertext está em TOAST e detoastar a tabela inteira derruba o f1-micro.
+# A ordem casa com ix_wearable_readings_device_latest (migração 006, fora do boot).
+_PG_LATEST_IDS_BY_DEVICE = """
     SELECT DISTINCT ON (device_id)
-        reading_id, patient_id, device_id, device_label, metric_type,
-        client_reading_id, extra, frame
+        reading_id, device_id
     FROM wearable_readings
     ORDER BY device_id, COALESCE(measured_at, received_at) DESC, received_at DESC
 """
 
+_PG_FRAMES_BY_IDS = """
+    SELECT reading_id, patient_id, device_id, device_label, metric_type,
+           client_reading_id, extra, frame
+    FROM wearable_readings
+    WHERE reading_id = ANY(:reading_ids)
+"""
+
+# Rótulo só da coluna. extra->>'device_label' obrigaria a abrir o TOAST de todas as linhas.
 _PG_LATEST_LABEL_BY_DEVICE = """
     SELECT DISTINCT ON (device_id)
-        device_id, COALESCE(device_label, extra->>'device_label') AS device_label
+        device_id, device_label
     FROM wearable_readings
-    WHERE device_label IS NOT NULL OR extra->>'device_label' IS NOT NULL
+    WHERE device_label IS NOT NULL
     ORDER BY device_id, COALESCE(measured_at, received_at) DESC, received_at DESC
 """
+
+
+def _frames_by_ids_statement():
+    return text(_PG_FRAMES_BY_IDS).bindparams(
+        bindparam("reading_ids", type_=ARRAY(String()))
+    )
 
 
 def _pg_latest_frames_by_device(engine: Engine) -> List[Dict[str, Any]]:
-    """Uma linha por device no próprio Postgres (sem trazer a tabela inteira)."""
+    """Uma linha por device: ids pelo índice, frame só desses ids."""
     from app.models.schemas import normalize_device_label
 
     with engine.connect() as conn:
-        rows = conn.execute(text(_PG_LATEST_BY_DEVICE)).fetchall()
+        id_rows = conn.execute(text(_PG_LATEST_IDS_BY_DEVICE)).fetchall()
+        ids = []
+        for row in id_rows:
+            mapping = dict(row._mapping)
+            reading_id = mapping.get("reading_id")
+            if reading_id:
+                ids.append(reading_id)
+        if not ids:
+            return []
+        rows = conn.execute(
+            _frames_by_ids_statement(), {"reading_ids": ids}
+        ).fetchall()
         label_rows = conn.execute(text(_PG_LATEST_LABEL_BY_DEVICE)).fetchall()
-    frames = [_row_frame(row) for row in rows]
+    # A chave do mapa é o device_id da COLUNA (claro ou índice cego).
+    # O frame aberto devolve o id original; casar os dois quebraria o rótulo.
+    paired: List[Tuple[str, Dict[str, Any]]] = []
+    for row in rows:
+        mapping = dict(row._mapping)
+        paired.append((str(mapping.get("device_id") or ""), _row_frame(row)))
     labels: Dict[str, str] = {}
     for row in label_rows:
         mapping = dict(row._mapping)
@@ -912,10 +1277,12 @@ def _pg_latest_frames_by_device(engine: Engine) -> List[Dict[str, Any]]:
             label = None
         if label:
             labels[str(mapping.get("device_id"))] = label
-    for frame in frames:
-        label = labels.get(str(frame.get("device_id")))
+    frames = []
+    for storage_id, frame in paired:
+        label = labels.get(storage_id)
         if label:
             frame["device_label"] = label
+        frames.append(frame)
     frames.sort(key=lambda f: str(f.get("timestamp") or ""), reverse=True)
     return frames
 
@@ -969,11 +1336,11 @@ def iter_patients(limit_per_patient: int = 50) -> Dict[str, List[Dict[str, Any]]
             rows = conn.execute(text(sql)).fetchall()
         grouped: Dict[str, List[Dict[str, Any]]] = {}
         for row in rows:
-            mapping = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
-            pid = str(mapping.get("patient_id") or "")
+            frame = _row_frame(row)
+            pid = str(frame.get("patient_id") or "")
             if not pid:
                 continue
-            grouped.setdefault(pid, []).append(_row_frame(row))
+            grouped.setdefault(pid, []).append(frame)
         for pid, frames in list(grouped.items()):
             if len(frames) > limit_per_patient:
                 grouped[pid] = frames[-limit_per_patient:]
@@ -985,12 +1352,16 @@ def iter_patients(limit_per_patient: int = 50) -> Dict[str, List[Dict[str, Any]]
 
 
 def anonymize_patient(patient_id: str) -> bool:
+    plain, blind = _id_pair(patient_id, "patient_id")
     try:
         engine = _require_engine()
         with engine.begin() as conn:
             result = conn.execute(
-                text("DELETE FROM wearable_readings WHERE patient_id = :patient_id"),
-                {"patient_id": patient_id},
+                text(
+                    "DELETE FROM wearable_readings "
+                    "WHERE patient_id = :patient_id OR patient_id = :patient_id_bidx"
+                ),
+                {"patient_id": plain, "patient_id_bidx": blind},
             )
         return bool(result.rowcount)
     except DurableStoreUnavailable:

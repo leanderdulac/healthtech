@@ -64,6 +64,47 @@ def _database_url() -> str:
     return (os.getenv("DATABASE_URL") or os.getenv("OPERATIONAL_DATABASE_URL") or "").strip()
 
 
+_LOCAL_DB_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+_STRONG_SSLMODES = frozenset({"require", "verify-ca", "verify-full"})
+
+
+def ensure_database_sslmode(url: str) -> str:
+    """Garante TLS na ida ao Postgres remoto.
+
+    - ``sslmode=require`` entra na URL se não houver modo forte.
+    - ``verify-ca`` e ``verify-full`` são mantidos.
+    - ``disable``, ``allow`` e ``prefer`` em host remoto sobem para ``require``.
+    - Socket Unix do Cloud SQL (``/cloudsql/``) e host local ficam como estão:
+      o socket não fala TLS; o túnel do connector é que protege o trecho.
+    """
+    raw = (url or "").strip()
+    if not raw.lower().startswith("postgres"):
+        return raw
+    if "/cloudsql/" in raw:
+        return raw
+    from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+    parsed = urlparse(raw)
+    host = (parsed.hostname or "").lower()
+    query_pairs = parse_qsl(parsed.query, keep_blank_values=True)
+    socket_host = ""
+    current_mode = ""
+    for key, value in query_pairs:
+        if key == "host" and not socket_host:
+            socket_host = value
+        if key == "sslmode":
+            current_mode = (value or "").strip().lower()
+    if socket_host.startswith("/"):
+        return raw
+    if host in _LOCAL_DB_HOSTS:
+        return raw
+    if current_mode in _STRONG_SSLMODES:
+        return raw
+    kept = [(key, value) for key, value in query_pairs if key != "sslmode"]
+    kept.append(("sslmode", "require"))
+    return urlunparse(parsed._replace(query=urlencode(kept)))
+
+
 def _pool_int(name: str, default: int, lo: int, hi: int) -> int:
     raw = (os.getenv(name) or "").strip()
     try:
@@ -77,15 +118,18 @@ def get_engine():
     global _engine
     if _engine is not None:
         return _engine
-    url = _database_url()
+    url = ensure_database_sslmode(_database_url())
     if not url:
         return None
     from sqlalchemy import create_engine
 
     connect_args: Dict[str, Any] = {}
+    # A URL remota já sai de ensure_database_sslmode com sslmode forte.
+    # connect_args só cobre o caso em que a URL ainda não declara o modo
+    # (socket e localhost são isentos de propósito).
     if (
         url.startswith("postgresql")
-        and "sslmode=" not in url
+        and "sslmode=" not in url.lower()
         and "/cloudsql/" not in url
         and "localhost" not in url
         and "127.0.0.1" not in url
@@ -206,17 +250,51 @@ def _as_list(value: Any) -> List[Any]:
         return []
 
 
+def _open_enrollment_scalar(value: Any, field: str) -> Any:
+    """Abre um enc1:. Texto legado volta igual. Sem chave, falha fechado."""
+    if not isinstance(value, str) or not value.startswith("enc1:"):
+        return value
+    try:
+        from app.security.field_crypto import FieldCryptoError, open_text
+    except Exception as exc:
+        raise OperationalDbUnavailable(
+            "Cadastro cifrado, mas o módulo de criptografia não está disponível"
+        ) from exc
+    try:
+        return open_text(value, aad=field)
+    except FieldCryptoError as exc:
+        raise OperationalDbUnavailable(
+            "Falha ao abrir campo cifrado do cadastro"
+        ) from exc
+
+
+def _open_enrollment_field(value: Any, field: str) -> Any:
+    """Abre escalar ou cada elemento de um text[] (doenças).
+
+    Elemento em claro no meio de elementos enc1: continua legível.
+    """
+    if isinstance(value, (list, tuple)) and not isinstance(value, (str, bytes)):
+        return [_open_enrollment_scalar(item, field) for item in value]
+    return _open_enrollment_scalar(value, field)
+
+
 def _row_to_patient(row: Any) -> Dict[str, Any]:
     mapping = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
     created = mapping.get("created_at")
     updated = mapping.get("updated_at")
     return {
         "patient_id": mapping.get("patient_id"),
-        "display_name": mapping.get("display_name"),
-        "phone": mapping.get("phone"),
-        "caregiver_phone": mapping.get("caregiver_phone"),
+        "display_name": _open_enrollment_field(
+            mapping.get("display_name"), "enrollment.display_name"
+        ),
+        "phone": _open_enrollment_field(mapping.get("phone"), "enrollment.phone"),
+        "caregiver_phone": _open_enrollment_field(
+            mapping.get("caregiver_phone"), "enrollment.caregiver_phone"
+        ),
         "programs": _as_list(mapping.get("programs")),
-        "diseases": _as_list(mapping.get("diseases")),
+        "diseases": _as_list(
+            _open_enrollment_field(mapping.get("diseases"), "enrollment.diseases")
+        ),
         "isolation_social": bool(mapping.get("isolation_social")),
         "is_demo": bool(mapping.get("is_demo")),
         "municipality_id": mapping.get("municipality_id"),
